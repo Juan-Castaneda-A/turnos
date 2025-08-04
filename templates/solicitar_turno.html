@@ -1,0 +1,30 @@
+<!-- templates/solicitar_turno.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitar Turno</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>Bienvenido a la Notaría Tercera</h1>
+    <p>Por favor, seleccione su tipo de trámite:</p>
+    <form action="{{ url_for('solicitar_turno_action') }}" method="post">
+        {% for servicio in servicios %}
+            <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}">
+                {{ servicio.nombre_servicio }}
+            </button>
+        {% endfor %}
+    </form>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+</body>
+</html>
