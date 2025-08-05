@@ -203,7 +203,6 @@
 
     <script type="module">
         // Importar el cliente de Supabase
-        // Usando cdn.jsdelivr.net para una importación más estable del paquete ESM
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
         // Variables de configuración (pasadas desde Flask)
@@ -216,16 +215,6 @@
         console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
         console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
 
-        // DEBUG: Inspeccionar el objeto retornado por supabase.from()
-        let testFromObject;
-        try {
-            testFromObject = supabase.from('turnos');
-            console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
-            console.log("¿Existe testFromObject.on?", typeof testFromObject.on); // ESTO DEBERÍA SER 'function'
-        } catch (e) {
-            console.error("Error al intentar llamar supabase.from('turnos'):", e);
-        }
-
         // Referencias a los elementos del DOM
         const currentTurnNumberElement = document.getElementById('current-turn-number');
         const currentTurnModuleElement = document.getElementById('current-turn-module');
@@ -236,6 +225,14 @@
 
         let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples veces para el mismo turno
 
+        let audioEnabled = false;
+
+        document.addEventListener('click', () => {
+            audioEnabled = true;
+            // Intentar reproducir el sonido para "desbloquear" el audio
+            callSound.play().then(() => callSound.pause()).catch(e => console.log(e));
+        }, { once: true });
+
         // Función para actualizar el display del turno actual
         async function updateCurrentTurnDisplay(turn) {
             if (turn) {
@@ -243,7 +240,10 @@
                 currentTurnModuleElement.textContent = `Diríjase a la Ventanilla ${turn.modulos.nombre_modulo.split(' ')[1]}`;
 
                 // Reproducir sonido si es un nuevo turno llamado
-                if (turn.id_turno !== lastCalledTurnId) {
+                if (turn.id_turno !== lastCalledTurnId && audioEnabled) {
+                    // La reproducción automática de audio está bloqueada por los navegadores
+                    // hasta que el usuario interactúe con el documento.
+                    // El sonido se intentará reproducir, pero podría fallar si no hay interacción previa.
                     callSound.play().catch(e => console.error("Error al reproducir sonido:", e));
                     lastCalledTurnId = turn.id_turno;
 
@@ -279,7 +279,7 @@
         }
 
         // Función para actualizar el estado de los módulos
-        function updateModulesStatus(modules) {
+        async function updateModulesStatus(modules) {
             modulesStatusBodyElement.innerHTML = ''; // Limpiar la tabla actual
             if (modules.length === 0) {
                 modulesStatusBodyElement.innerHTML = `
@@ -289,18 +289,39 @@
                 `;
                 return;
             }
+            /*
+            // Obtener todos los usuarios para mapear ID a nombre
+            let allUsers = {};
+            try {
+                const { data: users, error: usersError } = await supabase
+                    .from('usuarios')
+                    .select('id_usuario, nombre_completo');
+                if (usersError) throw usersError;
+                users.forEach(user => {
+                    allUsers[user.id_usuario] = user.nombre_completo;
+                });
+            } catch (error) {
+                console.error("Error al cargar todos los usuarios para el estado de módulos:", error.message);
+                // Continuar sin nombres de usuario si hay un error
+            }*/
+
             modules.forEach(mod => {
                 const tr = document.createElement('tr');
                 let statusClass = '';
                 let statusText = '';
                 let currentTurnInfo = '';
-
+                
+                // Obtener el nombre del funcionario asignado (si existe)
+        const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0 
+            ? mod.usuarios[0].nombre_completo 
+            : 'Sin Asignar';
+                // Filtrar turnos para mostrar solo el que está 'en atencion' por ese módulo
+                const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
                 switch (mod.estado) {
                     case 'activo':
                         statusClass = 'status-available';
                         statusText = 'Disponible';
-                        if (mod.turnos && mod.turnos.length > 0) {
-                            const currentTurn = mod.turnos[0]; // Asumiendo que el primer turno es el actual
+                        if (currentTurn) {
                             statusClass = 'status-attending';
                             statusText = 'Atendiendo';
                             currentTurnInfo = `Turno: ${currentTurn.prefijo_turno}-${String(currentTurn.numero_turno).padStart(3, '0')}`;
@@ -317,7 +338,7 @@
 
                 tr.innerHTML = `
                     <td>${mod.nombre_modulo}</td>
-                    <td>${mod.usuarios ? mod.usuarios.nombre_completo : 'Sin Asignar'}</td>
+                    <td>${funcionarioNombre}</td>
                     <td class="${statusClass}">${statusText} ${currentTurnInfo}</td>
                 `;
                 modulesStatusBodyElement.appendChild(tr);
@@ -327,42 +348,46 @@
         // --- Suscripciones en tiempo real a Supabase ---
 
         function setupRealtimeSubscriptions() {
-            // Verifica que supabase.from().on exista antes de suscribirse
-            if (supabase.from('turnos') && typeof supabase.from('turnos').on === 'function') {
-                supabase
-                    .from('turnos')
-                    .on('*', async payload => {
+            // Suscribirse a cambios en la tabla 'turnos'
+            const turnosChannel = supabase.channel('turnos_channel');
+            turnosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'turnos' },
+                    async payload => {
                         console.log('Cambio en turnos recibido en visualizador!', payload);
                         await loadInitialData();
-                    })
-                    .subscribe();
-            } else {
-                console.error("Error: supabase.from('turnos').on no es una función. Las suscripciones en tiempo real no funcionarán.");
-            }
+                    }
+                )
+                .subscribe();
 
-            if (supabase.from('modulos') && typeof supabase.from('modulos').on === 'function') {
-                supabase
-                    .from('modulos')
-                    .on('*', async payload => {
+            // Suscribirse a cambios en la tabla 'modulos'
+            const modulosChannel = supabase.channel('modulos_channel');
+            modulosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'modulos' },
+                    async payload => {
                         console.log('Cambio en modulos recibido en visualizador!', payload);
                         await loadInitialData();
-                    })
-                    .subscribe();
-            } else {
-                console.warn("Advertencia: supabase.from('modulos').on no es una función. Los cambios de módulos no se actualizarán en tiempo real.");
-            }
+                    }
+                )
+                .subscribe();
 
-            if (supabase.from('usuarios') && typeof supabase.from('usuarios').on === 'function') {
-                supabase
-                    .from('usuarios')
-                    .on('*', async payload => {
+            // Suscribirse a cambios en la tabla 'usuarios' (para nombres de funcionarios)
+            const usuariosChannel = supabase.channel('usuarios_channel');
+            usuariosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'usuarios' },
+                    async payload => {
                         console.log('Cambio en usuarios recibido en visualizador!', payload);
                         await loadInitialData();
-                    })
-                    .subscribe();
-            } else {
-                console.warn("Advertencia: supabase.from('usuarios').on no es una función. Los cambios de usuarios no se actualizarán en tiempo real.");
-            }
+                    }
+                )
+                .subscribe();
+
+            console.log("Suscripciones Realtime configuradas.");
         }
 
 
@@ -391,15 +416,15 @@
                 if (historyError) throw historyError;
                 updateCallHistory(historyData || []);
 
-                // 3. Cargar el estado de todos los módulos, incluyendo el turno actual y el funcionario
+                // 3. Cargar el estado de todos los módulos, incluyendo el ID del funcionario asignado
                 const { data: modulesData, error: modulesError } = await supabase
-                    .from('modulos')
-                    .select(`
-                        *,
-                        usuarios(nombre_completo),
-                        turnos(id_turno, numero_turno, prefijo_turno, estado)
-                    `)
-                    .order('nombre_modulo', { ascending: true }); // Ordenar por nombre para consistencia
+    .from('modulos')
+    .select(`
+        *,
+        usuarios!usuarios_id_modulo_asignado_fkey(nombre_completo, id_usuario),
+        turnos(id_turno, numero_turno, prefijo_turno, estado)
+    `)
+    .order('nombre_modulo', { ascending: true }); // Ordenar por nombre para consistencia
 
                 if (modulesError) throw modulesError;
 
@@ -409,11 +434,9 @@
                     turnos: mod.turnos ? mod.turnos.filter(t => t.estado === 'en atencion') : []
                 }));
 
-                updateModulesStatus(processedModulesData || []);
-
+                await updateModulesStatus(processedModulesData || []); // Usar await aquí
             } catch (error) {
                 console.error('Error al cargar datos iniciales para el visualizador:', error.message);
-                // Aquí podrías mostrar un mensaje de error en la interfaz si es necesario
             }
         }
 
