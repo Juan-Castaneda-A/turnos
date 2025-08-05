@@ -1,0 +1,114 @@
+<!-- templates/funcionario_login.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notaría Tercera - Iniciar Sesión</title>
+    <!-- Carga de Tailwind CSS desde CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Fondo oscuro */
+            color: #e2e8f0; /* Texto claro */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+            overflow: hidden;
+        }
+        .login-container {
+            background-color: #2d3748; /* Fondo del contenedor de login */
+            border-radius: 1.5rem; /* Bordes redondeados */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2.5rem;
+            text-align: center;
+            max-width: 450px; /* Ancho máximo para el formulario */
+            width: 100%;
+            animation: fadeIn 0.8s ease-out; /* Animación de entrada */
+        }
+        .login-title {
+            font-size: 2.25rem; /* Título grande */
+            font-weight: 700;
+            color: #48bb78; /* Verde brillante */
+            margin-bottom: 2rem;
+            text-shadow: 0 0 8px rgba(72, 187, 120, 0.3);
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+            border-radius: 0.5rem;
+            border: 1px solid #4a5568; /* Borde sutil */
+            background-color: #4a5568; /* Fondo del input */
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #4299e1; /* Borde azul al enfocar */
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.5); /* Sombra de enfoque */
+        }
+        .login-button {
+            width: 100%;
+            padding: 1rem;
+            background-color: #4299e1; /* Azul vibrante */
+            color: white;
+            border-radius: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+            box-shadow: 0 5px 15px -3px rgba(66, 153, 225, 0.4);
+            cursor: pointer;
+            border: none;
+        }
+        .login-button:hover {
+            background-color: #3182ce; /* Azul más oscuro al pasar el ratón */
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px -5px rgba(66, 153, 225, 0.6);
+        }
+        .login-button:active {
+            transform: translateY(0);
+            box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Animación de entrada */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1 class="login-title">Iniciar Sesión - Notaría Tercera</h1>
+        <form action="{{ url_for('funcionario_login') }}" method="post">
+            <input type="text" name="username" placeholder="Nombre de Usuario" required class="form-input">
+            <input type="password" name="password" placeholder="Contraseña" required class="form-input">
+            <button type="submit" class="login-button">Entrar</button>
+        </form>
+
+        <!-- Mensajes flash para notificaciones -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="mt-6 space-y-3">
+            {% for category, message in messages %}
+              <div class="p-3 rounded-lg text-base font-semibold
+                          {% if category == 'success' %}bg-green-600 text-white
+                          {% elif category == 'warning' %}bg-yellow-500 text-gray-900
+                          {% elif category == 'error' %}bg-red-600 text-white
+                          {% elif category == 'info' %}bg-blue-600 text-white
+                          {% else %}bg-gray-700 text-white{% endif %}">
+                {{ message }}
+              </div>
+            {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

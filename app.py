@@ -50,17 +50,28 @@ def solicitar_turno_ui():
     Interfaz para que los clientes soliciten un turno desde la PC táctil.
     Aquí se mostrarán los botones de servicio.
     """
+    if supabase is None:
+        flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
+        return render_template('error.html', message="Problema de configuración del sistema.")
+
     try:
         # Obtener los servicios disponibles desde Supabase
-        # En un sistema real, esto debería ser más robusto con manejo de errores
         response = supabase.table('servicios').select('id_servicio, nombre_servicio, prefijo_ticket').execute()
-        servicios = response.data if response.data else []
-        logging.info(f"Servicios cargados para solicitar turno: {servicios}")
+        
+        if response.data:
+            servicios = response.data
+            logging.info(f"Servicios cargados para solicitar turno: {len(servicios)} servicios encontrados.")
+        else:
+            servicios = []
+            logging.warning("No se encontraron servicios en la base de datos.")
+            flash("No hay servicios configurados en este momento. Por favor, intente más tarde.", "warning")
+
         return render_template('solicitar_turno.html', servicios=servicios)
     except Exception as e:
         logging.error(f"Error al cargar servicios para solicitar turno: {e}")
-        flash("Error al cargar los servicios. Por favor, intente de nuevo más tarde.", "error")
+        flash(f"Error al cargar los servicios: {e}. Por favor, intente de nuevo más tarde.", "error")
         return render_template('error.html', message="No se pudieron cargar los servicios.")
+
 
 
 @app.route('/solicitar-turno', methods=['POST'])
@@ -69,19 +80,27 @@ def solicitar_turno_action():
     Maneja la lógica cuando un cliente solicita un turno.
     Aquí se crearía el turno en la base de datos y se activaría la impresión.
     """
+    if supabase is None:
+        flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
+        return redirect(url_for('solicitar_turno_ui'))
+
     id_servicio = request.form.get('id_servicio')
     if not id_servicio:
-        flash("Por favor, seleccione un servicio.", "warning")
+        flash("Por favor, seleccione un servicio válido.", "warning")
         return redirect(url_for('solicitar_turno_ui'))
 
     try:
         # Obtener el prefijo del servicio
         service_response = supabase.table('servicios').select('prefijo_ticket').eq('id_servicio', id_servicio).single().execute()
+        if not service_response.data:
+            flash("Servicio no encontrado o inválido.", "error")
+            return redirect(url_for('solicitar_turno_ui'))
         prefijo_ticket = service_response.data['prefijo_ticket']
 
         # Obtener el último número de turno para este prefijo y calcular el siguiente
-        # Esto es una simplificación. En producción, se necesitaría una lógica de secuencia más robusta
-        # para evitar colisiones en entornos concurrentes. Supabase puede ayudar con funciones de base de datos.
+        # IMPORTANTE: Esta lógica de secuencia es básica. Para producción, considera
+        # usar funciones de base de datos de Supabase o bloqueos transaccionales
+        # para evitar problemas de concurrencia en entornos de alto tráfico.
         last_turn_response = supabase.table('turnos') \
             .select('numero_turno') \
             .eq('prefijo_turno', prefijo_ticket) \
@@ -100,22 +119,21 @@ def solicitar_turno_action():
             'estado': 'en espera'
         }
         insert_response = supabase.table('turnos').insert(new_turn_data).execute()
-        logging.info(f"Nuevo turno creado: {insert_response.data}")
-
-        # Aquí se integraría la lógica para enviar la señal a la aplicación de escritorio
-        # para imprimir el ticket. Esto podría ser a través de una API interna o un mensaje.
-        # Por ahora, solo simularemos la impresión.
-        flash(f"¡Gracias! Su turno es {prefijo_ticket}-{nuevo_numero_turno:03d}. Por favor, tome su ticket impreso.", "success")
-        logging.info(f"Turno {prefijo_ticket}-{nuevo_numero_turno:03d} solicitado.")
-
-        # Redirigir de nuevo a la pantalla de solicitud después de un breve retraso o confirmación
-        return render_template('ticket_confirmacion.html',
-                               turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}",
-                               servicio_id=id_servicio)
+        
+        if insert_response.data:
+            logging.info(f"Nuevo turno creado: {insert_response.data[0]['prefijo_turno']}-{insert_response.data[0]['numero_turno']}")
+            # Aquí se integraría la lógica para enviar la señal a la aplicación de escritorio
+            # para imprimir el ticket.
+            return render_template('ticket_confirmacion.html',
+                                   turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}")
+        else:
+            flash("No se pudo crear el turno. Error desconocido.", "error")
+            logging.error(f"Error desconocido al insertar turno: {insert_response.error}")
+            return redirect(url_for('solicitar_turno_ui'))
 
     except Exception as e:
         logging.error(f"Error al solicitar turno: {e}")
-        flash("Error al procesar su solicitud de turno. Por favor, intente de nuevo.", "error")
+        flash(f"Error al procesar su solicitud de turno: {e}. Por favor, intente de nuevo.", "error")
         return redirect(url_for('solicitar_turno_ui'))
 
 
