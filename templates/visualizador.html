@@ -1,0 +1,402 @@
+<!-- templates/visualizador.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notaría Tercera - Turnos en Atención</title>
+    <!-- Carga de Tailwind CSS desde CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Fondo oscuro para alto contraste */
+            color: #e2e8f0; /* Texto claro */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow: hidden; /* Evita scrollbars no deseados */
+        }
+        .container {
+            max-width: 1280px; /* Ancho máximo para pantallas grandes */
+            margin: 0 auto;
+            padding: 1rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .main-display {
+            background-color: #2d3748; /* Fondo más oscuro para el turno actual */
+            border-radius: 1.5rem; /* Bordes más redondeados */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            min-height: 250px; /* Altura mínima para el display principal */
+            text-align: center;
+            animation: fadeIn 1s ease-out; /* Animación de entrada */
+        }
+        .turn-number {
+            font-size: 8rem; /* Tamaño de fuente muy grande para el número de turno */
+            font-weight: 700;
+            color: #48bb78; /* Verde brillante para el número */
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 15px rgba(72, 187, 120, 0.6); /* Sombra para resaltar */
+        }
+        .module-direction {
+            font-size: 3rem; /* Tamaño de fuente grande para la dirección del módulo */
+            font-weight: 600;
+            color: #a0aec0; /* Gris claro */
+        }
+        .history-list {
+            background-color: #2d3748;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            min-height: 200px;
+            overflow: hidden; /* Oculta el desbordamiento si hay muchos turnos */
+        }
+        .history-item {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #cbd5e0;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #4a5568;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .modules-table {
+            background-color: #2d3748;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            overflow-x: auto; /* Permite scroll horizontal en móviles si es necesario */
+        }
+        .modules-table th, .modules-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 1.25rem;
+            white-space: nowrap; /* Evita que el texto se rompa */
+        }
+        .modules-table th {
+            color: #a0aec0;
+            font-weight: 700;
+            border-bottom: 2px solid #4a5568;
+        }
+        .modules-table td {
+            color: #e2e8f0;
+            border-bottom: 1px solid #4a5568;
+        }
+        .modules-table tr:last-child td {
+            border-bottom: none;
+        }
+        .status-available {
+            color: #48bb78; /* Verde para disponible */
+            font-weight: 600;
+        }
+        .status-attending {
+            color: #ecc94b; /* Amarillo para atendiendo */
+            font-weight: 600;
+        }
+        .status-inactive {
+            color: #e53e3e; /* Rojo para inactivo */
+            font-weight: 600;
+        }
+
+        /* Animación para el turno actual */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseGreen {
+            0% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(72, 187, 120, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+        }
+        .pulse-animation {
+            animation: pulseGreen 1.5s infinite;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .turn-number {
+                font-size: 5rem;
+            }
+            .module-direction {
+                font-size: 2rem;
+            }
+            .history-item {
+                font-size: 1.4rem;
+            }
+            .modules-table th, .modules-table td {
+                font-size: 1rem;
+            }
+            .grid-cols-3 {
+                grid-template-columns: 1fr; /* Una columna en pantallas pequeñas */
+            }
+            .col-span-2 {
+                grid-column: span 1 / span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container flex flex-col p-4 space-y-6">
+        <!-- Encabezado -->
+        <header class="text-center py-6 bg-blue-800 rounded-xl shadow-lg">
+            <h1 class="text-5xl font-extrabold text-white tracking-tight">
+                <span class="inline-block mr-4">🏛️</span> Notaría Tercera de Valledupar
+            </h1>
+            <h2 class="text-3xl font-semibold text-blue-200 mt-2">Turnos en Atención</h2>
+        </header>
+
+        <main class="grid grid-cols-3 gap-6 flex-grow">
+            <!-- Área del Turno Actual -->
+            <section class="col-span-2 main-display" id="current-turn-display">
+                <p class="text-xl font-medium text-gray-400 mb-2">TURNO ACTUAL:</p>
+                <div id="current-turn-number" class="turn-number">---</div>
+                <p id="current-turn-module" class="module-direction">Diríjase a la Ventanilla ---</p>
+            </section>
+
+            <!-- Historial de Llamados -->
+            <section class="col-span-1 history-list">
+                <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
+                <div id="call-history" class="space-y-2">
+                    <!-- Los turnos se insertarán aquí por JavaScript -->
+                    <div class="history-item text-gray-500">
+                        <span>Sin turnos previos</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabla de Ventanillas -->
+            <section class="col-span-3 modules-table">
+                <h3 class="text-2xl font-bold text-gray-300 mb-4">Estado de Ventanillas</h3>
+                <table class="min-w-full table-auto">
+                    <thead>
+                        <tr>
+                            <th>Módulo</th>
+                            <th>Funcionario</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modules-status-body">
+                        <!-- El estado de los módulos se insertará aquí por JavaScript -->
+                        <tr>
+                            <td colspan="3" class="text-center text-gray-500">Cargando estado de módulos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <!-- Elemento de audio para la alerta de sonido -->
+    <audio id="call-sound" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>
+
+    <script type="module">
+        // Importar el cliente de Supabase
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+        // Variables de configuración (pasadas desde Flask)
+        const SUPABASE_URL = "{{ supabase_url }}";
+        const SUPABASE_KEY = "{{ supabase_key }}";
+
+        // Inicializar Supabase
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log("Supabase Client inicializado.");
+
+        // Referencias a los elementos del DOM
+        const currentTurnNumberElement = document.getElementById('current-turn-number');
+        const currentTurnModuleElement = document.getElementById('current-turn-module');
+        const currentTurnDisplayElement = document.getElementById('current-turn-display');
+        const callHistoryElement = document.getElementById('call-history');
+        const modulesStatusBodyElement = document.getElementById('modules-status-body');
+        const callSound = document.getElementById('call-sound');
+
+        let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples veces para el mismo turno
+
+        // Función para actualizar el display del turno actual
+        async function updateCurrentTurnDisplay(turn) {
+            if (turn) {
+                currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
+                currentTurnModuleElement.textContent = `Diríjase a la Ventanilla ${turn.modulos.nombre_modulo.split(' ')[1]}`;
+
+                // Reproducir sonido si es un nuevo turno llamado
+                if (turn.id_turno !== lastCalledTurnId) {
+                    callSound.play().catch(e => console.error("Error al reproducir sonido:", e));
+                    lastCalledTurnId = turn.id_turno;
+
+                    // Añadir animación de pulso al display principal
+                    currentTurnDisplayElement.classList.add('pulse-animation');
+                    setTimeout(() => {
+                        currentTurnDisplayElement.classList.remove('pulse-animation');
+                    }, 1500); // Duración de la animación
+                }
+            } else {
+                currentTurnNumberElement.textContent = '---';
+                currentTurnModuleElement.textContent = 'Esperando nuevo turno...';
+                lastCalledTurnId = null;
+            }
+        }
+
+        // Función para actualizar el historial de llamados
+        function updateCallHistory(history) {
+            callHistoryElement.innerHTML = ''; // Limpiar el historial actual
+            if (history.length === 0) {
+                callHistoryElement.innerHTML = '<div class="history-item text-gray-500"><span>Sin turnos previos</span></div>';
+                return;
+            }
+            history.forEach(turn => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <span>${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}</span>
+                    <span class="text-gray-400">Módulo ${turn.modulos.nombre_modulo.split(' ')[1]}</span>
+                `;
+                callHistoryElement.appendChild(div);
+            });
+        }
+
+        // Función para actualizar el estado de los módulos
+        function updateModulesStatus(modules) {
+            modulesStatusBodyElement.innerHTML = ''; // Limpiar la tabla actual
+            if (modules.length === 0) {
+                modulesStatusBodyElement.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-gray-500">No hay módulos registrados.</td>
+                    </tr>
+                `;
+                return;
+            }
+            modules.forEach(mod => {
+                const tr = document.createElement('tr');
+                let statusClass = '';
+                let statusText = '';
+                let currentTurnInfo = '';
+
+                switch (mod.estado) {
+                    case 'activo':
+                        statusClass = 'status-available';
+                        statusText = 'Disponible';
+                        if (mod.turnos && mod.turnos.length > 0) {
+                            const currentTurn = mod.turnos[0]; // Asumiendo que el primer turno es el actual
+                            statusClass = 'status-attending';
+                            statusText = 'Atendiendo';
+                            currentTurnInfo = `Turno: ${currentTurn.prefijo_turno}-${String(currentTurn.numero_turno).padStart(3, '0')}`;
+                        }
+                        break;
+                    case 'inactivo':
+                        statusClass = 'status-inactive';
+                        statusText = 'Inactivo';
+                        break;
+                    default:
+                        statusClass = 'text-gray-400';
+                        statusText = mod.estado; // Mostrar estado desconocido
+                }
+
+                tr.innerHTML = `
+                    <td>${mod.nombre_modulo}</td>
+                    <td>${mod.usuarios ? mod.usuarios.nombre_completo : 'Sin Asignar'}</td>
+                    <td class="${statusClass}">${statusText} ${currentTurnInfo}</td>
+                `;
+                modulesStatusBodyElement.appendChild(tr);
+            });
+        }
+
+        // --- Suscripciones en tiempo real a Supabase ---
+
+        // Suscribirse a cambios en la tabla 'turnos'
+        supabase
+            .from('turnos')
+            .on('*', async payload => {
+                console.log('Cambio en turnos recibido!', payload);
+                // Recargar datos relevantes para el visualizador
+                await loadInitialData();
+            })
+            .subscribe();
+
+        // Suscribirse a cambios en la tabla 'modulos'
+        supabase
+            .from('modulos')
+            .on('*', async payload => {
+                console.log('Cambio en modulos recibido!', payload);
+                await loadInitialData();
+            })
+            .subscribe();
+
+        // Suscribirse a cambios en la tabla 'usuarios' (para actualizar nombres de funcionarios)
+        supabase
+            .from('usuarios')
+            .on('*', async payload => {
+                console.log('Cambio en usuarios recibido!', payload);
+                await loadInitialData();
+            })
+            .subscribe();
+
+
+        // Función para cargar los datos iniciales y mantener actualizados los displays
+        async function loadInitialData() {
+            try {
+                // 1. Cargar el último turno llamado (estado 'en atencion')
+                const { data: currentTurnData, error: currentTurnError } = await supabase
+                    .from('turnos')
+                    .select('*, modulos(nombre_modulo)')
+                    .eq('estado', 'en atencion')
+                    .order('hora_llamado', { ascending: false })
+                    .limit(1);
+
+                if (currentTurnError) throw currentTurnError;
+                updateCurrentTurnDisplay(currentTurnData && currentTurnData.length > 0 ? currentTurnData[0] : null);
+
+                // 2. Cargar el historial de los últimos 5 turnos llamados (estado 'atendido' o 'en atencion')
+                const { data: historyData, error: historyError } = await supabase
+                    .from('turnos')
+                    .select('*, modulos(nombre_modulo)')
+                    .or('estado.eq.atendido,estado.eq.en atencion')
+                    .order('hora_llamado', { ascending: false })
+                    .limit(5);
+
+                if (historyError) throw historyError;
+                updateCallHistory(historyData || []);
+
+                // 3. Cargar el estado de todos los módulos, incluyendo el turno actual y el funcionario
+                const { data: modulesData, error: modulesError } = await supabase
+                    .from('modulos')
+                    .select(`
+                        *,
+                        usuarios(nombre_completo),
+                        turnos(id_turno, numero_turno, prefijo_turno, estado)
+                    `)
+                    .order('nombre_modulo', { ascending: true }); // Ordenar por nombre para consistencia
+
+                if (modulesError) throw modulesError;
+
+                // Filtrar turnos para mostrar solo el que está 'en atencion' por ese módulo
+                const processedModulesData = modulesData.map(mod => ({
+                    ...mod,
+                    turnos: mod.turnos ? mod.turnos.filter(t => t.estado === 'en atencion') : []
+                }));
+
+                updateModulesStatus(processedModulesData || []);
+
+            } catch (error) {
+                console.error('Error al cargar datos iniciales para el visualizador:', error.message);
+                // Aquí podrías mostrar un mensaje de error en la interfaz si es necesario
+            }
+        }
+
+        // Cargar datos iniciales al cargar la página
+        window.onload = loadInitialData;
+
+    </script>
+</body>
+</html>
