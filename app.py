@@ -1,15 +1,11 @@
-# app.py
-# Estructura Inicial de la Aplicación Flask para el Sistema de Turnos
-
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+#Estructura Inicial de la Aplicación Flask para el Sistema de Turnos
+from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
 import logging
-#import secrets
-
-#secret_key = secrets.token_hex(32)
-#print(secret_key)
+import uuid
+from datetime import datetime, timedelta, timezone
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,8 +25,82 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     # Considera salir o manejar este error de forma más robusta en producción
     supabase = None
 else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logging.info("Conexión a Supabase establecida.")
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logging.info("Conexión a Supabase establecida.")
+    except Exception as e:
+        logging.error(f"Error al inicializar cliente Supabase: {e}")
+        supabase = None
+
+
+#Duración de la sesión del Token (ej. 8 horas)
+SESSION_TOKEN_LIFESPAN_HOURS = 8
+
+# --- Middleware para cargar usuario desde el token de sesión --- #
+@app.before_request
+def load_logged_in_user():
+    """
+    Carga la información del usuario en el objeto 'g' (global request context)
+    basándose en el token de sesión almacenado en la cookie.
+    """
+    session_token = session.get('session_token')
+    g.user = None #por defecto, no hay usuario logueado
+
+    if session_token:
+        try:
+            #Buscar la sesión en la base de datos
+            response = supabase.table('user_sessions') \
+                .select('user_id, role, assigned_module_id, usuarios(nombre_completo)')\
+                .eq('session_token',session_token) \
+                .gte('expires_at',datetime.now(timezone.utc).isoformat()) \
+                .single() \
+                .execute()
+            
+            if response.data:
+                user_session_data = response.data
+                #Almacenar la información del usuario en 'g.user'
+                g.user = {
+                    'id': user_session_data['user_id'],
+                    'name': user_session_data['usuarios']['nombre_completo'],
+                    'role': user_session_data['role'],
+                    'assigned_module_id': user_session_data['assigned_module_id']
+                }
+                logging.info(f"Usuario {g.user['name']} ({g.user['role']}) cargado para la petición.")
+            else:
+                #Sesión no encontrada o expirada, limpiar la cookie
+                session.pop('session_token',None)
+                logging.info("Token de sesión no válido o expirado, cookie de sesión limpiada.")
+        
+        except Exception as e:
+            logging.error(f"Error al cargar usuario desde el token de sesión: {e}")
+            session.pop('session_token',None) #Limpiar por si acaso
+
+# --- Decorador para rutas protegidas --- #
+def login_required(f):
+    """
+    Decorador para proteger rutas que requieren autenticación
+    """
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args,**kwargs):
+        if g.user is None:
+            flash("Necesita iniciar sesión para acceder a esta página.", "info")
+            return redirect(url_for('funcionario_login'))
+        return f(*args,**kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """
+    Decorador para proteger rutas que requieren rol de administrador
+    """
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args,**kwargs):
+        if g.user is None or g.user['role'] != 'administrador':
+            flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
+            return redirect(url_for('funcionario_login'))
+        return f(*args,**kwargs)
+    return decorated_function
 
 # --- Rutas de la Aplicación ---
 
@@ -163,6 +233,12 @@ def funcionario_login():
     """
     Página de inicio de sesión para funcionarios.
     """
+    if g.user:
+        if g.user['role'] == 'administrador':
+            return redirect(url_for('admin_dashboard'))
+        else:
+            return redirect(url_for('funcionario_panel'))
+        
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -174,16 +250,43 @@ def funcionario_login():
             user_data = user_response.data
 
             if user_data and user_data['contrasena'] == password: # ¡REEMPLAZAR CON VERIFICACIÓN DE HASH!
-                session['user_id'] = user_data['id_usuario']
-                session['user_name'] = user_data['nombre_completo']
-                session['user_role'] = user_data['rol']
-                session['assigned_module_id'] = user_data['id_modulo_asignado']
-                flash(f"Bienvenido, {user_data['nombre_completo']}!", "success")
-                logging.info(f"Usuario {username} ha iniciado sesión.")
-                if user_data['rol'] == 'administrador':
-                    return redirect(url_for('admin_dashboard'))
-                else:
-                    return redirect(url_for('funcionario_panel'))
+                #Generar un token de sesión único
+                new_session_token = str(uuid.uuid4())
+                #Calcular la fecha de expiración
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=SESSION_TOKEN_LIFESPAN_HOURS)
+
+                #Insertar la nueva sesión en la base de datos
+                session_insert_data = {
+                    'user_id': user_data['id_usuario'],
+                    'session_token': new_session_token,
+                    'role': user_data['rol'],
+                    'assigned_module_id': user_data['id_modulo_asignado'],
+                    'expires_at': expires_at.isoformat()
+                }
+                session_response = supabase.table('user_sessions').insert(session_insert_data).execute()
+                if session_response.data:
+                    #Almacenar SOLO el token de sesión en la cookie de Flask
+                    session['session_token'] = new_session_token
+                    flash(f"Bienvenido, {user_data['nombre_completo']}!","success")
+                    logging.info(f"Usuario {username} ha iniciado sesión con nuevo token.")
+                    if user_data['rol'] == 'administrador':
+                        return redirect(url_for('admin_dashboard'))
+                    else:
+                        return redirect(url_for('funcionario_panel'))
+                else: 
+                    flash("Error al crear la sesión. Por favor, intente de nuevo.", "error")
+                    logging.error(f"Error al insertar sesión en base de datos: {session_response.error}")
+
+                #session['user_id'] = user_data['id_usuario']
+                #session['user_name'] = user_data['nombre_completo']
+                #session['user_role'] = user_data['rol']
+                #session['assigned_module_id'] = user_data['id_modulo_asignado']
+                #flash(f"Bienvenido, {user_data['nombre_completo']}!", "success")
+                #logging.info(f"Usuario {username} ha iniciado sesión.")
+                #if user_data['rol'] == 'administrador':
+                #    return redirect(url_for('admin_dashboard'))
+                #else:
+                #    return redirect(url_for('funcionario_panel'))
             else:
                 flash("Usuario o contraseña incorrectos.", "danger")
                 logging.warning(f"Intento de inicio de sesión fallido para {username}.")
@@ -194,117 +297,143 @@ def funcionario_login():
     return render_template('funcionario_login.html')
 
 @app.route('/funcionario/panel')
+@login_required # Proteger esta ruta
 def funcionario_panel():
+    #g.user ya contiene la información del usuario gracias al before_request y login_required
     """
     Panel de atención para funcionarios.
     """
-    if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
-        flash("Necesita iniciar sesión para acceder a esta página.", "info")
-        return redirect(url_for('funcionario_login'))
+    return render_template('funcionario_panel.html',
+                           user_name=g.user['name'],
+                           supabase_url=SUPABASE_URL,
+                           supabase_key=SUPABASE_KEY,
+                           session_user_id=g.user['id'], #pasar el ID real desde g.user
+                           session_assigned_module_id=g.user['assigned_module_id']) #pasar el módulo desde g.user
+    #if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
+    #    flash("Necesita iniciar sesión para acceder a esta página.", "info")
+    #    return redirect(url_for('funcionario_login'))
 
-    user_id = session['user_id']
-    user_name = session['user_name']
-    assigned_module_id = session.get('assigned_module_id')
+    #user_id = session['user_id']
+    #user_name = session['user_name']
+    #assigned_module_id = session.get('assigned_module_id')
 
-    try:
+    #try:
         # Obtener los servicios que atiende este módulo (si está asignado)
-        servicios_atendidos = []
-        if assigned_module_id:
-            service_module_response = supabase.table('modulos_servicios') \
-                .select('servicios(id_servicio, nombre_servicio, prefijo_ticket)') \
-                .eq('id_modulo', assigned_module_id) \
-                .execute()
-            servicios_atendidos = [s['servicios'] for s in service_module_response.data]
+    #    servicios_atendidos = []
+    #    if assigned_module_id:
+    #        service_module_response = supabase.table('modulos_servicios') \
+    #            .select('servicios(id_servicio, nombre_servicio, prefijo_ticket)') \
+    #            .eq('id_modulo', assigned_module_id) \
+    #            .execute()
+    #        servicios_atendidos = [s['servicios'] for s in service_module_response.data]
 
         # Obtener turnos pendientes para este módulo/servicios
         # Esto se actualizará en tiempo real vía Supabase Realtime
-        turnos_pendientes = [] # Se llenará con JS
+    #    turnos_pendientes = [] # Se llenará con JS
 
         # Obtener historial de turnos atendidos por este funcionario
-        historial_turnos = [] # Se llenará con JS
+    #    historial_turnos = [] # Se llenará con JS
 
-        return render_template('funcionario_panel.html',
-                               user_name=user_name,
-                               module_id=assigned_module_id,
-                               servicios_atendidos=servicios_atendidos,
-                               supabase_url=SUPABASE_URL,
-                               supabase_key=SUPABASE_KEY)
-    except Exception as e:
-        logging.error(f"Error al cargar el panel del funcionario: {e}")
-        flash("Error al cargar el panel. Por favor, intente de nuevo más tarde.", "error")
-        return redirect(url_for('funcionario_login'))
+    #    return render_template('funcionario_panel.html',
+    #                           user_name=user_name,
+    #                           module_id=assigned_module_id,
+    #                           servicios_atendidos=servicios_atendidos,
+    #                           supabase_url=SUPABASE_URL,
+    #                           supabase_key=SUPABASE_KEY)
+    #except Exception as e:
+    #    logging.error(f"Error al cargar el panel del funcionario: {e}")
+    #    flash("Error al cargar el panel. Por favor, intente de nuevo más tarde.", "error")
+    #    return redirect(url_for('funcionario_login'))
 
 
 @app.route('/admin/dashboard')
+@admin_required #proteger esta ruta y requerir rol de administrador
 def admin_dashboard():
     """
     Panel de administración para superusuarios.
     """
-    if 'user_id' not in session or session.get('user_role') != 'administrador':
-        flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
-        return redirect(url_for('funcionario_login'))
+    #g.user ya contiene la información del usuario gracias al before_request y admin_required
+    return render_template('admin_dashboard.html',
+                           supabase_url=SUPABASE_URL,
+                           supabase_key=SUPABASE_KEY,
+                           user_name=g.user['name']) #user el nombre de g.user
+    #if 'user_id' not in session or session.get('user_role') != 'administrador':
+    #    flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
+    #    return redirect(url_for('funcionario_login'))
 
-    if supabase is None:
-        flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
-        return render_template('error.html', message="Problema de configuración del sistema.")
+    #if supabase is None:
+    #    flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
+    #    return render_template('error.html', message="Problema de configuración del sistema.")
 
-    try:
+    #try:
         # Aquí se cargarían los datos para el dashboard:
         # - Número de turnos en espera
         # - Total de turnos atendidos en el día
         # - Estado de cada ventanilla
         # Estos datos se pueden obtener de Supabase o se pueden cargar en el frontend con JS.
-        return render_template('admin_dashboard.html',
-                               supabase_url=SUPABASE_URL, # ¡Asegurarse de pasar la URL!
-                               supabase_key=SUPABASE_KEY,   # ¡Asegurarse de pasar la KEY!
-                               user_name=session.get('user_name', 'Administrador')) # También pasamos el nombre
-    except Exception as e:
-        logging.error(f"Error al cargar el dashboard de administración: {e}")
-        flash("Error al cargar el dashboard. Por favor, intente de nuevo más tarde.", "error")
-        return redirect(url_for('funcionario_login'))
+    #    return render_template('admin_dashboard.html',
+    #                           supabase_url=SUPABASE_URL, # ¡Asegurarse de pasar la URL!
+    #                           supabase_key=SUPABASE_KEY,   # ¡Asegurarse de pasar la KEY!
+    #                           user_name=session.get('user_name', 'Administrador')) # También pasamos el nombre
+    #except Exception as e:
+    #    logging.error(f"Error al cargar el dashboard de administración: {e}")
+    #    flash("Error al cargar el dashboard. Por favor, intente de nuevo más tarde.", "error")
+    #    return redirect(url_for('funcionario_login'))
 
 @app.route('/logout')
 def logout():
     """
     Cierra la sesión del usuario.
     """
-    session.pop('user_id', None)
-    session.pop('user_name', None)
-    session.pop('user_role', None)
-    session.pop('assigned_module_id', None)
-    flash("Has cerrado sesión exitosamente.", "info")
-    logging.info("Sesión cerrada.")
+    session_token = session.get('session_token')
+    if session_token:
+        try:
+            #Eliminar la sesión de la base de datos
+            supabase.table('user_sessions').delete().eq('session_token',session_token).execute()
+            logging.info(f"Sesión con token {session_token} eliminada de la base de datos.")
+        except Exception as e:
+            logging.error(f"Error al eliminar sesión de la base de datos: {e}")
+    
+    #Limpiar la cookie de sesión de Flask
+    #session.pop('user_id', None)
+    #session.pop('user_name', None)
+    #session.pop('user_role', None)
+    #session.pop('assigned_module_id', None)
+    #flash("Has cerrado sesión exitosamente.", "info")
+    session.pop('session_token',None)
+    flash("Has cerrado sesión exitosamente.","info")
+    logging.info("Cookie de sesión limpiada.")
     return redirect(url_for('funcionario_login'))
 
 # --- Funciones de API (para HTMX o llamadas directas) ---
 
 # Ejemplo de API para llamar al siguiente turno
-@app.route('/api/call_next_turn', methods=['POST'])
-def api_call_next_turn():
-    if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
-        return {"status": "error", "message": "No autorizado"}, 401
+#@app.route('/api/call_next_turn', methods=['POST'])
+#def api_call_next_turn():
+#    if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
+#        return {"status": "error", "message": "No autorizado"}, 401
 
-    user_id = session['user_id']
-    module_id = session.get('assigned_module_id')
+#    user_id = session['user_id']
+#    module_id = session.get('assigned_module_id')
 
-    if not module_id:
-        return {"status": "error", "message": "Funcionario no asignado a un módulo."}, 400
+#    if not module_id:
+#        return {"status": "error", "message": "Funcionario no asignado a un módulo."}, 400
 
-    try:
+#    try:
         # Lógica para encontrar el siguiente turno disponible para este módulo
         # y actualizar su estado a 'en atencion'.
         # Esto es complejo y requerirá transacciones y manejo de concurrencia.
         # Por ahora, es un placeholder.
         # La actualización en Supabase Realtime notificará a los visualizadores.
-        logging.info(f"Funcionario {user_id} en módulo {module_id} intentando llamar siguiente turno.")
+#        logging.info(f"Funcionario {user_id} en módulo {module_id} intentando llamar siguiente turno.")
         # Simulación de llamada exitosa
         # response = supabase.table('turnos').update({'estado': 'en atencion', 'hora_llamado': 'NOW()', 'id_modulo_atencion': module_id}).eq('id_turno', some_turn_id).execute()
         # supabase.table('logs_turnos').insert({'id_turno': some_turn_id, 'id_usuario': user_id, 'accion': 'llamado'}).execute()
 
-        return {"status": "success", "message": "Turno llamado (simulado)."}, 200
-    except Exception as e:
-        logging.error(f"Error en api_call_next_turn: {e}")
-        return {"status": "error", "message": f"Error al llamar turno: {e}"}, 500
+#        return {"status": "success", "message": "Turno llamado (simulado)."}, 200
+#    except Exception as e:
+#        logging.error(f"Error en api_call_next_turn: {e}")
+#        return {"status": "error", "message": f"Error al llamar turno: {e}"}, 500
 
 
 # --- Ejecución de la Aplicación ---

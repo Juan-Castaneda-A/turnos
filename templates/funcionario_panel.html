@@ -217,34 +217,31 @@
 
     <script type="module">
         // Importar el cliente de Supabase
-        // Usando cdn.jsdelivr.net para una importación más estable del paquete ESM
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
         // Variables de configuración (pasadas desde Flask)
         const SUPABASE_URL = "{{ supabase_url }}";
         const SUPABASE_KEY = "{{ supabase_key }}";
         // Convertir la cadena 'None' o 'null' a null de JavaScript
-        const USER_ID = "{{ session['user_id'] }}" === 'None' || "{{ session['user_id'] }}" === 'null' ? null : "{{ session['user_id'] }}";
-        const ASSIGNED_MODULE_ID_STR = "{{ session['assigned_module_id'] }}";
+        const USER_ID = "{{ session_user_id }}" === 'None' || "{{ session_user_id }}" === 'null' ? null : "{{ session_user_id }}";
+        const ASSIGNED_MODULE_ID_STR = "{{ session_assigned_module_id }}";
         const ASSIGNED_MODULE_ID = ASSIGNED_MODULE_ID_STR === 'None' || ASSIGNED_MODULE_ID_STR === 'null' ? null : parseInt(ASSIGNED_MODULE_ID_STR);
         const USER_NAME = "{{ user_name }}"; // Nombre del usuario
 
         // Inicializar Supabase
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         console.log("Supabase Client inicializado para Panel de Funcionario.");
-        console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
-        console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
+        console.log("Objeto Supabase:", supabase);
+        console.log("¿Existe supabase.from?", typeof supabase.from);
 
-        // DEBUG: Inspeccionar el objeto retornado por supabase.from()
         let testFromObject;
         try {
             testFromObject = supabase.from('turnos');
             console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
-            console.log("¿Existe testFromObject.on?", typeof testFromObject.on); // ESTO DEBERÍA SER 'function'
+            console.log("¿Existe testFromObject.on?", typeof testFromObject.on);
         } catch (e) {
             console.error("Error al intentar llamar supabase.from('turnos'):", e);
         }
-
 
         // Referencias a elementos del DOM
         const assignedModuleNameElement = document.getElementById('assigned-module-name');
@@ -257,18 +254,14 @@
         const btnFinish = document.getElementById('btn-finish');
         const dailyHistoryBody = document.getElementById('daily-history-body');
 
-        // Modal de Confirmación
         const confirmationModal = document.getElementById('confirmation-modal');
         const modalTitle = document.getElementById('modal-title');
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-        let currentAttendingTurnId = null; // ID del turno que el funcionario está atendiendo actualmente
+        let currentAttendingTurnId = null;
 
-        // --- Funciones de Utilidad ---
-
-        // Función para mostrar el modal de confirmación
         function showConfirmationModal(title, message) {
             return new Promise((resolve) => {
                 modalTitle.textContent = title;
@@ -293,8 +286,6 @@
                 modalCancelBtn.addEventListener('click', handleCancel);
             });
         }
-
-        // --- Funciones de Actualización de UI ---
 
         async function updateAssignedModuleName() {
             if (ASSIGNED_MODULE_ID !== null) {
@@ -474,8 +465,6 @@
             btnFinish.disabled = !hasCurrentTurn;
         }
 
-        // --- Manejo de Acciones de Turno ---
-
         btnCallNext.addEventListener('click', async () => {
             const confirmed = await showConfirmationModal('Llamar Siguiente Turno', '¿Está seguro de que desea llamar al siguiente turno disponible?');
             if (!confirmed) return;
@@ -601,11 +590,7 @@
             }
         });
 
-
-        // --- Suscripciones en tiempo real a Supabase ---
-
         function setupRealtimeSubscriptions() {
-            // Verifica que supabase.from().on exista antes de suscribirse
             if (supabase.from('turnos') && typeof supabase.from('turnos').on === 'function') {
                 supabase
                     .from('turnos')
@@ -645,16 +630,12 @@
             }
         }
 
-
-        // Cargar datos iniciales al cargar la página
         window.onload = () => {
             updateAssignedModuleName();
             loadPendingTurns();
             loadCurrentTurn();
             loadDailyHistory();
-            // Retrasar la configuración de las suscripciones en tiempo real
-            // para dar tiempo a que el DOM y el cliente de Supabase se inicialicen completamente.
-            setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
+            setTimeout(setupRealtimeSubscriptions, 500);
         };
 
     </script>

@@ -263,7 +263,7 @@
                     Configurar Servicios
                 </a></li>
                 <li><a href="#" class="nav-link" data-view="reports">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125l7.25 7.25m-7.25-7.25L10.5 6.75M10.5 6.75l7.25-7.25M10.5 6.75v14.5"></path></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125l7.25 7.25m-7.25-7.25L10.5 6.75m-7.25-7.25L10.5 6.75v14.5"></path></svg>
                     Reportes Estadísticos
                 </a></li>
                 <li><a href="#" class="nav-link" data-view="turn-history">
@@ -552,29 +552,37 @@
 
     <script type="module">
         // Importar el cliente de Supabase
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
         // Variables de configuración (pasadas desde Flask)
         const SUPABASE_URL = "{{ supabase_url }}";
         const SUPABASE_KEY = "{{ supabase_key }}";
-        const USER_ID = "{{ session['user_id'] }}"; // ID del usuario logueado
-        const USER_NAME = "{{ user_name }}"; // Nombre del usuario
+        const USER_ID = "{{ g.user.id }}"; // Ahora se lee de g.user
+        const USER_NAME = "{{ g.user.name }}"; // Ahora se lee de g.user
 
         // Inicializar Supabase
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         console.log("Supabase Client inicializado para Panel de Administración.");
+        console.log("Objeto Supabase:", supabase);
+        console.log("¿Existe supabase.from?", typeof supabase.from);
 
-        // Referencias a elementos del DOM
+        let testFromObject;
+        try {
+            testFromObject = supabase.from('turnos');
+            console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
+            console.log("¿Existe testFromObject.on?", typeof testFromObject.on);
+        } catch (e) {
+            console.error("Error al intentar llamar supabase.from('turnos'):", e);
+        }
+
         const navLinks = document.querySelectorAll('.nav-link');
         const contentSections = document.querySelectorAll('.content-section');
 
-        // Dashboard elements
         const turnsWaitingElement = document.getElementById('turns-waiting');
         const turnsAttendedTodayElement = document.getElementById('turns-attended-today');
         const activeModulesElement = document.getElementById('active-modules');
         const realtimeModulesStatusBody = document.getElementById('realtime-modules-status-body');
 
-        // Manage Users elements
         const addUserBtn = document.getElementById('add-user-btn');
         const userFormContainer = document.getElementById('user-form-container');
         const userFormTitle = document.getElementById('user-form-title');
@@ -589,13 +597,12 @@
         const cancelUserFormBtn = document.getElementById('cancel-user-form-btn');
         const usersTableBody = document.getElementById('users-table-body');
 
-        // Manage Modules elements
         const addModuleBtn = document.getElementById('add-module-btn');
         const moduleFormContainer = document.getElementById('module-form-container');
         const moduleFormTitle = document.getElementById('module-form-title');
         const moduleForm = document.getElementById('module-form');
         const moduleIdField = document.getElementById('module-id-field');
-        const moduleNameField = document.getElementById('module-name-field');
+        const moduleNameField = document = document.getElementById('module-name-field');
         const moduleDescriptionField = document.getElementById('module-description-field');
         const moduleStatusField = document.getElementById('module-status-field');
         const moduleStatusText = document.getElementById('module-status-text');
@@ -603,31 +610,24 @@
         const cancelModuleFormBtn = document.getElementById('cancel-module-form-btn');
         const modulesTableBody = document.getElementById('modules-table-body');
 
-        // Configure Services elements
         const servicesConfigHeader = document.getElementById('services-config-header');
         const servicesConfigBody = document.getElementById('services-config-body');
         const saveServicesConfigBtn = document.getElementById('save-services-config-btn');
 
-        // Turn History elements
         const historyStartDate = document.getElementById('history-start-date');
         const historyEndDate = document.getElementById('history-end-date');
         const historyServiceFilter = document.getElementById('history-service-filter');
         const filterHistoryBtn = document.getElementById('filter-history-btn');
         const turnHistoryTableBody = document.getElementById('turn-history-table-body');
 
-        // Notary Settings elements
         const resetTurnsBtn = document.getElementById('reset-turns-btn');
 
-        // Modal de Confirmación
         const confirmationModal = document.getElementById('confirmation-modal');
         const modalTitle = document.getElementById('modal-title');
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-        // --- Funciones de Utilidad ---
-
-        // Función para mostrar el modal de confirmación (reutilizada del panel de funcionario)
         function showConfirmationModal(title, message) {
             return new Promise((resolve) => {
                 modalTitle.textContent = title;
@@ -653,7 +653,6 @@
             });
         }
 
-        // --- Navegación del Panel ---
         function showView(viewId) {
             contentSections.forEach(section => {
                 section.classList.add('hidden');
@@ -665,7 +664,6 @@
             });
             document.querySelector(`.nav-link[data-view="${viewId}"]`).classList.add('active');
 
-            // Cargar datos específicos para la vista
             switch (viewId) {
                 case 'dashboard':
                     loadDashboardSummary();
@@ -682,19 +680,16 @@
                     loadServicesConfig();
                     break;
                 case 'reports':
-                    // Los gráficos se cargarían aquí, por ahora solo texto
                     break;
                 case 'turn-history':
                     loadHistoryServicesFilter();
                     loadTurnHistory();
                     break;
                 case 'notary-settings':
-                    // No hay datos dinámicos por cargar aquí inicialmente
                     break;
             }
         }
 
-        // Event listeners para la navegación
         navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -702,10 +697,8 @@
             });
         });
 
-        // --- Dashboard Functions ---
         async function loadDashboardSummary() {
             try {
-                // Turnos en espera
                 const { count: waitingCount, error: waitingError } = await supabase
                     .from('turnos')
                     .select('*', { count: 'exact' })
@@ -713,7 +706,6 @@
                 if (waitingError) throw waitingError;
                 turnsWaitingElement.textContent = waitingCount;
 
-                // Turnos atendidos hoy
                 const today = new Date().toISOString().split('T')[0];
                 const { count: attendedCount, error: attendedError } = await supabase
                     .from('turnos')
@@ -723,7 +715,6 @@
                 if (attendedError) throw attendedError;
                 turnsAttendedTodayElement.textContent = attendedCount;
 
-                // Módulos activos
                 const { count: activeModulesCount, error: activeModulesError } = await supabase
                     .from('modulos')
                     .select('*', { count: 'exact' })
@@ -766,7 +757,6 @@
                     let statusText = '';
                     let currentTurnInfo = '---';
 
-                    // Filtrar turnos para mostrar solo el que está 'en atencion' por ese módulo
                     const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
 
                     switch (mod.estado) {
@@ -804,7 +794,6 @@
             }
         }
 
-        // --- Manage Users Functions ---
         async function loadUsers() {
             usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">Cargando usuarios...</td></tr>`;
             try {
@@ -836,7 +825,6 @@
                     usersTableBody.appendChild(tr);
                 });
 
-                // Add event listeners for edit/delete buttons
                 document.querySelectorAll('.edit-user-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => editUser(e.target.dataset.id));
                 });
@@ -855,7 +843,7 @@
                 const { data: modules, error } = await supabase.from('modulos').select('id_modulo, nombre_modulo').order('nombre_modulo', { ascending: true });
                 if (error) throw error;
 
-                assignedModuleField.innerHTML = '<option value="">Sin Módulo Asignado</option>'; // Reset options
+                assignedModuleField.innerHTML = '<option value="">Sin Módulo Asignado</option>';
                 modules.forEach(mod => {
                     const option = document.createElement('option');
                     option.value = mod.id_modulo;
@@ -872,7 +860,7 @@
             userFormTitle.textContent = 'Crear Nuevo Usuario';
             userForm.reset();
             userIdField.value = '';
-            passwordField.required = true; // Password is required for new users
+            passwordField.required = true;
         });
 
         cancelUserFormBtn.addEventListener('click', () => {
@@ -884,9 +872,9 @@
             const id = userIdField.value;
             const fullName = fullNameField.value;
             const username = usernameField.value;
-            const password = passwordField.value; // ¡Recordar hashear en el backend!
+            const password = passwordField.value;
             const role = roleField.value;
-            const assignedModule = assignedModuleField.value || null; // Convert empty string to null
+            const assignedModule = assignedModuleField.value || null;
 
             const userData = {
                 nombre_completo: fullName,
@@ -896,32 +884,30 @@
             };
 
             if (password) {
-                userData.contrasena = password; // En un sistema real, aquí se enviaría el hash
+                userData.contrasena = password;
             }
 
             try {
                 if (id) {
-                    // Update user
                     const confirmed = await showConfirmationModal('Editar Usuario', '¿Está seguro de que desea guardar los cambios de este usuario?');
                     if (!confirmed) return;
 
                     const { error } = await supabase.from('usuarios').update(userData).eq('id_usuario', id);
                     if (error) throw error;
-                    alert('Usuario actualizado exitosamente.'); // Reemplazar con modal de éxito
+                    await showConfirmationModal('Éxito', 'Usuario actualizado exitosamente.');
                 } else {
-                    // Create new user
                     const confirmed = await showConfirmationModal('Crear Usuario', '¿Está seguro de que desea crear este nuevo usuario?');
                     if (!confirmed) return;
 
                     const { error } = await supabase.from('usuarios').insert(userData);
                     if (error) throw error;
-                    alert('Usuario creado exitosamente.'); // Reemplazar con modal de éxito
+                    await showConfirmationModal('Éxito', 'Usuario creado exitosamente.');
                 }
                 userFormContainer.classList.add('hidden');
-                loadUsers(); // Recargar la tabla de usuarios
+                loadUsers();
             } catch (error) {
                 console.error("Error al guardar usuario:", error.message);
-                alert(`Error al guardar usuario: ${error.message}`); // Reemplazar con modal de error
+                await showConfirmationModal('Error', `Error al guardar usuario: ${error.message}`);
             }
         });
 
@@ -935,13 +921,13 @@
                 userIdField.value = user.id_usuario;
                 fullNameField.value = user.nombre_completo;
                 usernameField.value = user.nombre_usuario;
-                passwordField.value = ''; // Clear password field for security
-                passwordField.required = false; // Password is not required for edit if not changing
+                passwordField.value = '';
+                passwordField.required = false;
                 roleField.value = user.rol;
-                assignedModuleField.value = user.id_modulo_asignado || ''; // Set to empty string if null
+                assignedModuleField.value = user.id_modulo_asignado || '';
             } catch (error) {
                 console.error("Error al cargar usuario para edición:", error.message);
-                alert(`Error al cargar usuario para edición: ${error.message}`);
+                await showConfirmationModal('Error', `Error al cargar usuario para edición: ${error.message}`);
             }
         }
 
@@ -952,15 +938,14 @@
             try {
                 const { error } = await supabase.from('usuarios').delete().eq('id_usuario', id);
                 if (error) throw error;
-                alert('Usuario eliminado exitosamente.'); // Reemplazar con modal de éxito
-                loadUsers(); // Recargar la tabla
+                await showConfirmationModal('Éxito', 'Usuario eliminado exitosamente.');
+                loadUsers();
             } catch (error) {
                 console.error("Error al eliminar usuario:", error.message);
-                alert(`Error al eliminar usuario: ${error.message}`); // Reemplazar con modal de error
+                await showConfirmationModal('Error', `Error al eliminar usuario: ${error.message}`);
             }
         }
 
-        // --- Manage Modules Functions ---
         async function loadModules() {
             modulesTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando módulos...</td></tr>`;
             try {
@@ -1011,7 +996,7 @@
             moduleFormTitle.textContent = 'Crear Nuevo Módulo';
             moduleForm.reset();
             moduleIdField.value = '';
-            moduleStatusField.checked = true; // Default to active
+            moduleStatusField.checked = true;
             moduleStatusText.textContent = 'Activo';
         });
 
@@ -1038,27 +1023,25 @@
 
             try {
                 if (id) {
-                    // Update module
                     const confirmed = await showConfirmationModal('Editar Módulo', '¿Está seguro de que desea guardar los cambios de este módulo?');
                     if (!confirmed) return;
 
                     const { error } = await supabase.from('modulos').update(moduleData).eq('id_modulo', id);
                     if (error) throw error;
-                    alert('Módulo actualizado exitosamente.');
+                    await showConfirmationModal('Éxito', 'Módulo actualizado exitosamente.');
                 } else {
-                    // Create new module
                     const confirmed = await showConfirmationModal('Crear Módulo', '¿Está seguro de que desea crear este nuevo módulo?');
                     if (!confirmed) return;
 
                     const { error } = await supabase.from('modulos').insert(moduleData);
                     if (error) throw error;
-                    alert('Módulo creado exitosamente.');
+                    await showConfirmationModal('Éxito', 'Módulo creado exitosamente.');
                 }
                 moduleFormContainer.classList.add('hidden');
                 loadModules();
             } catch (error) {
                 console.error("Error al guardar módulo:", error.message);
-                alert(`Error al guardar módulo: ${error.message}`);
+                await showConfirmationModal('Error', `Error al guardar módulo: ${error.message}`);
             }
         });
 
@@ -1076,7 +1059,7 @@
                 moduleStatusText.textContent = mod.estado === 'activo' ? 'Activo' : 'Inactivo';
             } catch (error) {
                 console.error("Error al cargar módulo para edición:", error.message);
-                alert(`Error al cargar módulo para edición: ${error.message}`);
+                await showConfirmationModal('Error', `Error al cargar módulo para edición: ${error.message}`);
             }
         }
 
@@ -1087,18 +1070,17 @@
             try {
                 const { error } = await supabase.from('modulos').delete().eq('id_modulo', id);
                 if (error) throw error;
-                alert('Módulo eliminado exitosamente.');
+                await showConfirmationModal('Éxito', 'Módulo eliminado exitosamente.');
                 loadModules();
             } catch (error) {
                 console.error("Error al eliminar módulo:", error.message);
-                alert(`Error al eliminar módulo: ${error.message}`);
+                await showConfirmationModal('Error', `Error al eliminar módulo: ${error.message}`);
             }
         }
 
-        // --- Configure Services Functions ---
         let allModules = [];
         let allServices = [];
-        let currentModuleServiceConfig = {}; // {moduleId: [serviceId1, serviceId2], ...}
+        let currentModuleServiceConfig = {};
 
         async function loadServicesConfig() {
             servicesConfigHeader.innerHTML = '<th class="px-4 py-2 rounded-tl-lg">Módulo</th>';
@@ -1113,16 +1095,14 @@
                 if (servicesError) throw servicesError;
                 allServices = services;
 
-                // Build header row with services
                 allServices.forEach(service => {
                     const th = document.createElement('th');
                     th.className = 'px-4 py-2';
                     th.textContent = service.nombre_servicio;
                     servicesConfigHeader.appendChild(th);
                 });
-                servicesConfigHeader.lastChild.classList.add('rounded-tr-lg'); // Add to last service header
+                servicesConfigHeader.lastChild.classList.add('rounded-tr-lg');
 
-                // Load existing module-service configurations
                 const { data: moduleServices, error: msError } = await supabase.from('modulos_servicios').select('*');
                 if (msError) throw msError;
 
@@ -1134,7 +1114,6 @@
                     currentModuleServiceConfig[ms.id_modulo].push(ms.id_servicio);
                 });
 
-                // Populate table body
                 servicesConfigBody.innerHTML = '';
                 if (allModules.length === 0) {
                     servicesConfigBody.innerHTML = `<tr><td colspan="${allServices.length + 1}" class="text-center text-gray-500 py-4">No hay módulos registrados.</td></tr>`;
@@ -1188,11 +1167,9 @@
             });
 
             try {
-                // Delete all existing configurations
-                const { error: deleteError } = await supabase.from('modulos_servicios').delete().neq('id', 0); // Delete all rows
+                const { error: deleteError } = await supabase.from('modulos_servicios').delete().neq('id', 0);
                 if (deleteError) throw deleteError;
 
-                // Insert new configurations
                 const inserts = [];
                 for (const moduleId in newConfig) {
                     newConfig[moduleId].forEach(serviceId => {
@@ -1205,15 +1182,14 @@
                     if (insertError) throw insertError;
                 }
 
-                alert('Configuración de servicios guardada exitosamente.');
-                loadServicesConfig(); // Reload to confirm
+                await showConfirmationModal('Éxito', 'Configuración de servicios guardada exitosamente.');
+                loadServicesConfig();
             } catch (error) {
                 console.error("Error al guardar configuración de servicios:", error.message);
-                alert(`Error al guardar configuración de servicios: ${error.message}`);
+                await showConfirmationModal('Error', `Error al guardar configuración de servicios: ${error.message}`);
             }
         });
 
-        // --- Turn History Functions ---
         async function loadHistoryServicesFilter() {
             try {
                 const { data: services, error } = await supabase.from('servicios').select('id_servicio, nombre_servicio').order('nombre_servicio', { ascending: true });
@@ -1238,7 +1214,6 @@
                     .from('turnos')
                     .select('*, servicios(nombre_servicio), modulos(nombre_modulo), logs_turnos(accion, hora_accion)');
 
-                // Aplicar filtros
                 const startDate = historyStartDate.value;
                 const endDate = historyEndDate.value;
                 const serviceId = historyServiceFilter.value;
@@ -1247,7 +1222,6 @@
                     query = query.gte('hora_solicitud', startDate);
                 }
                 if (endDate) {
-                    // Add one day to end date to include the whole day
                     const end = new Date(endDate);
                     end.setDate(end.getDate() + 1);
                     query = query.lt('hora_solicitud', end.toISOString().split('T')[0]);
@@ -1256,7 +1230,7 @@
                     query = query.eq('id_servicio', serviceId);
                 }
 
-                query = query.order('hora_solicitud', { ascending: false }); // Últimos turnos primero
+                query = query.order('hora_solicitud', { ascending: false });
 
                 const { data: history, error } = await query;
                 if (error) throw error;
@@ -1273,10 +1247,9 @@
 
                     const formatTime = (isoString) => isoString ? new Date(isoString).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
 
-                    // Format logs
                     let logsHtml = '<ul>';
                     if (turn.logs_turnos && turn.logs_turnos.length > 0) {
-                        turn.logs_turnos.sort((a, b) => new Date(a.hora_accion) - new Date(b.hora_accion)); // Sort logs by time
+                        turn.logs_turnos.sort((a, b) => new Date(a.hora_accion) - new Date(b.hora_accion));
                         turn.logs_turnos.forEach(log => {
                             logsHtml += `<li>${log.accion} @ ${new Date(log.hora_accion).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</li>`;
                         });
@@ -1306,8 +1279,6 @@
 
         filterHistoryBtn.addEventListener('click', loadTurnHistory);
 
-
-        // --- Notary Settings Functions ---
         resetTurnsBtn.addEventListener('click', async () => {
             const confirmed = await showConfirmationModal(
                 'Confirmar Reseteo de Turnos',
@@ -1316,88 +1287,94 @@
             if (!confirmed) return;
 
             try {
-                // NOTA: En un sistema real, esta lógica de reseteo de numeración
-                // debería ser manejada cuidadosamente en el backend para asegurar
-                // la integridad de los datos y evitar problemas de concurrencia.
-                // Aquí solo se simula un reseteo simple de la tabla 'turnos'.
-                // Una mejor aproximación sería tener una tabla de secuencias por prefijo
-                // y resetear solo esas secuencias.
-
-                // Eliminar todos los turnos existentes para "resetear" el sistema
-                // (Esto es una simplificación, en producción se archivarian o se resetearian contadores)
-                const { error } = await supabase.from('turnos').delete().neq('id_turno', 0); // Elimina todos los turnos
+                const { error } = await supabase.from('turnos').delete().neq('id_turno', 0);
                 if (error) throw error;
 
-                alert('Numeración de turnos reseteada exitosamente para el día.');
-                // Recargar el dashboard para reflejar los cambios
+                await showConfirmationModal('Éxito', 'Numeración de turnos reseteada exitosamente para el día.');
                 loadDashboardSummary();
                 loadRealtimeModulesStatus();
             } catch (error) {
                 console.error("Error al resetear turnos:", error.message);
-                alert(`Error al resetear turnos: ${error.message}`);
+                await showConfirmationModal('Error', `Error al resetear turnos: ${error.message}`);
             }
         });
 
+        function setupRealtimeSubscriptions() {
+            if (supabase.from && typeof supabase.from === 'function') {
+                if (typeof supabase.from('turnos').on === 'function') {
+                    supabase
+                        .from('turnos')
+                        .on('*', payload => {
+                            console.log('Cambio en turnos recibido en admin dashboard!', payload);
+                            loadDashboardSummary();
+                            loadRealtimeModulesStatus();
+                            if (!document.getElementById('turn-history-view').classList.contains('hidden')) {
+                                loadTurnHistory();
+                            }
+                        })
+                        .subscribe();
+                } else {
+                    console.error("Error: supabase.from('turnos').on no es una función. Las suscripciones en tiempo real para turnos no funcionarán.");
+                }
 
-        // --- Suscripciones en tiempo real a Supabase (para el Dashboard) ---
-        supabase
-            .from('turnos')
-            .on('*', payload => {
-                console.log('Cambio en turnos recibido en admin dashboard!', payload);
-                loadDashboardSummary();
-                loadRealtimeModulesStatus();
-                // Si la vista actual es historial, recargarla
-                if (!document.getElementById('turn-history-view').classList.contains('hidden')) {
-                    loadTurnHistory();
+                if (typeof supabase.from('modulos').on === 'function') {
+                    supabase
+                        .from('modulos')
+                        .on('*', payload => {
+                            console.log('Cambio en modulos recibido en admin dashboard!', payload);
+                            loadDashboardSummary();
+                            loadRealtimeModulesStatus();
+                            if (!document.getElementById('manage-modules-view').classList.contains('hidden')) {
+                                loadModules();
+                            }
+                            if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
+                                loadServicesConfig();
+                            }
+                            if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
+                                loadModulesForUserAssignment();
+                            }
+                        })
+                        .subscribe();
+                } else {
+                    console.warn("Advertencia: supabase.from('modulos').on no es una función. Los cambios de módulos no se actualizarán en tiempo real.");
                 }
-            })
-            .subscribe();
 
-        supabase
-            .from('modulos')
-            .on('*', payload => {
-                console.log('Cambio en modulos recibido en admin dashboard!', payload);
-                loadDashboardSummary();
-                loadRealtimeModulesStatus();
-                // Si la vista actual es gestionar módulos o configurar servicios, recargarla
-                if (!document.getElementById('manage-modules-view').classList.contains('hidden')) {
-                    loadModules();
+                if (typeof supabase.from('usuarios').on === 'function') {
+                    supabase
+                        .from('usuarios')
+                        .on('*', payload => {
+                            console.log('Cambio en usuarios recibido en admin dashboard!', payload);
+                            if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
+                                loadUsers();
+                            }
+                            loadRealtimeModulesStatus();
+                        })
+                        .subscribe();
+                } else {
+                    console.warn("Advertencia: supabase.from('usuarios').on no es una función. Los cambios de usuarios no se actualizarán en tiempo real.");
                 }
-                if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
-                    loadServicesConfig();
-                }
-                if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
-                    loadModulesForUserAssignment(); // Para actualizar el select de módulos
-                }
-            })
-            .subscribe();
 
-        supabase
-            .from('usuarios')
-            .on('*', payload => {
-                console.log('Cambio en usuarios recibido en admin dashboard!', payload);
-                if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
-                    loadUsers();
+                if (typeof supabase.from('modulos_servicios').on === 'function') {
+                    supabase
+                        .from('modulos_servicios')
+                        .on('*', payload => {
+                            console.log('Cambio en modulos_servicios recibido en admin dashboard!', payload);
+                            if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
+                                loadServicesConfig();
+                            }
+                        })
+                        .subscribe();
+                } else {
+                    console.warn("Advertencia: supabase.from('modulos_servicios').on no es una función. Los cambios de asignación de servicios no se actualizarán en tiempo real.");
                 }
-                loadRealtimeModulesStatus(); // Para actualizar nombres de funcionarios en el dashboard
-            })
-            .subscribe();
+            } else {
+                console.error("Error: supabase.from no es una función. Las suscripciones en tiempo real no funcionarán.");
+            }
+        }
 
-        supabase
-            .from('modulos_servicios')
-            .on('*', payload => {
-                console.log('Cambio en modulos_servicios recibido en admin dashboard!', payload);
-                if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
-                    loadServicesConfig();
-                }
-                // También puede afectar la carga de turnos pendientes para funcionarios,
-                // pero eso se maneja en el panel de funcionario.
-            })
-            .subscribe();
-
-        // Cargar la vista inicial (Dashboard) al cargar la página
         window.onload = () => {
             showView('dashboard');
+            setTimeout(setupRealtimeSubscriptions, 500);
         };
 
     </script>
