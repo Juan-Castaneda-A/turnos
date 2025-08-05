@@ -217,18 +217,34 @@
 
     <script type="module">
         // Importar el cliente de Supabase
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+        // Usando cdn.jsdelivr.net para una importación más estable del paquete ESM
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
         // Variables de configuración (pasadas desde Flask)
         const SUPABASE_URL = "{{ supabase_url }}";
         const SUPABASE_KEY = "{{ supabase_key }}";
-        const USER_ID = "{{ session['user_id'] }}"; // ID del usuario logueado
-        const ASSIGNED_MODULE_ID = "{{ session['assigned_module_id'] }}"; // ID del módulo asignado
+        // Convertir la cadena 'None' o 'null' a null de JavaScript
+        const USER_ID = "{{ session['user_id'] }}" === 'None' || "{{ session['user_id'] }}" === 'null' ? null : "{{ session['user_id'] }}";
+        const ASSIGNED_MODULE_ID_STR = "{{ session['assigned_module_id'] }}";
+        const ASSIGNED_MODULE_ID = ASSIGNED_MODULE_ID_STR === 'None' || ASSIGNED_MODULE_ID_STR === 'null' ? null : parseInt(ASSIGNED_MODULE_ID_STR);
         const USER_NAME = "{{ user_name }}"; // Nombre del usuario
 
         // Inicializar Supabase
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         console.log("Supabase Client inicializado para Panel de Funcionario.");
+        console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
+        console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
+
+        // DEBUG: Inspeccionar el objeto retornado por supabase.from()
+        let testFromObject;
+        try {
+            testFromObject = supabase.from('turnos');
+            console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
+            console.log("¿Existe testFromObject.on?", typeof testFromObject.on); // ESTO DEBERÍA SER 'function'
+        } catch (e) {
+            console.error("Error al intentar llamar supabase.from('turnos'):", e);
+        }
+
 
         // Referencias a elementos del DOM
         const assignedModuleNameElement = document.getElementById('assigned-module-name');
@@ -281,7 +297,7 @@
         // --- Funciones de Actualización de UI ---
 
         async function updateAssignedModuleName() {
-            if (ASSIGNED_MODULE_ID && ASSIGNED_MODULE_ID !== 'None') {
+            if (ASSIGNED_MODULE_ID !== null) {
                 try {
                     const { data, error } = await supabase
                         .from('modulos')
@@ -299,13 +315,21 @@
             } else {
                 assignedModuleNameElement.textContent = 'No Asignado';
                 myModuleTitleElement.textContent = 'Mi Módulo: No Asignado';
+                btnCallNext.disabled = true;
+                btnRecall.disabled = true;
+                btnFinish.disabled = true;
             }
         }
 
         async function loadPendingTurns() {
             pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Cargando turnos...</td></tr>`;
+            if (ASSIGNED_MODULE_ID === null) {
+                pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Asigne un módulo a este funcionario para ver turnos.</td></tr>`;
+                btnCallNext.disabled = true;
+                return;
+            }
+
             try {
-                // Obtener los servicios que este módulo puede atender
                 const { data: moduleServices, error: msError } = await supabase
                     .from('modulos_servicios')
                     .select('id_servicio')
@@ -320,13 +344,12 @@
                     return;
                 }
 
-                // Obtener turnos 'en espera' para los servicios que este módulo atiende
                 const { data: turns, error: turnsError } = await supabase
                     .from('turnos')
                     .select('*, servicios(nombre_servicio)')
                     .eq('estado', 'en espera')
                     .in('id_servicio', serviceIds)
-                    .order('hora_solicitud', { ascending: true }); // El turno más antiguo primero
+                    .order('hora_solicitud', { ascending: true });
 
                 if (turnsError) throw turnsError;
 
@@ -344,7 +367,7 @@
                         `;
                         pendingTurnsBody.appendChild(tr);
                     });
-                    btnCallNext.disabled = false; // Habilitar si hay turnos
+                    btnCallNext.disabled = false;
                 }
             } catch (error) {
                 console.error("Error al cargar turnos pendientes:", error.message);
@@ -355,15 +378,23 @@
         }
 
         async function loadCurrentTurn() {
+            if (ASSIGNED_MODULE_ID === null) {
+                currentAttendingTurnElement.textContent = '---';
+                currentAttendingServiceElement.textContent = 'Módulo no asignado.';
+                currentAttendingTurnId = null;
+                updateButtonStates();
+                return;
+            }
+
             try {
                 const { data: turn, error } = await supabase
                     .from('turnos')
                     .select('*, servicios(nombre_servicio)')
                     .eq('estado', 'en atencion')
                     .eq('id_modulo_atencion', ASSIGNED_MODULE_ID)
-                    .single(); // Esperamos solo un turno en atención por módulo
+                    .single();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 es 'No rows found'
+                if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
 
@@ -387,15 +418,19 @@
 
         async function loadDailyHistory() {
             dailyHistoryBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Cargando historial...</td></tr>`;
+            if (ASSIGNED_MODULE_ID === null) {
+                dailyHistoryBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Asigne un módulo a este funcionario para ver historial.</td></tr>`;
+                return;
+            }
+
             try {
-                // Obtener turnos 'atendido' por este usuario hoy
-                const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+                const today = new Date().toISOString().split('T')[0];
                 const { data: history, error } = await supabase
                     .from('turnos')
                     .select('*')
                     .eq('estado', 'atendido')
-                    .eq('id_modulo_atencion', ASSIGNED_MODULE_ID) // Asumimos que el historial es por módulo de atención
-                    .gte('hora_finalizacion', today) // Desde el inicio del día
+                    .eq('id_modulo_atencion', ASSIGNED_MODULE_ID)
+                    .gte('hora_finalizacion', today)
                     .order('hora_finalizacion', { ascending: false });
 
                 if (error) throw error;
@@ -421,10 +456,18 @@
             }
         }
 
-        // Habilitar/deshabilitar botones según el estado actual
         function updateButtonStates() {
+            if (ASSIGNED_MODULE_ID === null) {
+                btnCallNext.disabled = true;
+                btnRecall.disabled = true;
+                btnFinish.disabled = true;
+                return;
+            }
+
             const hasCurrentTurn = currentAttendingTurnId !== null;
-            const hasPendingTurns = pendingTurnsBody.querySelector('.table-row') !== null && pendingTurnsBody.querySelector('.text-gray-500') === null;
+            const hasPendingTurns = pendingTurnsBody.querySelector('.table-row') !== null &&
+                                    pendingTurnsBody.querySelector('.text-gray-500') === null &&
+                                    pendingTurnsBody.querySelector('.text-red-400') === null;
 
             btnCallNext.disabled = hasCurrentTurn || !hasPendingTurns;
             btnRecall.disabled = !hasCurrentTurn;
@@ -437,9 +480,8 @@
             const confirmed = await showConfirmationModal('Llamar Siguiente Turno', '¿Está seguro de que desea llamar al siguiente turno disponible?');
             if (!confirmed) return;
 
-            btnCallNext.disabled = true; // Deshabilitar para evitar doble clic
+            btnCallNext.disabled = true;
             try {
-                // Obtener el siguiente turno 'en espera' para este módulo
                 const { data: moduleServices, error: msError } = await supabase
                     .from('modulos_servicios')
                     .select('id_servicio')
@@ -454,15 +496,16 @@
                     .in('id_servicio', serviceIds)
                     .order('hora_solicitud', { ascending: true })
                     .limit(1)
-                    .single(); // Intentar obtener solo uno
+                    .single();
 
-                if (nextTurnError && nextTurnError.code !== 'PGRST116') throw nextTurnError; // PGRST116 = no rows
+                if (nextTurnError && nextTurnError.code !== 'PGRST116') {
+                    throw nextTurnError;
+                }
                 if (!nextTurn) {
-                    alert('No hay turnos pendientes para llamar.'); // Usar modal en producción
+                    await showConfirmationModal('Atención', 'No hay turnos pendientes para llamar.');
                     return;
                 }
 
-                // Actualizar el estado del turno a 'en atencion'
                 const { error: updateError } = await supabase
                     .from('turnos')
                     .update({
@@ -474,7 +517,6 @@
 
                 if (updateError) throw updateError;
 
-                // Registrar la acción en logs_turnos
                 await supabase.from('logs_turnos').insert({
                     id_turno: nextTurn.id_turno,
                     id_usuario: USER_ID,
@@ -482,18 +524,17 @@
                 });
 
                 console.log(`Turno ${nextTurn.prefijo_turno}-${nextTurn.numero_turno} llamado.`);
-                // Las suscripciones en tiempo real actualizarán la UI automáticamente
             } catch (error) {
                 console.error("Error al llamar siguiente turno:", error.message);
-                alert(`Error al llamar turno: ${error.message}`); // Usar modal en producción
+                await showConfirmationModal('Error', `Error al llamar turno: ${error.message}`);
             } finally {
-                // La UI se actualizará vía suscripción, los botones se re-habilitarán si es necesario
+                updateButtonStates();
             }
         });
 
         btnRecall.addEventListener('click', async () => {
             if (!currentAttendingTurnId) {
-                alert('No hay un turno en curso para rellamar.'); // Usar modal en producción
+                await showConfirmationModal('Atención', 'No hay un turno en curso para rellamar.');
                 return;
             }
             const confirmed = await showConfirmationModal('Rellamar Turno', '¿Está seguro de que desea rellamar el turno actual?');
@@ -501,7 +542,6 @@
 
             btnRecall.disabled = true;
             try {
-                // Actualizar hora_llamado para que el visualizador lo detecte como "nuevo llamado"
                 const { error: updateError } = await supabase
                     .from('turnos')
                     .update({ hora_llamado: new Date().toISOString() })
@@ -509,7 +549,6 @@
 
                 if (updateError) throw updateError;
 
-                // Registrar la acción en logs_turnos
                 await supabase.from('logs_turnos').insert({
                     id_turno: currentAttendingTurnId,
                     id_usuario: USER_ID,
@@ -519,15 +558,16 @@
                 console.log(`Turno ${currentAttendingTurnId} rellamado.`);
             } catch (error) {
                 console.error("Error al rellamar turno:", error.message);
-                alert(`Error al rellamar turno: ${error.message}`); // Usar modal en producción
+                await showConfirmationModal('Error', `Error al rellamar turno: ${error.message}`);
             } finally {
-                btnRecall.disabled = false; // Re-habilitar
+                btnRecall.disabled = false;
+                updateButtonStates();
             }
         });
 
         btnFinish.addEventListener('click', async () => {
             if (!currentAttendingTurnId) {
-                alert('No hay un turno en curso para finalizar.'); // Usar modal en producción
+                await showConfirmationModal('Atención', 'No hay un turno en curso para finalizar.');
                 return;
             }
             const confirmed = await showConfirmationModal('Finalizar Turno', '¿Está seguro de que desea finalizar el turno actual?');
@@ -535,7 +575,6 @@
 
             btnFinish.disabled = true;
             try {
-                // Actualizar el estado del turno a 'atendido'
                 const { error: updateError } = await supabase
                     .from('turnos')
                     .update({
@@ -546,7 +585,6 @@
 
                 if (updateError) throw updateError;
 
-                // Registrar la acción en logs_turnos
                 await supabase.from('logs_turnos').insert({
                     id_turno: currentAttendingTurnId,
                     id_usuario: USER_ID,
@@ -554,46 +592,59 @@
                 });
 
                 console.log(`Turno ${currentAttendingTurnId} finalizado.`);
-                currentAttendingTurnId = null; // Limpiar el turno actual
+                currentAttendingTurnId = null;
             } catch (error) {
                 console.error("Error al finalizar turno:", error.message);
-                alert(`Error al finalizar turno: ${error.message}`); // Usar modal en producción
+                await showConfirmationModal('Error', `Error al finalizar turno: ${error.message}`);
             } finally {
-                // La UI se actualizará vía suscripción, los botones se re-habilitarán si es necesario
+                updateButtonStates();
             }
         });
 
 
         // --- Suscripciones en tiempo real a Supabase ---
 
-        // Suscribirse a cambios en la tabla 'turnos'
-        supabase
-            .from('turnos')
-            .on('*', payload => {
-                console.log('Cambio en turnos recibido en panel funcionario!', payload);
-                loadPendingTurns();
-                loadCurrentTurn();
-                loadDailyHistory();
-            })
-            .subscribe();
+        function setupRealtimeSubscriptions() {
+            // Verifica que supabase.from().on exista antes de suscribirse
+            if (supabase.from('turnos') && typeof supabase.from('turnos').on === 'function') {
+                supabase
+                    .from('turnos')
+                    .on('*', payload => {
+                        console.log('Cambio en turnos recibido en panel funcionario!', payload);
+                        loadPendingTurns();
+                        loadCurrentTurn();
+                        loadDailyHistory();
+                    })
+                    .subscribe();
+            } else {
+                console.error("Error: supabase.from('turnos').on no es una función. Las suscripciones en tiempo real no funcionarán.");
+            }
 
-        // Suscribirse a cambios en modulos_servicios (si la configuración de servicios cambia para el módulo)
-        supabase
-            .from('modulos_servicios')
-            .on('*', payload => {
-                console.log('Cambio en modulos_servicios recibido!', payload);
-                loadPendingTurns(); // Podría afectar qué turnos son "pendientes" para este módulo
-            })
-            .subscribe();
+            if (supabase.from('modulos_servicios') && typeof supabase.from('modulos_servicios').on === 'function') {
+                supabase
+                    .from('modulos_servicios')
+                    .on('*', payload => {
+                        console.log('Cambio en modulos_servicios recibido!', payload);
+                        loadPendingTurns();
+                    })
+                    .subscribe();
+            } else {
+                console.warn("Advertencia: supabase.from('modulos_servicios').on no es una función. Los cambios de configuración de servicios no se actualizarán en tiempo real.");
+            }
 
-        // Suscribirse a cambios en modulos (para actualizar el nombre del módulo si cambia)
-        supabase
-            .from('modulos')
-            .on('*', payload => {
-                console.log('Cambio en modulos recibido!', payload);
-                updateAssignedModuleName();
-            })
-            .subscribe();
+            if (supabase.from('modulos') && typeof supabase.from('modulos').on === 'function') {
+                supabase
+                    .from('modulos')
+                    .on('*', payload => {
+                        console.log('Cambio en modulos recibido!', payload);
+                        updateAssignedModuleName();
+                    })
+                    .subscribe();
+            } else {
+                console.warn("Advertencia: supabase.from('modulos').on no es una función. Los cambios de módulos no se actualizarán en tiempo real.");
+            }
+        }
+
 
         // Cargar datos iniciales al cargar la página
         window.onload = () => {
@@ -601,6 +652,9 @@
             loadPendingTurns();
             loadCurrentTurn();
             loadDailyHistory();
+            // Retrasar la configuración de las suscripciones en tiempo real
+            // para dar tiempo a que el DOM y el cliente de Supabase se inicialicen completamente.
+            setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
         };
 
     </script>

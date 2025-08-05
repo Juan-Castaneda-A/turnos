@@ -244,18 +244,24 @@ def admin_dashboard():
         flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
         return redirect(url_for('funcionario_login'))
 
+    if supabase is None:
+        flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
+        return render_template('error.html', message="Problema de configuración del sistema.")
+
     try:
         # Aquí se cargarían los datos para el dashboard:
         # - Número de turnos en espera
         # - Total de turnos atendidos en el día
         # - Estado de cada ventanilla
         # Estos datos se pueden obtener de Supabase o se pueden cargar en el frontend con JS.
-        return render_template('admin_dashboard.html')
+        return render_template('admin_dashboard.html',
+                               supabase_url=SUPABASE_URL, # ¡Asegurarse de pasar la URL!
+                               supabase_key=SUPABASE_KEY,   # ¡Asegurarse de pasar la KEY!
+                               user_name=session.get('user_name', 'Administrador')) # También pasamos el nombre
     except Exception as e:
         logging.error(f"Error al cargar el dashboard de administración: {e}")
         flash("Error al cargar el dashboard. Por favor, intente de nuevo más tarde.", "error")
         return redirect(url_for('funcionario_login'))
-
 
 @app.route('/logout')
 def logout():
