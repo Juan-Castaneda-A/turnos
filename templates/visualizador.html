@@ -189,7 +189,6 @@
                         </tr>
                     </thead>
                     <tbody id="modules-status-body">
-                        <!-- El estado de los módulos se insertará aquí por JavaScript -->
                         <tr>
                             <td colspan="3" class="text-center text-gray-500">Cargando estado de módulos...</td>
                         </tr>
@@ -204,7 +203,8 @@
 
     <script type="module">
         // Importar el cliente de Supabase
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+        // Usando cdn.jsdelivr.net para una importación más estable del paquete ESM
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
         // Variables de configuración (pasadas desde Flask)
         const SUPABASE_URL = "{{ supabase_url }}";
@@ -212,7 +212,19 @@
 
         // Inicializar Supabase
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log("Supabase Client inicializado.");
+        console.log("Supabase Client inicializado para Visualizador.");
+        console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
+        console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
+
+        // DEBUG: Inspeccionar el objeto retornado por supabase.from()
+        let testFromObject;
+        try {
+            testFromObject = supabase.from('turnos');
+            console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
+            console.log("¿Existe testFromObject.on?", typeof testFromObject.on); // ESTO DEBERÍA SER 'function'
+        } catch (e) {
+            console.error("Error al intentar llamar supabase.from('turnos'):", e);
+        }
 
         // Referencias a los elementos del DOM
         const currentTurnNumberElement = document.getElementById('current-turn-number');
@@ -314,33 +326,44 @@
 
         // --- Suscripciones en tiempo real a Supabase ---
 
-        // Suscribirse a cambios en la tabla 'turnos'
-        supabase
-            .from('turnos')
-            .on('*', async payload => {
-                console.log('Cambio en turnos recibido!', payload);
-                // Recargar datos relevantes para el visualizador
-                await loadInitialData();
-            })
-            .subscribe();
+        function setupRealtimeSubscriptions() {
+            // Verifica que supabase.from().on exista antes de suscribirse
+            if (supabase.from('turnos') && typeof supabase.from('turnos').on === 'function') {
+                supabase
+                    .from('turnos')
+                    .on('*', async payload => {
+                        console.log('Cambio en turnos recibido en visualizador!', payload);
+                        await loadInitialData();
+                    })
+                    .subscribe();
+            } else {
+                console.error("Error: supabase.from('turnos').on no es una función. Las suscripciones en tiempo real no funcionarán.");
+            }
 
-        // Suscribirse a cambios en la tabla 'modulos'
-        supabase
-            .from('modulos')
-            .on('*', async payload => {
-                console.log('Cambio en modulos recibido!', payload);
-                await loadInitialData();
-            })
-            .subscribe();
+            if (supabase.from('modulos') && typeof supabase.from('modulos').on === 'function') {
+                supabase
+                    .from('modulos')
+                    .on('*', async payload => {
+                        console.log('Cambio en modulos recibido en visualizador!', payload);
+                        await loadInitialData();
+                    })
+                    .subscribe();
+            } else {
+                console.warn("Advertencia: supabase.from('modulos').on no es una función. Los cambios de módulos no se actualizarán en tiempo real.");
+            }
 
-        // Suscribirse a cambios en la tabla 'usuarios' (para actualizar nombres de funcionarios)
-        supabase
-            .from('usuarios')
-            .on('*', async payload => {
-                console.log('Cambio en usuarios recibido!', payload);
-                await loadInitialData();
-            })
-            .subscribe();
+            if (supabase.from('usuarios') && typeof supabase.from('usuarios').on === 'function') {
+                supabase
+                    .from('usuarios')
+                    .on('*', async payload => {
+                        console.log('Cambio en usuarios recibido en visualizador!', payload);
+                        await loadInitialData();
+                    })
+                    .subscribe();
+            } else {
+                console.warn("Advertencia: supabase.from('usuarios').on no es una función. Los cambios de usuarios no se actualizarán en tiempo real.");
+            }
+        }
 
 
         // Función para cargar los datos iniciales y mantener actualizados los displays
@@ -395,7 +418,11 @@
         }
 
         // Cargar datos iniciales al cargar la página
-        window.onload = loadInitialData;
+        window.onload = () => {
+            loadInitialData();
+            // Retrasar la configuración de las suscripciones en tiempo real
+            setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
+        };
 
     </script>
 </body>
