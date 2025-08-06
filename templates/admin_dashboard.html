@@ -566,15 +566,6 @@
         console.log("Objeto Supabase:", supabase);
         console.log("¿Existe supabase.from?", typeof supabase.from);
 
-        let testFromObject;
-        try {
-            testFromObject = supabase.from('turnos');
-            console.log("Objeto retornado por supabase.from('turnos'):", testFromObject);
-            console.log("¿Existe testFromObject.on?", typeof testFromObject.on);
-        } catch (e) {
-            console.error("Error al intentar llamar supabase.from('turnos'):", e);
-        }
-
         const navLinks = document.querySelectorAll('.nav-link');
         const contentSections = document.querySelectorAll('.content-section');
 
@@ -602,7 +593,8 @@
         const moduleFormTitle = document.getElementById('module-form-title');
         const moduleForm = document.getElementById('module-form');
         const moduleIdField = document.getElementById('module-id-field');
-        const moduleNameField = document = document.getElementById('module-name-field');
+        // CORRECCIÓN: Eliminado el error de tipeo "document ="
+        const moduleNameField = document.getElementById('module-name-field');
         const moduleDescriptionField = document.getElementById('module-description-field');
         const moduleStatusField = document.getElementById('module-status-field');
         const moduleStatusText = document.getElementById('module-status-text');
@@ -680,12 +672,14 @@
                     loadServicesConfig();
                     break;
                 case 'reports':
+                    // Lógica para cargar reportes (si aplica)
                     break;
                 case 'turn-history':
                     loadHistoryServicesFilter();
                     loadTurnHistory();
                     break;
                 case 'notary-settings':
+                    // Lógica para cargar configuración de notaría (si aplica)
                     break;
             }
         }
@@ -733,11 +727,27 @@
         async function loadRealtimeModulesStatus() {
             realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando estado de módulos...</td></tr>`;
             try {
+                // Obtener todos los usuarios y mapear su id_modulo_asignado a su nombre
+                let moduleToUserNameMap = {};
+                try {
+                    const { data: users, error: usersError } = await supabase
+                        .from('usuarios')
+                        .select('id_usuario, nombre_completo, id_modulo_asignado');
+                    if (usersError) throw usersError;
+                    
+                    users.forEach(user => {
+                        if (user.id_modulo_asignado) {
+                            moduleToUserNameMap[user.id_modulo_asignado] = user.nombre_completo;
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error al cargar usuarios para el estado de módulos en tiempo real:", error.message);
+                }
+
                 const { data: modulesData, error: modulesError } = await supabase
                     .from('modulos')
                     .select(`
                         *,
-                        usuarios(nombre_completo),
                         turnos(id_turno, numero_turno, prefijo_turno, estado)
                     `)
                     .order('nombre_modulo', { ascending: true });
@@ -756,6 +766,9 @@
                     let statusClass = '';
                     let statusText = '';
                     let currentTurnInfo = '---';
+
+                    // Obtener el nombre del funcionario asignado a este módulo
+                    const funcionarioNombre = moduleToUserNameMap[mod.id_modulo] || 'Sin Asignar';
 
                     const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
 
@@ -781,7 +794,7 @@
 
                     tr.innerHTML = `
                         <td class="px-4 py-2">${mod.nombre_modulo}</td>
-                        <td class="px-4 py-2">${mod.usuarios ? mod.usuarios.nombre_completo : 'Sin Asignar'}</td>
+                        <td class="px-4 py-2">${funcionarioNombre}</td>
                         <td class="px-4 py-2 ${statusClass}">${statusText}</td>
                         <td class="px-4 py-2">${currentTurnInfo}</td>
                     `;
@@ -1300,81 +1313,88 @@
         });
 
         function setupRealtimeSubscriptions() {
-            if (supabase.from && typeof supabase.from === 'function') {
-                if (typeof supabase.from('turnos').on === 'function') {
-                    supabase
-                        .from('turnos')
-                        .on('*', payload => {
-                            console.log('Cambio en turnos recibido en admin dashboard!', payload);
-                            loadDashboardSummary();
-                            loadRealtimeModulesStatus();
-                            if (!document.getElementById('turn-history-view').classList.contains('hidden')) {
-                                loadTurnHistory();
-                            }
-                        })
-                        .subscribe();
-                } else {
-                    console.error("Error: supabase.from('turnos').on no es una función. Las suscripciones en tiempo real para turnos no funcionarán.");
-                }
+            // Suscribirse a cambios en la tabla 'turnos'
+            const turnosChannel = supabase.channel('admin_turnos_channel');
+            turnosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'turnos' },
+                    async payload => {
+                        console.log('Cambio en turnos recibido en admin dashboard!', payload);
+                        loadDashboardSummary();
+                        loadRealtimeModulesStatus();
+                        // Solo recargar el historial si la vista está activa
+                        if (!document.getElementById('turn-history-view').classList.contains('hidden')) {
+                            loadTurnHistory();
+                        }
+                    }
+                )
+                .subscribe();
 
-                if (typeof supabase.from('modulos').on === 'function') {
-                    supabase
-                        .from('modulos')
-                        .on('*', payload => {
-                            console.log('Cambio en modulos recibido en admin dashboard!', payload);
-                            loadDashboardSummary();
-                            loadRealtimeModulesStatus();
-                            if (!document.getElementById('manage-modules-view').classList.contains('hidden')) {
-                                loadModules();
-                            }
-                            if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
-                                loadServicesConfig();
-                            }
-                            if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
-                                loadModulesForUserAssignment();
-                            }
-                        })
-                        .subscribe();
-                } else {
-                    console.warn("Advertencia: supabase.from('modulos').on no es una función. Los cambios de módulos no se actualizarán en tiempo real.");
-                }
+            // Suscribirse a cambios en la tabla 'modulos'
+            const modulosChannel = supabase.channel('admin_modulos_channel');
+            modulosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'modulos' },
+                    async payload => {
+                        console.log('Cambio en modulos recibido en admin dashboard!', payload);
+                        loadDashboardSummary();
+                        loadRealtimeModulesStatus();
+                        // Solo recargar si la vista está activa
+                        if (!document.getElementById('manage-modules-view').classList.contains('hidden')) {
+                            loadModules();
+                        }
+                        if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
+                            loadServicesConfig();
+                        }
+                        if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
+                            loadModulesForUserAssignment();
+                        }
+                    }
+                )
+                .subscribe();
 
-                if (typeof supabase.from('usuarios').on === 'function') {
-                    supabase
-                        .from('usuarios')
-                        .on('*', payload => {
-                            console.log('Cambio en usuarios recibido en admin dashboard!', payload);
-                            if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
-                                loadUsers();
-                            }
-                            loadRealtimeModulesStatus();
-                        })
-                        .subscribe();
-                } else {
-                    console.warn("Advertencia: supabase.from('usuarios').on no es una función. Los cambios de usuarios no se actualizarán en tiempo real.");
-                }
+            // Suscribirse a cambios en la tabla 'usuarios'
+            const usuariosChannel = supabase.channel('admin_usuarios_channel');
+            usuariosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'usuarios' },
+                    async payload => {
+                        console.log('Cambio en usuarios recibido en admin dashboard!', payload);
+                        // Solo recargar si la vista está activa
+                        if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
+                            loadUsers();
+                        }
+                        loadRealtimeModulesStatus(); // Esto siempre debe actualizarse
+                    }
+                )
+                .subscribe();
 
-                if (typeof supabase.from('modulos_servicios').on === 'function') {
-                    supabase
-                        .from('modulos_servicios')
-                        .on('*', payload => {
-                            console.log('Cambio en modulos_servicios recibido en admin dashboard!', payload);
-                            if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
-                                loadServicesConfig();
-                            }
-                        })
-                        .subscribe();
-                } else {
-                    console.warn("Advertencia: supabase.from('modulos_servicios').on no es una función. Los cambios de asignación de servicios no se actualizarán en tiempo real.");
-                }
-            } else {
-                console.error("Error: supabase.from no es una función. Las suscripciones en tiempo real no funcionarán.");
-            }
+            // Suscribirse a cambios en la tabla 'modulos_servicios'
+            const modulosServiciosChannel = supabase.channel('admin_modulos_servicios_channel');
+            modulosServiciosChannel
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'modulos_servicios' },
+                    async payload => {
+                        console.log('Cambio en modulos_servicios recibido en admin dashboard!', payload);
+                        // Solo recargar si la vista está activa
+                        if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
+                            loadServicesConfig();
+                        }
+                    }
+                )
+                .subscribe();
+
+            console.log("Suscripciones Realtime configuradas para el Panel de Administración.");
         }
 
         window.onload = () => {
-            showView('dashboard');
-            setTimeout(setupRealtimeSubscriptions, 500);
+            showView('dashboard'); // Carga la vista de Dashboard por defecto
+            // Retrasar la configuración de las suscripciones en tiempo real
+            setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
         };
 
     </script>
