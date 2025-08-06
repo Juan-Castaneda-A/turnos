@@ -199,7 +199,7 @@
     </div>
 
     <!-- Elemento de audio para la alerta de sonido -->
-    <audio id="call-sound" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>
+    <!--<audio id="call-sound" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>-->
 
     <script type="module">
         // Importar el cliente de Supabase
@@ -221,17 +221,197 @@
         const currentTurnDisplayElement = document.getElementById('current-turn-display');
         const callHistoryElement = document.getElementById('call-history');
         const modulesStatusBodyElement = document.getElementById('modules-status-body');
-        const callSound = document.getElementById('call-sound');
+        //const callSound = document.getElementById('call-sound');
 
         let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples veces para el mismo turno
 
-        let audioEnabled = false;
+        //let audioEnabled = false;
 
-        document.addEventListener('click', () => {
+        /*document.addEventListener('click', () => {
             audioEnabled = true;
             // Intentar reproducir el sonido para "desbloquear" el audio
             callSound.play().then(() => callSound.pause()).catch(e => console.log(e));
-        }, { once: true });
+        }, { once: true });*/
+
+        // --- Funciones de Utilidad para Audio y TTS ---
+
+        // Utility function to convert base64 to ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Utility function to convert PCM (Int16Array) to WAV Blob
+        function pcmToWav(pcm, sampleRate) {
+            const pcmLength = pcm.length;
+            const buffer = new ArrayBuffer(44 + pcmLength * 2); // 44 bytes for WAV header, 2 bytes per sample (PCM16)
+            const view = new DataView(buffer);
+
+            // WAV header
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcmLength * 2, true); // ChunkSize
+            writeString(view, 8, 'WAVE');
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+            view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+            view.setUint16(22, 1, true); // NumChannels (1 for mono)
+            view.setUint32(24, sampleRate, true); // SampleRate
+            view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
+            view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
+            view.setUint16(34, 16, true); // BitsPerSample
+            // DATA sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcmLength * 2, true); // Subchunk2Size (NumSamples * NumChannels * BitsPerSample/8)
+
+            // Write PCM data
+            let offset = 44;
+            for (let i = 0; i < pcmLength; i++, offset += 2) {
+                view.setInt16(offset, pcm[i], true);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        // Utility function for exponential backoff with fetch
+        async function fetchWithExponentialBackoff(url, options, retries = 3, delay = 1000) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    if (response.status === 429 && retries > 0) { // Too Many Requests
+                        console.warn(`Rate limit hit, retrying in ${delay / 1000}s...`);
+                        await new Promise(res => setTimeout(res, delay));
+                        return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response;
+            } catch (error) {
+                if (retries > 0) {
+                    console.warn(`Fetch failed, retrying in ${delay / 1000}s...`, error);
+                    await new Promise(res => setTimeout(res, delay));
+                    return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
+                }
+                throw error;
+            }
+        }
+
+        // Function to convert numbers to Spanish words (simplified for turn numbers)
+        function numberToWordsSpanish(num) {
+            if (num === 0) return "cero";
+            if (num < 0) return "menos " + numberToWordsSpanish(Math.abs(num));
+
+            const units = ["", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve"];
+            const teens = ["diez", "once", "doce", "trece", "catorce", "quince", "dieciséis", "diecisiete", "dieciocho", "diecinueve"];
+            const tens = ["", "diez", "veinte", "treinta", "cuarenta", "cincuenta", "sesenta", "setenta", "ochenta", "noventa"];
+            const specialTeens = {
+                21: "veintiuno", 22: "veintidós", 23: "veintitrés", 24: "veinticuatro", 25: "veinticinco",
+                26: "veintiséis", 27: "veintisiete", 28: "veintiocho", 29: "veintinueve"
+            };
+
+            let words = [];
+            let currentNum = num;
+
+            if (currentNum >= 100) {
+                const hundredsVal = Math.floor(currentNum / 100);
+                if (hundredsVal === 1 && currentNum % 100 === 0) {
+                    words.push("cien");
+                } else {
+                    words.push(units[hundredsVal] === "uno" ? "ciento" : (units[hundredsVal] + "cientos"));
+                }
+                currentNum %= 100;
+            }
+
+            if (currentNum in specialTeens) {
+                words.push(specialTeens[currentNum]);
+            } else if (currentNum >= 20) {
+                words.push(tens[Math.floor(currentNum / 10)]);
+                if (currentNum % 10 !== 0) {
+                    words.push("y", units[currentNum % 10]);
+                }
+            } else if (currentNum >= 10) {
+                words.push(teens[currentNum - 10]);
+            } else if (currentNum > 0) {
+                words.push(units[currentNum]);
+            }
+
+            return words.join(" ").trim();
+        }
+
+        // Function to announce the turn using TTS
+        async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
+            try {
+                const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
+                const moduleNumberStr = nombreModulo.split(' ')[1]; // Extract "01" from "Módulo 01"
+                const moduleNumber = parseInt(moduleNumberStr, 10); // Convert "01" to 1
+                const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
+
+                const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase a la ventanilla ${moduleNumberEnPalabras}.`;
+                console.log("Texto a anunciar:", textToSpeak);
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: textToSpeak }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: "Charon" } // Voz en español (Colombia)
+                            }
+                        }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+
+                const apiKey = "AIzaSyCUBRXY-lDsx4Xm4s5MGzvvQF5wdjdLm3g"; // Canvas will inject the API key at runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+                const response = await fetchWithExponentialBackoff(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    // Extract sample rate from mimeType, e.g., "audio/L16;rate=16000"
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000; // Default to 16000 if not found
+
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData); // API returns signed PCM16 audio data.
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(e => console.error("Error al reproducir el audio TTS (posiblemente bloqueado por el navegador):", e));
+                    audio.onended = () => URL.revokeObjectURL(audioUrl); // Clean up URL
+                } else {
+                    console.error("No se recibieron datos de audio válidos de la API de TTS.");
+                }
+
+            } catch (error) {
+                console.error("Error al anunciar el turno con TTS:", error);
+            }
+        }
+        
 
         // Función para actualizar el display del turno actual
         async function updateCurrentTurnDisplay(turn) {
@@ -240,11 +420,8 @@
                 currentTurnModuleElement.textContent = `Diríjase a la Ventanilla ${turn.modulos.nombre_modulo.split(' ')[1]}`;
 
                 // Reproducir sonido si es un nuevo turno llamado
-                if (turn.id_turno !== lastCalledTurnId && audioEnabled) {
-                    // La reproducción automática de audio está bloqueada por los navegadores
-                    // hasta que el usuario interactúe con el documento.
-                    // El sonido se intentará reproducir, pero podría fallar si no hay interacción previa.
-                    callSound.play().catch(e => console.error("Error al reproducir sonido:", e));
+                if (turn.id_turno !== lastCalledTurnId) {
+                    await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
                     lastCalledTurnId = turn.id_turno;
 
                     // Añadir animación de pulso al display principal
