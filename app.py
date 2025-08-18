@@ -179,9 +179,13 @@ def solicitar_turno_action():
             
             logging.info(f"Nuevo turno creado vía RPC: {prefijo_ticket}-{nuevo_numero_turno}")
             
+            #Obtener el nombre del servicio para pasarlo a la plantilla
+            response_servicio = supabase.table('servicios').select('nombre_servicio').eq('id_servicio', nuevo_turno_data['id_servicio']).single().execute()
+            nombre_servicio = response_servicio.data['nombre_servicio'] if response_servicio.data else ''
             # Aquí se integraría la lógica para imprimir el ticket.
             return render_template('ticket_confirmacion.html',
-                                   turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}")
+                                   turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}",
+                                   servicio_nombre=nombre_servicio)
         else:
             # Esto podría pasar si la función RPC lanza un error (ej. servicio no existe)
             error_message = response.error.message if response.error else "Error desconocido al crear el turno."

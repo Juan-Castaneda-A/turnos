@@ -23,6 +23,31 @@
         setTimeout(function() {
             window.location.href = "{{ url_for('solicitar_turno_ui') }}";
         }, 5000); // 5000 milisegundos = 5 segundos
+
+        // --- CÓDIGO PARA IMPRIMIR
+        document.addEventListener('DOMContentLoaded', () => {
+            const ws = new WebSocket('ws://localhost:8765');
+
+            ws.onopen = function() {
+                console.log("Conectado al servidor de impresión.");
+                const ticketData = {
+                    turno: "{{ turno_id }}",
+                    servicio: "{{ servicio_nombre }}"
+                };
+                //se envía los datos del ticket al servidor puente
+                ws.send(JSON.stringify(ticketData)); 
+            };
+
+            ws.onerror = function(error) {
+                console.log('Error de WebSocket', error);
+                //aquí se mostrará un mensaje en pantalla si la conexión falla
+                //alert("Error: No se pudo conectar con el servicio de impresión")
+            };
+
+            ws.onclose = function() {
+                console.log("Desconectando del servidor de impresión.")
+            }
+        })
     </script>
 </body>
 </html>
