@@ -149,8 +149,8 @@ def solicitar_turno_ui():
 @app.route('/solicitar-turno', methods=['POST'])
 def solicitar_turno_action():
     """
-    Maneja la lógica cuando un cliente solicita un turno.
-    Aquí se crearía el turno en la base de datos y se activaría la impresión.
+    Maneja la lógica cuando un cliente solicita un turno llamando
+    a una función RPC de Supabase para evitar condiciones de carrera.
     """
     if supabase is None:
         flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
@@ -162,50 +162,36 @@ def solicitar_turno_action():
         return redirect(url_for('solicitar_turno_ui'))
 
     try:
-        # Obtener el prefijo del servicio
-        service_response = supabase.table('servicios').select('prefijo_ticket').eq('id_servicio', id_servicio).single().execute()
-        if not service_response.data:
-            flash("Servicio no encontrado o inválido.", "error")
-            return redirect(url_for('solicitar_turno_ui'))
-        prefijo_ticket = service_response.data['prefijo_ticket']
+        # --- Lógica Antigua (eliminada) ---
+        # Ya no necesitamos obtener el prefijo ni calcular el último número aquí.
+        # La función de la base de datos 'crear_nuevo_turno' hace todo eso.
 
-        # Obtener el último número de turno para este prefijo y calcular el siguiente
-        # IMPORTANTE: Esta lógica de secuencia es básica. Para producción, considera
-        # usar funciones de base de datos de Supabase o bloqueos transaccionales
-        # para evitar problemas de concurrencia en entornos de alto tráfico.
-        last_turn_response = supabase.table('turnos') \
-            .select('numero_turno') \
-            .eq('prefijo_turno', prefijo_ticket) \
-            .order('numero_turno', desc=True) \
-            .limit(1) \
-            .execute()
+        # --- Nueva Lógica: Llamada a la Función RPC ---
+        # Simplemente llamamos a la función que creamos en Supabase y le pasamos el id_servicio.
+        params = {'_id_servicio': int(id_servicio)}
+        response = supabase.rpc('crear_nuevo_turno', params).execute()
 
-        last_turn_number = last_turn_response.data[0]['numero_turno'] if last_turn_response.data else 0
-        nuevo_numero_turno = last_turn_number + 1
-
-        # Insertar el nuevo turno en la base de datos
-        new_turn_data = {
-            'numero_turno': nuevo_numero_turno,
-            'prefijo_turno': prefijo_ticket,
-            'id_servicio': id_servicio,
-            'estado': 'en espera'
-        }
-        insert_response = supabase.table('turnos').insert(new_turn_data).execute()
-        
-        if insert_response.data:
-            logging.info(f"Nuevo turno creado: {insert_response.data[0]['prefijo_turno']}-{insert_response.data[0]['numero_turno']}")
-            # Aquí se integraría la lógica para enviar la señal a la aplicación de escritorio
-            # para imprimir el ticket.
+        if response.data:
+            # La función nos devuelve la fila completa del turno que se creó
+            nuevo_turno_data = response.data
+            prefijo_ticket = nuevo_turno_data['prefijo_turno']
+            nuevo_numero_turno = nuevo_turno_data['numero_turno']
+            
+            logging.info(f"Nuevo turno creado vía RPC: {prefijo_ticket}-{nuevo_numero_turno}")
+            
+            # Aquí se integraría la lógica para imprimir el ticket.
             return render_template('ticket_confirmacion.html',
                                    turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}")
         else:
-            flash("No se pudo crear el turno. Error desconocido.", "error")
-            logging.error(f"Error desconocido al insertar turno: {insert_response.error}")
+            # Esto podría pasar si la función RPC lanza un error (ej. servicio no existe)
+            error_message = response.error.message if response.error else "Error desconocido al crear el turno."
+            flash(f"No se pudo crear el turno: {error_message}", "error")
+            logging.error(f"Error al llamar RPC 'crear_nuevo_turno': {error_message}")
             return redirect(url_for('solicitar_turno_ui'))
 
     except Exception as e:
-        logging.error(f"Error al solicitar turno: {e}")
-        flash(f"Error al procesar su solicitud de turno: {e}. Por favor, intente de nuevo.", "error")
+        logging.error(f"Excepción al solicitar turno con RPC: {e}")
+        flash(f"Error al procesar su solicitud de turno. Por favor, intente de nuevo.", "error")
         return redirect(url_for('solicitar_turno_ui'))
 
 
