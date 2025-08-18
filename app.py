@@ -1,7 +1,9 @@
 #Estructura Inicial de la Aplicación Flask para el Sistema de Turnos
-from flask import Flask, render_template, request, redirect, url_for, session, flash, g
+from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 import os
+import requests
 from dotenv import load_dotenv
 import logging
 import uuid
@@ -435,6 +437,114 @@ def logout():
 #        logging.error(f"Error en api_call_next_turn: {e}")
 #        return {"status": "error", "message": f"Error al llamar turno: {e}"}, 500
 
+
+# --- API Segura para Administración ---
+
+@app.route('/api/save-user', methods=['POST'])
+@admin_required # ¡Muy importante! Solo los admins pueden acceder
+def api_save_user():
+    """
+    Endpoint para crear o actualizar usuarios de forma segura.
+    Recibe datos JSON desde el panel de administración.
+    """
+    if not request.is_json:
+        return jsonify({"success": False, "error": "La solicitud debe ser JSON"}), 400
+
+    data = request.get_json()
+    user_id = data.get('id_usuario')
+
+    # Validaciones básicas
+    if not data.get('nombre_completo') or not data.get('nombre_usuario'):
+        return jsonify({"success": False, "error": "Nombre completo y nombre de usuario son requeridos."}), 400
+
+    try:
+        user_data = {
+            'nombre_completo': data.get('nombre_completo'),
+            'nombre_usuario': data.get('nombre_usuario'),
+            'rol': data.get('rol', 'funcionario'),
+            'id_modulo_asignado': data.get('id_modulo_asignado')
+        }
+
+        # --- Lógica de Hashing de Contraseña ---
+        # Solo hashea y guarda la contraseña si se proporcionó una.
+        password = data.get('password')
+        if password:
+            user_data['contrasena'] = generate_password_hash(password)
+
+        if user_id:
+            # --- Actualizar Usuario Existente ---
+            if not password:
+                # Si no se envía contraseña al editar, no se actualiza
+                user_data.pop('contrasena', None) 
+
+            response = supabase.table('usuarios').update(user_data).eq('id_usuario', user_id).execute()
+        else:
+            # --- Crear Nuevo Usuario ---
+            if not password:
+                return jsonify({"success": False, "error": "La contraseña es requerida para nuevos usuarios."}), 400
+            response = supabase.table('usuarios').insert(user_data).execute()
+
+        if response.data:
+            logging.info(f"Usuario {'actualizado' if user_id else 'creado'} exitosamente por {g.user['name']}.")
+            return jsonify({"success": True, "message": "Usuario guardado exitosamente."}), 200
+        else:
+            logging.error(f"Error de Supabase al guardar usuario: {response.error}")
+            return jsonify({"success": False, "error": str(response.error)}), 500
+
+    except Exception as e:
+        logging.error(f"Error en api_save_user: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/text-to-speech', methods=['POST'])
+def text_to_speech():
+    """
+    Endpoint seguro que actúa como proxy para la API de Gemini TTS.
+    Recibe texto y devuelve el audio generado.
+    """
+    if not request.is_json:
+        return jsonify({"error": "La solicitud debe ser JSON"}), 400
+
+    data = request.get_json()
+    text_to_speak = data.get('text')
+
+    if not text_to_speak:
+        return jsonify({"error": "No se proporcionó texto"}), 400
+
+    # Carga la API Key de forma segura desde las variables de entorno
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if not GEMINI_API_KEY:
+        logging.error("La variable de entorno GEMINI_API_KEY no está configurada.")
+        return jsonify({"error": "El servicio de voz no está configurado en el servidor."}), 500
+
+    # La misma estructura de payload que tenías en el frontend
+    payload = {
+        "contents": [{"parts": [{"text": text_to_speak}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {
+                    "prebuiltVoiceConfig": {"voiceName": "Charon"}
+                }
+            }
+        },
+        "model": "gemini-2.5-flash-preview-tts"
+    }
+
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={GEMINI_API_KEY}"
+
+    try:
+        # Llamada a la API de Gemini desde el backend
+        response = requests.post(api_url, json=payload)
+
+        # Si la respuesta de Google no es exitosa, devuelve el error
+        response.raise_for_status() 
+
+        # Devuelve la respuesta JSON de Gemini directamente al frontend
+        return jsonify(response.json())
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error al llamar a la API de Gemini: {e}")
+        return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':

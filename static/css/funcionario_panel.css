@@ -1,0 +1,145 @@
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #1a202c;
+    /* Fondo oscuro */
+    color: #e2e8f0;
+    /* Texto claro */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
+    /* Evita scroll horizontal */
+}
+
+.container {
+    max-width: 1400px;
+    /* Ancho máximo para el panel */
+    margin: 0 auto;
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-section {
+    background-color: #2d3748;
+    /* Fondo de las secciones */
+    border-radius: 1.5rem;
+    /* Bordes redondeados */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.section-title {
+    font-size: 1.75rem;
+    /* Título de sección */
+    font-weight: 700;
+    color: #48bb78;
+    /* Verde brillante */
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 8px rgba(72, 187, 120, 0.3);
+}
+
+.table-header {
+    background-color: #4a5568;
+    /* Fondo para encabezados de tabla */
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.table-row:nth-child(even) {
+    background-color: #2d3748;
+    /* Fondo alterno para filas */
+}
+
+.table-row:nth-child(odd) {
+    background-color: #2c3546;
+}
+
+.table-row td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #4a5568;
+    font-size: 1rem;
+}
+
+.table-row:last-child td {
+    border-bottom: none;
+}
+
+.action-button {
+    padding: 1rem 1.5rem;
+    border-radius: 0.75rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 5px 15px -3px rgba(0, 0, 0, 0.2);
+}
+
+.btn-call {
+    background-color: #4299e1;
+    /* Azul */
+    color: white;
+}
+
+.btn-call:hover:enabled {
+    background-color: #3182ce;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -5px rgba(66, 153, 225, 0.6);
+}
+
+.btn-recall {
+    background-color: #ecc94b;
+    /* Amarillo */
+    color: #2d3748;
+}
+
+.btn-recall:hover:enabled {
+    background-color: #d69e2e;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -5px rgba(236, 201, 75, 0.6);
+}
+
+.btn-finish {
+    background-color: #48bb78;
+    /* Verde */
+    color: white;
+}
+
+.btn-finish:hover:enabled {
+    background-color: #38a169;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px -5px rgba(72, 187, 120, 0.6);
+}
+
+.action-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* Responsive adjustments */
+@media (min-width: 1024px) {
+
+    /* Desktop layout */
+    .main-grid {
+        grid-template-columns: 1fr 2fr 1fr;
+        /* 3 columnas: Turnos, Mi Módulo, Historial */
+    }
+}
+
+@media (max-width: 1023px) {
+
+    /* Tablet and Mobile layout */
+    .main-grid {
+        grid-template-columns: 1fr;
+        /* Una columna */
+    }
+
+    .panel-section {
+        margin-bottom: 1.5rem;
+        /* Espacio entre secciones apiladas */
+    }
+}
