@@ -13,7 +13,7 @@ console.log("Supabase Client inicializado para Panel de Administración.");
 console.log("Objeto Supabase:", supabase);
 console.log("¿Existe supabase.from?", typeof supabase.from);
 
-const navLinks = document.querySelectorAll('.nav-link');
+const navLinks = document.querySelectorAll('nav .nav-link');
 const contentSections = document.querySelectorAll('.content-section');
 
 const turnsWaitingElement = document.getElementById('turns-waiting');
