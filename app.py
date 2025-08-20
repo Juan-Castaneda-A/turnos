@@ -223,7 +223,7 @@ def visualizador_ui():
 @app.route('/funcionario/login', methods=['GET', 'POST'])
 def funcionario_login():
     """
-    Página de inicio de sesión para funcionarios.
+    Página de inicio de sesión para funcionarios. Ahora con verificación de hash.
     """
     if g.user:
         if g.user['role'] == 'administrador':
@@ -241,8 +241,10 @@ def funcionario_login():
             user_response = supabase.table('usuarios').select('id_usuario, nombre_completo, rol, id_modulo_asignado, contrasena').eq('nombre_usuario', username).single().execute()
             user_data = user_response.data
 
-            if user_data and user_data['contrasena'] == password: # ¡REEMPLAZAR CON VERIFICACIÓN DE HASH!
-                #Generar un token de sesión único
+            #-- línea donde se checkea la contraseña hasheada
+
+            if user_data and check_password_hash(user_data['contrasena'], password): # ¡REEMPLAZAR CON VERIFICACIÓN DE HASH!
+                #Generar un token de sesión único   
                 new_session_token = str(uuid.uuid4())
                 #Calcular la fecha de expiración
                 expires_at = datetime.now(timezone.utc) + timedelta(hours=SESSION_TOKEN_LIFESPAN_HOURS)
