@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 load_dotenv()
 
 app = Flask(__name__)
+TTS_CACHE = {}
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'super_secret_key_default') # ¡Cambia esto en producción!
 
 # Configuración de Supabase
@@ -487,56 +488,56 @@ def api_save_user():
         logging.error(f"Error en api_save_user: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/text-to-speech', methods=['POST'])
-def text_to_speech():
-    """
-    Endpoint seguro que actúa como proxy para la API de Gemini TTS.
-    Recibe texto y devuelve el audio generado.
-    """
-    if not request.is_json:
-        return jsonify({"error": "La solicitud debe ser JSON"}), 400
+# @app.route('/api/text-to-speech', methods=['POST'])
+# def text_to_speech():
+#     """
+#     Endpoint seguro que actúa como proxy para la API de Gemini TTS.
+#     Recibe texto y devuelve el audio generado.
+#     """
+#     if not request.is_json:
+#         return jsonify({"error": "La solicitud debe ser JSON"}), 400
 
-    data = request.get_json()
-    text_to_speak = data.get('text')
+#     data = request.get_json()
+#     text_to_speak = data.get('text')
 
-    if not text_to_speak:
-        return jsonify({"error": "No se proporcionó texto"}), 400
+#     if not text_to_speak:
+#         return jsonify({"error": "No se proporcionó texto"}), 400
 
-    # Carga la API Key de forma segura desde las variables de entorno
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    if not GEMINI_API_KEY:
-        logging.error("La variable de entorno GEMINI_API_KEY no está configurada.")
-        return jsonify({"error": "El servicio de voz no está configurado en el servidor."}), 500
+#     # Carga la API Key de forma segura desde las variables de entorno
+#     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+#     if not GEMINI_API_KEY:
+#         logging.error("La variable de entorno GEMINI_API_KEY no está configurada.")
+#         return jsonify({"error": "El servicio de voz no está configurado en el servidor."}), 500
 
-    # La misma estructura de payload que tenías en el frontend
-    payload = {
-        "contents": [{"parts": [{"text": text_to_speak}]}],
-        "generationConfig": {
-            "responseModalities": ["AUDIO"],
-            "speechConfig": {
-                "voiceConfig": {
-                    "prebuiltVoiceConfig": {"voiceName": "Charon"}
-                }
-            }
-        },
-        "model": "gemini-2.5-flash-preview-tts"
-    }
+#     # La misma estructura de payload que tenías en el frontend
+#     payload = {
+#         "contents": [{"parts": [{"text": text_to_speak}]}],
+#         "generationConfig": {
+#             "responseModalities": ["AUDIO"],
+#             "speechConfig": {
+#                 "voiceConfig": {
+#                     "prebuiltVoiceConfig": {"voiceName": "Charon"}
+#                 }
+#             }
+#         },
+#         "model": "gemini-2.5-flash-preview-tts"
+#     }
 
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={GEMINI_API_KEY}"
+#     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={GEMINI_API_KEY}"
 
-    try:
-        # Llamada a la API de Gemini desde el backend
-        response = requests.post(api_url, json=payload)
+#     try:
+#         # Llamada a la API de Gemini desde el backend
+#         response = requests.post(api_url, json=payload)
 
-        # Si la respuesta de Google no es exitosa, devuelve el error
-        response.raise_for_status() 
+#         # Si la respuesta de Google no es exitosa, devuelve el error
+#         response.raise_for_status() 
 
-        # Devuelve la respuesta JSON de Gemini directamente al frontend
-        return jsonify(response.json())
+#         # Devuelve la respuesta JSON de Gemini directamente al frontend
+#         return jsonify(response.json())
 
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error al llamar a la API de Gemini: {e}")
-        return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
+#     except requests.exceptions.RequestException as e:
+#         logging.error(f"Error al llamar a la API de Gemini: {e}")
+#         return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':

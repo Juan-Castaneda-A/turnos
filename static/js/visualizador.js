@@ -32,77 +32,77 @@ let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples vece
 // --- Funciones de Utilidad para Audio y TTS ---
 
 // Utility function to convert base64 to ArrayBuffer
-function base64ToArrayBuffer(base64) {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
+// function base64ToArrayBuffer(base64) {
+//     const binaryString = atob(base64);
+//     const len = binaryString.length;
+//     const bytes = new Uint8Array(len);
+//     for (let i = 0; i < len; i++) {
+//         bytes[i] = binaryString.charCodeAt(i);
+//     }
+//     return bytes.buffer;
+// }
 
 // Utility function to convert PCM (Int16Array) to WAV Blob
-function pcmToWav(pcm, sampleRate) {
-    const pcmLength = pcm.length;
-    const buffer = new ArrayBuffer(44 + pcmLength * 2); // 44 bytes for WAV header, 2 bytes per sample (PCM16)
-    const view = new DataView(buffer);
+// function pcmToWav(pcm, sampleRate) {
+//     const pcmLength = pcm.length;
+//     const buffer = new ArrayBuffer(44 + pcmLength * 2); // 44 bytes for WAV header, 2 bytes per sample (PCM16)
+//     const view = new DataView(buffer);
 
-    // WAV header
-    // RIFF chunk descriptor
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + pcmLength * 2, true); // ChunkSize
-    writeString(view, 8, 'WAVE');
-    // FMT sub-chunk
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-    view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
-    view.setUint16(22, 1, true); // NumChannels (1 for mono)
-    view.setUint32(24, sampleRate, true); // SampleRate
-    view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
-    view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
-    view.setUint16(34, 16, true); // BitsPerSample
-    // DATA sub-chunk
-    writeString(view, 36, 'data');
-    view.setUint32(40, pcmLength * 2, true); // Subchunk2Size (NumSamples * NumChannels * BitsPerSample/8)
+//     // WAV header
+//     // RIFF chunk descriptor
+//     writeString(view, 0, 'RIFF');
+//     view.setUint32(4, 36 + pcmLength * 2, true); // ChunkSize
+//     writeString(view, 8, 'WAVE');
+//     // FMT sub-chunk
+//     writeString(view, 12, 'fmt ');
+//     view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+//     view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+//     view.setUint16(22, 1, true); // NumChannels (1 for mono)
+//     view.setUint32(24, sampleRate, true); // SampleRate
+//     view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
+//     view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
+//     view.setUint16(34, 16, true); // BitsPerSample
+//     // DATA sub-chunk
+//     writeString(view, 36, 'data');
+//     view.setUint32(40, pcmLength * 2, true); // Subchunk2Size (NumSamples * NumChannels * BitsPerSample/8)
 
-    // Write PCM data
-    let offset = 44;
-    for (let i = 0; i < pcmLength; i++, offset += 2) {
-        view.setInt16(offset, pcm[i], true);
-    }
+//     // Write PCM data
+//     let offset = 44;
+//     for (let i = 0; i < pcmLength; i++, offset += 2) {
+//         view.setInt16(offset, pcm[i], true);
+//     }
 
-    return new Blob([buffer], { type: 'audio/wav' });
-}
+//     return new Blob([buffer], { type: 'audio/wav' });
+// }
 
-function writeString(view, offset, string) {
-    for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-    }
-}
+// function writeString(view, offset, string) {
+//     for (let i = 0; i < string.length; i++) {
+//         view.setUint8(offset + i, string.charCodeAt(i));
+//     }
+// }
 
 // Utility function for exponential backoff with fetch
-async function fetchWithExponentialBackoff(url, options, retries = 3, delay = 1000) {
-    try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            if (response.status === 429 && retries > 0) { // Too Many Requests
-                console.warn(`Rate limit hit, retrying in ${delay / 1000}s...`);
-                await new Promise(res => setTimeout(res, delay));
-                return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response;
-    } catch (error) {
-        if (retries > 0) {
-            console.warn(`Fetch failed, retrying in ${delay / 1000}s...`, error);
-            await new Promise(res => setTimeout(res, delay));
-            return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
-        }
-        throw error;
-    }
-}
+// async function fetchWithExponentialBackoff(url, options, retries = 3, delay = 1000) {
+//     try {
+//         const response = await fetch(url, options);
+//         if (!response.ok) {
+//             if (response.status === 429 && retries > 0) { // Too Many Requests
+//                 console.warn(`Rate limit hit, retrying in ${delay / 1000}s...`);
+//                 await new Promise(res => setTimeout(res, delay));
+//                 return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
+//             }
+//             throw new Error(`HTTP error! status: ${response.status}`);
+//         }
+//         return response;
+//     } catch (error) {
+//         if (retries > 0) {
+//             console.warn(`Fetch failed, retrying in ${delay / 1000}s...`, error);
+//             await new Promise(res => setTimeout(res, delay));
+//             return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
+//         }
+//         throw error;
+//     }
+// }
 
 // Function to convert numbers to Spanish words (simplified for turn numbers)
 function numberToWordsSpanish(num) {
@@ -147,55 +147,58 @@ function numberToWordsSpanish(num) {
 }
 
 // Function to announce the turn using TTS
+// REEMPLAZA tu antigua función announceTurn con esta nueva versión
+
+// Variable global para guardar la voz en español una vez que la encontremos
+let spanishVoice = null;
+
+// Función para cargar y seleccionar la voz en español
+function loadSpanishVoice() {
+    // getVoices() puede cargar las voces de forma asíncrona
+    const voices = window.speechSynthesis.getVoices();
+    spanishVoice = voices.find(voice => voice.lang.startsWith('es-')) || voices[0];
+    console.log("Voz seleccionada:", spanishVoice);
+}
+
+// El evento 'voiceschanged' se dispara cuando la lista de voces está lista
+window.speechSynthesis.onvoiceschanged = loadSpanishVoice;
+
 async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
+    // Primero, nos aseguramos de que las voces se hayan cargado
+    if (!spanishVoice) {
+        loadSpanishVoice();
+    }
+
     try {
+        // La función que convierte números a palabras sigue siendo útil
         const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
-        const moduleNumberStr = nombreModulo.split(' ')[1]; 
+        const moduleNumberStr = nombreModulo.split(' ')[1] || '';
         const moduleNumber = parseInt(moduleNumberStr, 10);
         const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
 
         const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase a la ventanilla ${moduleNumberEnPalabras}.`;
-        console.log("Solicitando audio para:", textToSpeak);
+        console.log("Texto a anunciar (nativo):", textToSpeak);
 
-        // ------------------- CAMBIOS CLAVE AQUÍ -------------------
+        // Cancelar cualquier anuncio anterior para evitar que se solapen
+        window.speechSynthesis.cancel();
 
-        // 1. La URL ahora apunta a nuestro propio backend. ¡No hay API Key!
-        const apiUrl = '/api/text-to-speech'; 
+        // Crear el objeto de síntesis de voz
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
 
-        // 2. El payload es mucho más simple. Solo enviamos el texto.
-        const payload = { text: textToSpeak };
-
-        // 3. La llamada fetch ahora va a nuestro servidor.
-        const response = await fetchWithExponentialBackoff(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        // EL RESTO DEL CÓDIGO PERMANECE IGUAL PORQUE NUESTRO BACKEND DEVUELVE EL MISMO JSON QUE GOOGLE
-        const result = await response.json();
-        const part = result?.candidates?.[0]?.content?.parts?.[0];
-        const audioData = part?.inlineData?.data;
-        const mimeType = part?.inlineData?.mimeType;
-
-        if (audioData && mimeType && mimeType.startsWith("audio/")) {
-            const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-            const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000;
-
-            const pcmData = base64ToArrayBuffer(audioData);
-            const pcm16 = new Int16Array(pcmData);
-            const wavBlob = pcmToWav(pcm16, sampleRate);
-            const audioUrl = URL.createObjectURL(wavBlob);
-
-            const audio = new Audio(audioUrl);
-            audio.play().catch(e => console.error("Error al reproducir el audio TTS (posiblemente bloqueado por el navegador):", e));
-            audio.onended = () => URL.revokeObjectURL(audioUrl);
-        } else {
-            console.error("No se recibieron datos de audio válidos de nuestro backend.", result.error || '');
+        // Asignar la voz en español que encontramos
+        if (spanishVoice) {
+            utterance.voice = spanishVoice;
         }
 
+        // (Opcional) Ajustar velocidad y tono
+        utterance.rate = 0.9; // Un poco más lento que lo normal
+        utterance.pitch = 1.0; 
+
+        // ¡Hablar!
+        window.speechSynthesis.speak(utterance);
+
     } catch (error) {
-        console.error("Error al anunciar el turno con TTS:", error);
+        console.error("Error al anunciar el turno con la Web Speech API:", error);
     }
 }
 
