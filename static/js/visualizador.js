@@ -314,47 +314,83 @@ const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0
 
 // --- Suscripciones en tiempo real a Supabase ---
 
+// Pega esta nueva función en visualizador.js
+
+async function forceAnnounceTurnById(turnId) {
+    if (!turnId) return;
+    try {
+        const { data: turn, error } = await supabase
+            .from('turnos')
+            .select('*, modulos(nombre_modulo)')
+            .eq('id_turno', turnId)
+            .single(); // .single() para obtener un solo objeto
+
+        if (error) throw error;
+
+        if (turn) {
+            // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
+            updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
+            await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+        }
+    } catch (error) {
+        console.error("Error al forzar el anuncio del turno:", error);
+    }
+}
+
 function setupRealtimeSubscriptions() {
-    // Suscribirse a cambios en la tabla 'turnos'
-    const turnosChannel = supabase.channel('turnos_channel');
-    turnosChannel
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'turnos' },
-            async payload => {
-                console.log('Cambio en turnos recibido en visualizador!', payload);
-                await loadInitialData();
-            }
-        )
-        .subscribe();
+    // 1. Definimos UN SOLO CANAL con el nombre que acordamos
+    const channel = supabase.channel('turnos_channel');
 
-    // Suscribirse a cambios en la tabla 'modulos'
-    const modulosChannel = supabase.channel('modulos_channel');
-    modulosChannel
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'modulos' },
-            async payload => {
-                console.log('Cambio en modulos recibido en visualizador!', payload);
-                await loadInitialData();
-            }
-        )
-        .subscribe();
+    // 2. Le decimos a ESE MISMO CANAL que escuche todo lo que nos interesa
 
-    // Suscribirse a cambios en la tabla 'usuarios' (para nombres de funcionarios)
-    const usuariosChannel = supabase.channel('usuarios_channel');
-    usuariosChannel
-        .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'usuarios' },
-            async payload => {
-                console.log('Cambio en usuarios recibido en visualizador!', payload);
-                await loadInitialData();
-            }
-        )
-        .subscribe();
+    // Escucha cambios en la tabla 'turnos'
+    channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'turnos' },
+        (payload) => {
+            console.log('Cambio en turnos recibido:', payload.eventType);
+            loadInitialData();
+        }
+    );
 
-    console.log("Suscripciones Realtime configuradas.");
+    // Escucha cambios en la tabla 'modulos'
+    channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'modulos' },
+        (payload) => {
+            console.log('Cambio en modulos recibido:', payload.eventType);
+            loadInitialData();
+        }
+    );
+
+    // Escucha cambios en la tabla 'usuarios'
+    channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'usuarios' },
+        (payload) => {
+            console.log('Cambio en usuarios recibido:', payload.eventType);
+            loadInitialData();
+        }
+    );
+
+    // Escucha el mensaje específico de 'rellamar'
+    channel.on(
+        'broadcast',
+        { event: 'rellamar' },
+        (message) => {
+            console.log('¡Evento de RELLAMADO recibido!', message.payload);
+            forceAnnounceTurnById(message.payload.id_turno);
+        }
+    );
+
+    // 3. Finalmente, nos suscribimos al canal UNA SOLA VEZ para activar todos los listeners
+    channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Visualizador conectado y escuchando en el canal notaria-turnos-canal.');
+        }
+    });
+
+    console.log("Todas las suscripciones Realtime han sido configuradas en un solo canal.");
 }
 
 

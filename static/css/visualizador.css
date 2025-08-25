@@ -1,147 +1,14 @@
+/* Mantenemos la fuente base para el body */
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #1a202c;
-    /* Fondo oscuro para alto contraste */
-    color: #e2e8f0;
-    /* Texto claro */
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    overflow: hidden;
-    /* Evita scrollbars no deseados */
 }
 
-.container {
-    max-width: 1280px;
-    /* Ancho máximo para pantallas grandes */
-    margin: 0 auto;
-    padding: 1rem;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.main-display {
-    background-color: #2d3748;
-    /* Fondo más oscuro para el turno actual */
-    border-radius: 1.5rem;
-    /* Bordes más redondeados */
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding: 2rem;
-    min-height: 250px;
-    /* Altura mínima para el display principal */
-    text-align: center;
-    animation: fadeIn 1s ease-out;
-    /* Animación de entrada */
-}
-
-.turn-number {
-    font-size: 8rem;
-    /* Tamaño de fuente muy grande para el número de turno */
-    font-weight: 700;
-    color: #48bb78;
-    /* Verde brillante para el número */
-    line-height: 1;
-    margin-bottom: 0.5rem;
-    text-shadow: 0 0 15px rgba(72, 187, 120, 0.6);
-    /* Sombra para resaltar */
-}
-
-.module-direction {
-    font-size: 3rem;
-    /* Tamaño de fuente grande para la dirección del módulo */
-    font-weight: 600;
-    color: #a0aec0;
-    /* Gris claro */
-}
-
-.history-list {
-    background-color: #2d3748;
-    border-radius: 1.5rem;
-    padding: 1.5rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    min-height: 200px;
-    overflow: hidden;
-    /* Oculta el desbordamiento si hay muchos turnos */
-}
-
-.history-item {
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: #cbd5e0;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #4a5568;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.history-item:last-child {
-    border-bottom: none;
-}
-
-.modules-table {
-    background-color: #2d3748;
-    border-radius: 1.5rem;
-    padding: 1.5rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    overflow-x: auto;
-    /* Permite scroll horizontal en móviles si es necesario */
-}
-
-.modules-table th,
-.modules-table td {
-    padding: 0.75rem 1rem;
-    text-align: left;
-    font-size: 1.25rem;
-    white-space: nowrap;
-    /* Evita que el texto se rompa */
-}
-
-.modules-table th {
-    color: #a0aec0;
-    font-weight: 700;
-    border-bottom: 2px solid #4a5568;
-}
-
-.modules-table td {
-    color: #e2e8f0;
-    border-bottom: 1px solid #4a5568;
-}
-
-.modules-table tr:last-child td {
-    border-bottom: none;
-}
-
-.status-available {
-    color: #48bb78;
-    /* Verde para disponible */
-    font-weight: 600;
-}
-
-.status-attending {
-    color: #ecc94b;
-    /* Amarillo para atendiendo */
-    font-weight: 600;
-}
-
-.status-inactive {
-    color: #e53e3e;
-    /* Rojo para inactivo */
-    font-weight: 600;
-}
-
-/* Animación para el turno actual */
+/* Conservamos ÚNICAMENTE las animaciones personalizadas que creamos */
 @keyframes fadeIn {
     from {
         opacity: 0;
         transform: translateY(-20px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
@@ -152,45 +19,18 @@ body {
     0% {
         box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7);
     }
-
     70% {
         box-shadow: 0 0 0 20px rgba(72, 187, 120, 0);
     }
-
     100% {
         box-shadow: 0 0 0 0 rgba(72, 187, 120, 0);
     }
 }
 
+/*
+   Aún necesitas una clase para aplicar la animación, ya que Tailwind no la conoce.
+   Tu JavaScript añade y quita esta clase.
+*/
 .pulse-animation {
-    animation: pulseGreen 1.5s infinite;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .turn-number {
-        font-size: 5rem;
-    }
-
-    .module-direction {
-        font-size: 2rem;
-    }
-
-    .history-item {
-        font-size: 1.4rem;
-    }
-
-    .modules-table th,
-    .modules-table td {
-        font-size: 1rem;
-    }
-
-    .grid-cols-3 {
-        grid-template-columns: 1fr;
-        /* Una columna en pantallas pequeñas */
-    }
-
-    .col-span-2 {
-        grid-column: span 1 / span 1;
-    }
+    animation: pulseGreen 1.5s; /* La quitamos de 'infinite' para que solo se ejecute una vez por llamado */
 }

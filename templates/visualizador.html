@@ -1,6 +1,7 @@
 <!-- templates/visualizador.html -->
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,65 +9,61 @@
     <!-- Carga de Tailwind CSS desde CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <link href="../static/css/visualizador.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/visualizador.css') }}" rel="stylesheet">
 </head>
-<body>
-    <div class="container flex flex-col p-4 space-y-6">
-        <!-- Encabezado -->
-        <header class="text-center py-6 bg-blue-800 rounded-xl shadow-lg">
-            <h1 class="text-5xl font-extrabold text-white tracking-tight">
-                <span class="inline-block mr-4">🏛️</span> Notaría Tercera de Valledupar
+
+<body class="bg-gray-800 text-gray-200 font-sans antialiased">
+
+    <div class="container mx-auto p-4 lg:p-6 flex flex-col min-h-screen">
+        
+        <header class="text-center py-6 bg-blue-800 rounded-2xl shadow-lg">
+            <h1 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+                <span class="inline-block mr-4">🏛️</span> Notaría Tercera
             </h1>
-            <h2 class="text-3xl font-semibold text-blue-200 mt-2">Turnos en Atención</h2>
+            <h2 class="text-xl sm:text-3xl font-semibold text-blue-200 mt-2">Turnos en Atención</h2>
         </header>
 
-        <main class="grid grid-cols-3 gap-6 flex-grow">
-            <!-- Área del Turno Actual -->
-            <section class="col-span-2 main-display" id="current-turn-display">
-                <p class="text-xl font-medium text-gray-400 mb-2">TURNO ACTUAL:</p>
-                <div id="current-turn-number" class="turn-number">---</div>
-                <p id="current-turn-module" class="module-direction">Diríjase a la Ventanilla ---</p>
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow mt-6">
+            
+            <section class="lg:col-span-2 bg-gray-900 rounded-2xl shadow-lg flex flex-col justify-center items-center text-center p-6 min-h-[300px]" id="current-turn-display">
+                <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
+                <div id="current-turn-number" class="text-7xl sm:text-8xl lg:text-9xl font-extrabold text-green-400 leading-none tracking-tight">---</div>
+                <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">Esperando turno...</p>
             </section>
 
-            <!-- Historial de Llamados -->
-            <section class="col-span-1 history-list">
+            <section class="lg:col-span-1 bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col">
                 <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
-                <div id="call-history" class="space-y-2">
-                    <!-- Los turnos se insertarán aquí por JavaScript -->
-                    <div class="history-item text-gray-500">
-                        <span>Sin turnos previos</span>
+                <div id="call-history" class="space-y-3 overflow-y-auto flex-grow">
+                    <div class="flex justify-between items-center text-2xl font-semibold text-gray-400 p-2">
+                        <span>Cargando...</span>
                     </div>
                 </div>
             </section>
 
-            <!-- Tabla de Ventanillas -->
-            <section class="col-span-3 modules-table">
+            <section class="col-span-1 lg:col-span-3 bg-gray-900 p-6 rounded-2xl shadow-lg">
                 <h3 class="text-2xl font-bold text-gray-300 mb-4">Estado de Ventanillas</h3>
-                <table class="min-w-full table-auto">
-                    <thead>
-                        <tr>
-                            <th>Módulo</th>
-                            <th>Funcionario</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modules-status-body">
-                        <tr>
-                            <td colspan="3" class="text-center text-gray-500">Cargando estado de módulos...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                <th class="p-3">Módulo</th>
+                                <th class="p-3">Funcionario</th>
+                                <th class="p-3">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modules-status-body" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
             </section>
         </main>
     </div>
-
-    <!-- Elemento de audio para la alerta de sonido -->
-    <!--<audio id="call-sound" src="https://www.soundjay.com/buttons/beep-07.mp3" preload="auto"></audio>-->
 
     <script>
         window.SUPABASE_URL = "{{ supabase_url }}";
         window.SUPABASE_KEY = "{{ supabase_key }}";
     </script>
-    <script type="module" src="../static/js/visualizador.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/visualizador.js') }}"></script>
 </body>
+
 </html>

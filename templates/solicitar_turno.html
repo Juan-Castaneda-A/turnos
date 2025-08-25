@@ -8,51 +8,54 @@
     <!-- Carga de Tailwind CSS desde CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link href="../static/css/solicitar_turno.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/solicitar_turno.css') }}" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <h1 class="welcome-message">Bienvenido a la Notaría Tercera.<br>Por favor, seleccione su tipo de trámite:</h1>
+<body class="bg-gray-900 text-gray-200 font-sans flex justify-center items-center min-h-screen p-4">
 
-        <!-- Formulario para seleccionar el servicio -->
+    <div class="container w-full max-w-4xl bg-gray-800 rounded-3xl shadow-2xl p-8 md:p-12 text-center animate-fade-in-scale">
+        
+        <h1 class="welcome-message text-3xl md:text-5xl font-extrabold text-green-400 mb-10">
+            Bienvenido a la Notaría Tercera.<br>Por favor, seleccione su tipo de trámite:
+        </h1>
+
         <form action="{{ url_for('solicitar_turno_action') }}" method="post" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
             {% for servicio in servicios %}
-                <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}" class="service-button">
-                    <!-- Iconos simples para cada servicio (ejemplos, puedes usar emojis o SVGs más elaborados) -->
-                    {% if servicio.nombre_servicio == 'Autenticación de Biometría' %}
-                        <span> ☝️ </span>
-                    {% elif servicio.nombre_servicio == 'Declaración' %}
-                        <span> 📝 </span>
-                    {% elif servicio.nombre_servicio == 'Copia de Registro Civil, Escrituras y Vigencia de Poderes' %}
-                        <span> 📄 </span>
-                    {% elif servicio.nombre_servicio == 'Salida del País y Poderes en el VUR' %}
-                        <span> ✈️ </span>
-                    {% elif servicio.nombre_servicio == 'Información Jurídica' %}
-                        <span> ⚖️ </span>
-                    {% else %}
-                        <span> ✨ </span>
-                    {% endif %}
+                <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}" 
+                        class="w-full flex items-center justify-center gap-4 p-6 md:p-8 bg-blue-500 text-white font-bold text-xl md:text-2xl uppercase rounded-2xl shadow-lg
+                               hover:bg-blue-600 hover:shadow-xl hover:-translate-y-1 
+                               active:translate-y-0 active:shadow-md
+                               transition-all duration-300">
+                    
+                    <span class="text-3xl md:text-4xl">
+                        {% if 'Biometría' in servicio.nombre_servicio %} ☝️
+                        {% elif 'Declaración' in servicio.nombre_servicio %} 📝
+                        {% elif 'Registro Civil' in servicio.nombre_servicio %} 📄
+                        {% elif 'Salida del País' in servicio.nombre_servicio %} ✈️
+                        {% elif 'Jurídica' in servicio.nombre_servicio %} ⚖️
+                        {% else %} ✨ {% endif %}
+                    </span>
                     {{ servicio.nombre_servicio }}
                 </button>
             {% endfor %}
         </form>
 
-        <!-- Mensajes flash para notificaciones -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <div class="mt-8 space-y-3">
-            {% for category, message in messages %}
-              <div class="p-4 rounded-lg text-lg font-semibold
-                          {% if category == 'success' %}bg-green-600 text-white
-                          {% elif category == 'warning' %}bg-yellow-500 text-gray-900
-                          {% elif category == 'error' %}bg-red-600 text-white
-                          {% else %}bg-gray-700 text-white{% endif %}">
-                {{ message }}
-              </div>
-            {% endfor %}
-            </div>
-          {% endif %}
+            {% if messages %}
+                <div class="mt-8 space-y-3">
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-lg text-lg font-semibold
+                                {% if category == 'success' %}bg-green-600 text-white
+                                {% elif category == 'warning' %}bg-yellow-500 text-gray-900
+                                {% elif category == 'error' %}bg-red-600 text-white
+                                {% else %}bg-gray-700 text-white{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
         {% endwith %}
     </div>
+
 </body>
 </html>

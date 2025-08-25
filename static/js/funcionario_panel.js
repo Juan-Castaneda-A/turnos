@@ -16,6 +16,8 @@ console.log("Supabase Client inicializado para Panel de Funcionario.");
 console.log("Objeto Supabase:", supabase);
 console.log("¿Existe supabase.from?", typeof supabase.from);
 
+const turnosChannel = supabase.channel('turnos_channel'); // Dale un nombre específico
+
 let testFromObject;
 try {
     testFromObject = supabase.from('turnos');
@@ -372,6 +374,16 @@ btnRecall.addEventListener('click', async () => {
 
         if (updateError) throw updateError;
 
+        // --- AÑADE ESTA SECCIÓN ---
+        // Envía un mensaje directo al canal del visualizador
+        console.log("Enviando evento de broadcast 'rellamar'");
+        turnosChannel.send({
+            type: 'broadcast',
+            event: 'rellamar',
+            payload: { id_turno: currentAttendingTurnId },
+        });
+        // --- FIN DE LA SECCIÓN A AÑADIR ---
+
         await supabase.from('logs_turnos').insert({
             id_turno: currentAttendingTurnId,
             id_usuario: window.USER_ID,
@@ -487,3 +499,4 @@ window.onload = async () => {
     setupRealtimeSubscriptions();
     console.log("Suscripciones en tiempo real configuradas");
 };
+turnosChannel.subscribe();

@@ -14,7 +14,7 @@ console.log("Objeto Supabase:", supabase);
 console.log("¿Existe supabase.from?", typeof supabase.from);
 
 const navLinks = document.querySelectorAll('nav .nav-link');
-const contentSections = document.querySelectorAll('.content-section');
+const contentSections = document.querySelectorAll('.view-section');
 
 const turnsWaitingElement = document.getElementById('turns-waiting');
 const turnsAttendedTodayElement = document.getElementById('turns-attended-today');

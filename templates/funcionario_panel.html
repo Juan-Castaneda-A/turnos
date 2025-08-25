@@ -1,6 +1,7 @@
 <!-- templates/funcionario_panel.html -->
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,94 +9,84 @@
     <!-- Carga de Tailwind CSS desde CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link href="../static/css/funcionario_panel.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/funcionario_panel.css') }}" rel="stylesheet">
 </head>
-<body>
-    <div class="container flex flex-col p-4 space-y-6">
-        <!-- Encabezado del Panel -->
-        <header class="flex flex-col md:flex-row justify-between items-center py-4 px-6 bg-blue-800 rounded-xl shadow-lg mb-6">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-white tracking-tight mb-2 md:mb-0">
-                Panel de Atención Notaría Tercera
+
+<body class="bg-gray-800 text-gray-200 font-sans antialiased">
+    <div class="container mx-auto p-4">
+
+        <header class="flex flex-col md:flex-row justify-between items-center py-4 px-6 bg-blue-800 rounded-2xl shadow-lg mb-6">
+            <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight text-center md:text-left mb-4 md:mb-0">
+                Panel de Atención
             </h1>
-            <div class="text-xl md:text-2xl font-semibold text-blue-200">
-                Bienvenido, <span class="text-white">{{ user_name }}</span> | Módulo: <span class="text-white" id="assigned-module-name">Cargando...</span>
+            <div class="text-lg md:text-xl font-semibold text-blue-200 text-center md:text-left mb-4 md:mb-0">
+                Bienvenido, <span class="font-bold text-white">{{ user_name }}</span> | Módulo: <span class="font-bold text-white" id="assigned-module-name">Cargando...</span>
             </div>
-            <a href="{{ url_for('logout') }}" class="mt-4 md:mt-0 px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition duration-300">
+            <a href="{{ url_for('logout') }}" class="w-full md:w-auto text-center px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition duration-300">
                 Cerrar Sesión
             </a>
         </header>
 
-        <main class="main-grid grid gap-6 flex-grow">
-            <!-- Sección 1: Turnos por Atender -->
-            <section class="panel-section col-span-1">
-                <h2 class="section-title">Turnos por Atender</h2>
-                <div class="overflow-y-auto max-h-[calc(100vh-250px)] custom-scrollbar">
-                    <table class="min-w-full table-auto">
-                        <thead>
-                            <tr class="table-header">
-                                <th class="px-4 py-2 rounded-tl-lg">Turno</th>
-                                <th class="px-4 py-2 rounded-tr-lg">Servicio</th>
+        <main class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col lg:col-span-1">
+                <h2 class="text-2xl font-bold text-green-400 mb-4">Turnos por Atender</h2>
+                <div class="overflow-y-auto flex-grow">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-gray-700">
+                            <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                <th class="p-3">Turno</th>
+                                <th class="p-3">Servicio</th>
                             </tr>
                         </thead>
-                        <tbody id="pending-turns-body">
-                            <!-- Los turnos pendientes se cargarán aquí por JavaScript -->
-                            <tr>
-                                <td colspan="2" class="text-center text-gray-500 py-4">Cargando turnos...</td>
-                            </tr>
-                        </tbody>
+                        <tbody id="pending-turns-body" class="divide-y divide-gray-700">
+                            </tbody>
                     </table>
                 </div>
             </section>
 
-            <!-- Sección 2: Mi Módulo [N] -->
-            <section class="panel-section col-span-2 flex flex-col items-center justify-center text-center">
-                <h2 class="section-title" id="my-module-title">Mi Módulo: Cargando...</h2>
+            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-2">
+                <h2 class="text-2xl font-bold text-green-400 mb-4" id="my-module-title">Mi Módulo: Cargando...</h2>
                 <div class="flex-grow flex flex-col justify-center items-center w-full">
-                    <p class="text-xl font-medium text-gray-400 mb-4">Turno en Curso:</p>
-                    <div id="current-attending-turn" class="text-7xl font-extrabold text-yellow-400 mb-4 tracking-wide">---</div>
-                    <p id="current-attending-service" class="text-3xl font-semibold text-gray-300 mb-8">Esperando nuevo turno...</p>
+                    <p class="text-lg font-medium text-gray-400 mb-2">Turno en Curso:</p>
+                    <div id="current-attending-turn" class="text-7xl font-extrabold text-yellow-400 mb-2 tracking-wide">---</div>
+                    <p id="current-attending-service" class="text-2xl font-semibold text-gray-300 mb-8">Esperando nuevo turno...</p>
 
-                    <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                        <button id="btn-call-next" class="action-button btn-call flex-1" disabled>
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    <div class="flex flex-col sm:flex-row gap-4 w-full max-w-lg">
+                        <button id="btn-call-next" class="flex-1 flex items-center justify-center px-5 py-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                             Llamar Siguiente
                         </button>
-                        <button id="btn-recall" class="action-button btn-recall flex-1" disabled>
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17l-3 3m0 0l-3-3m3 3V3"></path></svg>
+                        <button id="btn-recall" class="flex-1 flex items-center justify-center px-5 py-4 bg-yellow-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
                             Rellamar
                         </button>
-                        <button id="btn-finish" class="action-button btn-finish flex-1" disabled>
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <button id="btn-finish" class="flex-1 flex items-center justify-center px-5 py-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             Finalizar Turno
                         </button>
                     </div>
                 </div>
             </section>
 
-            <!-- Sección 3: Historial del Día -->
-            <section class="panel-section col-span-1">
-                <h2 class="section-title">Historial del Día</h2>
-                <div class="overflow-y-auto max-h-[calc(100vh-250px)] custom-scrollbar">
-                    <table class="min-w-full table-auto">
-                        <thead>
-                            <tr class="table-header">
-                                <th class="px-4 py-2 rounded-tl-lg">Turno</th>
-                                <th class="px-4 py-2 rounded-tr-lg">Hora Fin</th>
+            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col lg:col-span-1">
+                <h2 class="text-2xl font-bold text-green-400 mb-4">Historial del Día</h2>
+                <div class="overflow-y-auto flex-grow">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-gray-700">
+                            <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                <th class="p-3">Turno</th>
+                                <th class="p-3">Hora Fin</th>
                             </tr>
                         </thead>
-                        <tbody id="daily-history-body">
-                            <!-- El historial del día se cargará aquí por JavaScript -->
-                            <tr>
-                                <td colspan="2" class="text-center text-gray-500 py-4">Cargando historial...</td>
-                            </tr>
-                        </tbody>
+                        <tbody id="daily-history-body" class="divide-y divide-gray-700">
+                            </tbody>
                     </table>
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- Modal para Confirmación (reemplazo de alert/confirm) -->
     <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
             <h3 class="text-2xl font-bold text-white mb-4" id="modal-title"></h3>
@@ -114,7 +105,7 @@
         window.ASSIGNED_MODULE_ID = "{{ session_assigned_module_id }}" === 'None' ? null : parseInt("{{ session_assigned_module_id }}");
         window.USER_NAME = "{{ user_name }}";
     </script>
-
-    <script type="module" src="../static/js/funcionario_panel.js"></script>
+    <script type="module" src="{{ url_for('static', filename='js/funcionario_panel.js') }}"></script>
 </body>
+
 </html>
