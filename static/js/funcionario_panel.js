@@ -33,6 +33,7 @@ const myModuleTitleElement = document.getElementById('my-module-title');
 const pendingTurnsBody = document.getElementById('pending-turns-body');
 const currentAttendingTurnElement = document.getElementById('current-attending-turn');
 const currentAttendingServiceElement = document.getElementById('current-attending-service');
+const currentAttendingClientElement = document.getElementById('current-attending-client');
 const btnCallNext = document.getElementById('btn-call-next');
 const btnRecall = document.getElementById('btn-recall');
 const btnFinish = document.getElementById('btn-finish');
@@ -167,6 +168,7 @@ async function loadCurrentTurn() {
     if (window.ASSIGNED_MODULE_ID === null) {
         currentAttendingTurnElement.textContent = '---';
         currentAttendingServiceElement.textContent = 'Módulo no asignado.';
+        currentAttendingClientElement.textContent = '-'; // Limpiar nombre del cliente
         currentAttendingTurnId = null;
         updateButtonStates();
         return;
@@ -182,7 +184,8 @@ async function loadCurrentTurn() {
         id_turno,
         prefijo_turno,
         numero_turno,
-        servicios: id_servicio (nombre_servicio)
+        servicios:id_servicio(nombre_servicio),
+        clientes:id_cliente(nombre_completo)
     `)
             .eq('estado', 'en atencion')
             .eq('id_modulo_atencion', window.ASSIGNED_MODULE_ID)
@@ -203,19 +206,28 @@ async function loadCurrentTurn() {
 
             console.log(`Turno actual encontrado: ${turnNumber} - ${serviceName}`);
 
+            const clientName = turn.clientes?.nombre_completo || 'N/A';
+
+
             currentAttendingTurnElement.textContent = turnNumber;
             currentAttendingServiceElement.textContent = serviceName;
+            currentAttendingClientElement.textContent = clientName; // <-- MOSTRAMOS EL NOMBRE
+
             currentAttendingTurnId = turn.id_turno;
         } else {
             console.log("No hay turno en atención actualmente");
             currentAttendingTurnElement.textContent = '---';
             currentAttendingServiceElement.textContent = 'Esperando nuevo turno...';
+            currentAttendingClientElement.textContent = '-'; // Limpiar nombre del cliente
+
             currentAttendingTurnId = null;
         }
     } catch (error) {
         console.error("Error al cargar turno actual:", error);
         currentAttendingTurnElement.textContent = 'Error';
         currentAttendingServiceElement.textContent = 'Error al cargar turno.';
+        currentAttendingClientElement.textContent = 'Error';
+
         currentAttendingTurnId = null;
     }
     updateButtonStates();

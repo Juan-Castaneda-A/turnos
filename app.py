@@ -156,20 +156,36 @@ def solicitar_turno_action():
     if supabase is None:
         flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
         return redirect(url_for('solicitar_turno_ui'))
-
+    #1. Obtenemos los nuevos datos del formulario
     id_servicio = request.form.get('id_servicio')
-    if not id_servicio:
-        flash("Por favor, seleccione un servicio válido.", "warning")
+    numero_identificacion = request.form.get('numero_identificacion')
+    nombre_completo = request.form.get('nombre_completo')
+
+    if not all([id_servicio, numero_identificacion, nombre_completo]):
+        flash("Todos los campos son requeridos.", "warning")
         return redirect(url_for('solicitar_turno_ui'))
 
     try:
+        # 2. Lógica para "obtener o crear" el cliente
+        #Primero, se busca si el cliente ya existe
+        cliente_response = supabase.table('clientes').select('id_cliente').eq('numero_identificacion', numero_identificacion).execute()
+
+        if cliente_response.data:
+            id_cliente = cliente_response.data[0]['id_cliente'] # Si existe, usamos su ID
+        else:
+            nuevo_cliente = supabase.table('clientes').insert({ # Si no existe, lo insertamos y obtenemos el nuevo ID
+                'numero_identificacion': numero_identificacion,
+                'nombre_completo': nombre_completo
+            }).execute()
+            id_cliente = nuevo_cliente.data[0]['id_cliente']
         # --- Lógica Antigua (eliminada) ---
         # Ya no necesitamos obtener el prefijo ni calcular el último número aquí.
         # La función de la base de datos 'crear_nuevo_turno' hace todo eso.
 
         # --- Nueva Lógica: Llamada a la Función RPC ---
         # Simplemente llamamos a la función que creamos en Supabase y le pasamos el id_servicio.
-        params = {'_id_servicio': int(id_servicio)}
+        
+        params = {'_id_servicio': int(id_servicio), '_id_cliente': id_cliente}
         response = supabase.rpc('crear_nuevo_turno', params).execute()
 
         if response.data:
@@ -178,11 +194,12 @@ def solicitar_turno_action():
             prefijo_ticket = nuevo_turno_data['prefijo_turno']
             nuevo_numero_turno = nuevo_turno_data['numero_turno']
             
-            logging.info(f"Nuevo turno creado vía RPC: {prefijo_ticket}-{nuevo_numero_turno}")
-            
             #Obtener el nombre del servicio para pasarlo a la plantilla
             response_servicio = supabase.table('servicios').select('nombre_servicio').eq('id_servicio', nuevo_turno_data['id_servicio']).single().execute()
             nombre_servicio = response_servicio.data['nombre_servicio'] if response_servicio.data else ''
+
+            logging.info(f"Nuevo turno creado vía RPC: {prefijo_ticket}-{nuevo_numero_turno}")
+            
             # Aquí se integraría la lógica para imprimir el ticket.
             return render_template('ticket_confirmacion.html',
                                    turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}",
@@ -487,6 +504,21 @@ def api_save_user():
     except Exception as e:
         logging.error(f"Error en api_save_user: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/check-cliente/<identificacion>')
+def check_cliente(identificacion):
+    """
+    Verifica si un cliente existe por su número de identificación
+    y devuelve su nombre si lo encuentra.
+    """
+    try:
+        response = supabase.table('clientes').select('nombre_completo').eq('numero_identificacion', identificacion).single().execute()
+        if response.data:
+            return jsonify(response.data) # Devuelve {"nombre_completo": "Juan Perez"} si lo encuentra
+        else:
+            return jsonify(None) # Devuelve null si no lo encuentra
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # @app.route('/api/text-to-speech', methods=['POST'])
 # def text_to_speech():
