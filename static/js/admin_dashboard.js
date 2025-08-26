@@ -94,7 +94,9 @@ function showConfirmationModal(title, message) {
 
 function showView(viewId) {
     contentSections.forEach(section => {
-        section.classList.add('hidden');
+        if (section.id !== 'confirmation-modal') {
+            section.classList.add('hidden');
+        }
     });
     document.getElementById(viewId + '-view').classList.remove('hidden');
 
@@ -551,6 +553,7 @@ async function deleteModule(id) {
 let allModules = [];
 let allServices = [];
 let currentModuleServiceConfig = {};
+let isSavingConfig = false;
 
 async function loadServicesConfig() {
     servicesConfigHeader.innerHTML = '<th class="px-4 py-2 rounded-tl-lg">Módulo</th>';
@@ -624,6 +627,8 @@ saveServicesConfigBtn.addEventListener('click', async () => {
     const confirmed = await showConfirmationModal('Guardar Configuración de Servicios', '¿Está seguro de que desea guardar los cambios en la asignación de servicios?');
     if (!confirmed) return;
 
+    isSavingConfig = true;
+
     const newConfig = {};
     servicesConfigBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
         const moduleId = parseInt(checkbox.dataset.moduleId);
@@ -657,6 +662,8 @@ saveServicesConfigBtn.addEventListener('click', async () => {
     } catch (error) {
         console.error("Error al guardar configuración de servicios:", error.message);
         await showConfirmationModal('Error', `Error al guardar configuración de servicios: ${error.message}`);
+    } finally {
+        isSavingConfig = false;
     }
 });
 
@@ -836,6 +843,11 @@ function setupRealtimeSubscriptions() {
             'postgres_changes',
             { event: '*', schema: 'public', table: 'modulos_servicios' },
             async payload => {
+                // Si la bandera está levantada, ignora el evento y no hagas nada.
+                if (isSavingConfig) {
+                    return;
+                }
+
                 console.log('Cambio en modulos_servicios recibido en admin dashboard!', payload);
                 // Solo recargar si la vista está activa
                 if (!document.getElementById('configure-services-view').classList.contains('hidden')) {
