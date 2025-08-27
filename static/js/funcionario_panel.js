@@ -1,14 +1,7 @@
-// Importar el cliente de Supabase
+// ==========================================================
+// IMPORTACIÓN Y CONFIGURACIÓN INICIAL
+// ==========================================================
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
-
-// Variables de configuración (pasadas desde Flask)
-//const SUPABASE_URL = "{{ supabase_url }}";
-//const SUPABASE_KEY = "{{ supabase_key }}";
-// Convertir la cadena 'None' o 'null' a null de JavaScript
-//const USER_ID = "{{ session_user_id }}" === 'None' || "{{ session_user_id }}" === 'null' ? null : "{{ session_user_id }}";
-//const ASSIGNED_MODULE_ID_STR = "{{ session_assigned_module_id }}";
-//const ASSIGNED_MODULE_ID = ASSIGNED_MODULE_ID_STR === 'None' || ASSIGNED_MODULE_ID_STR === 'null' ? null : parseInt(ASSIGNED_MODULE_ID_STR);
-//const USER_NAME = "{{ user_name }}"; // Nombre del usuario
 
 // Inicializar Supabase
 const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
@@ -27,7 +20,9 @@ try {
     console.error("Error al intentar llamar supabase.from('turnos'):", e);
 }
 
-// Referencias a elementos del DOM
+// ==========================================================
+// REFERENCIAS AL DOM
+// ==========================================================
 const assignedModuleNameElement = document.getElementById('assigned-module-name');
 const myModuleTitleElement = document.getElementById('my-module-title');
 const pendingTurnsBody = document.getElementById('pending-turns-body');
@@ -47,6 +42,9 @@ const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
 let currentAttendingTurnId = null;
 let channels = [];
+// ==========================================================
+// FUNCIONES DE LÓGICA
+// ==========================================================
 
 function showConfirmationModal(title, message) {
     return new Promise((resolve) => {
@@ -291,6 +289,29 @@ function updateButtonStates() {
     btnFinish.disabled = !hasCurrentTurn;
 }
 
+function setupRealtimeSubscriptions() {
+    console.log("Configurando suscripciones en tiempo real para el panel...");
+
+    turnosChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'turnos' },
+        (payload) => {
+            console.log('Cambio en la tabla de turnos detectado!', payload.eventType);
+            loadPendingTurns();
+            loadCurrentTurn();
+            loadDailyHistory();
+        }
+    );
+
+    turnosChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Panel de funcionario conectado al canal de tiempo real.');
+        }
+    });
+}
+
+// ==========================================================
+// EVENT LISTENERS PARA LOS BOTONES
+// ==========================================================
+
 btnCallNext.addEventListener('click', async () => {
     const confirmed = await showConfirmationModal('Llamar Siguiente Turno', '¿Está seguro de que desea llamar al siguiente turno disponible?');
     if (!confirmed) return;
@@ -448,67 +469,57 @@ btnFinish.addEventListener('click', async () => {
     }
 });
 
-function setupRealtimeSubscriptions() {
-    console.log("Configurando suscripciones en tiempo real...");
 
-    // Limpiar suscripciones existentes
-    cleanupRealtimeSubscriptions();
 
-    // Canal para cambios en turnos
-    const turnsChannel = supabase
-        .channel('turns_changes')
-        .on(
-            'postgres_changes',
-            {
-                event: '*',
-                schema: 'public',
-                table: 'turnos',
-                filter: `id_modulo_atencion=eq.${window.ASSIGNED_MODULE_ID}`
-            },
-            (payload) => {
-                console.log('Cambio en turnos recibido:', payload);
-                loadCurrentTurn();
-                loadPendingTurns();
-            }
-        )
-        .subscribe();
-
-    channels.push(turnsChannel);
-    console.log("Suscripción a cambios en turnos activada");
-}
-
-function cleanupRealtimeSubscriptions() {
-    if (channels && channels.length > 0) {
-        console.log("Limpiando suscripciones existentes...");
-        channels.forEach(channel => {
-            try {
-                supabase.removeChannel(channel);
-            } catch (e) {
-                console.warn("Error al limpiar canal:", e);
-            }
-        });
-        channels = [];
-    }
-}
-
-window.onload = async () => {
+// ==========================================================
+// INICIO DE LA APLICACIÓN
+// ==========================================================
+// (Función autoejecutable que se corre al cargar el script)
+async function init() {
     console.log("Inicializando panel de funcionario...");
-    console.log("Usuario ID:", window.USER_ID);
-    console.log("Módulo asignado ID:", window.ASSIGNED_MODULE_ID);
-
     await updateAssignedModuleName();
-    console.log("Nombre del módulo actualizado");
-
     await loadPendingTurns();
-    console.log("Turnos pendientes cargados");
-
     await loadCurrentTurn();
-    console.log("Turno actual cargado");
-
     await loadDailyHistory();
-    console.log("Historial diario cargado");
-
+    updateButtonStates();
     setupRealtimeSubscriptions();
-    console.log("Suscripciones en tiempo real configuradas");
-};
-turnosChannel.subscribe();
+    console.log("Panel inicializado.");
+}
+
+// function cleanupRealtimeSubscriptions() {
+//     if (channels && channels.length > 0) {
+//         console.log("Limpiando suscripciones existentes...");
+//         channels.forEach(channel => {
+//             try {
+//                 supabase.removeChannel(channel);
+//             } catch (e) {
+//                 console.warn("Error al limpiar canal:", e);
+//             }
+//         });
+//         channels = [];
+//     }
+// }
+
+// window.onload = async () => {
+//     console.log("Inicializando panel de funcionario...");
+//     console.log("Usuario ID:", window.USER_ID);
+//     console.log("Módulo asignado ID:", window.ASSIGNED_MODULE_ID);
+
+//     await updateAssignedModuleName();
+//     console.log("Nombre del módulo actualizado");
+
+//     await loadPendingTurns();
+//     console.log("Turnos pendientes cargados");
+
+//     await loadCurrentTurn();
+//     console.log("Turno actual cargado");
+
+//     await loadDailyHistory();
+//     console.log("Historial diario cargado");
+
+//     setupRealtimeSubscriptions();
+//     console.log("Suscripciones en tiempo real configuradas");
+// };
+// turnosChannel.subscribe();
+
+document.addEventListener('DOMContentLoaded', init);
