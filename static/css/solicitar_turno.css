@@ -10,3 +10,22 @@ body {
 .animate-fade-in-scale {
     animation: fadeInScale 0.8s ease-out;
 }
+
+/* Estilos para el tema oscuro de simple-keyboard */
+.simple-keyboard.hg-theme-default {
+    background-color: #1f2937; /* bg-gray-800 */
+    border-radius: 0.5rem;
+}
+.simple-keyboard.hg-theme-default .hg-button {
+    background-color: #4b5563; /* bg-gray-600 */
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+    border-bottom: 4px solid #374151; /* bg-gray-700 */
+    border-radius: 0.5rem;
+}
+.simple-keyboard.hg-theme-default .hg-button:active {
+    background-color: #374151; /* bg-gray-700 */
+    transform: translateY(2px);
+    border-bottom-width: 2px;
+}

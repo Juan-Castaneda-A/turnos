@@ -41,14 +41,11 @@ def print_ticket(data):
         if NOTARIA_LOGO:
             printer.set(align='center') # Centra la imagen
             printer.image(NOTARIA_LOGO) # Imprime el logo
-            printer.textln() # Un salto de línea después del logo
-        else:
-            # Si no hay logo, imprime el nombre como antes
-            printer.set(align='center', font='a', bold=True, width=1, height=1)
-            printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
-        printer.textln("--------------------------------")
-        printer.textln()
-
+        # else:
+        #     # Si no hay logo, imprime el nombre como antes
+        #     printer.set(align='center', font='a', bold=True, width=1, height=1)
+        #     printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
+        # printer.textln("--------------------------------")
         # --- Texto "Su turno es:" (normal) ---
         printer.set(align='center', font='a', bold=False, width=1, height=1)
         printer.textln("Su turno es:") 
@@ -64,16 +61,12 @@ def print_ticket(data):
         printer.textln("Servicio:")
         printer.textln(data.get('servicio', ''))
         printer.textln("--------------------------------")
-
         # --- Fecha y Hora ---
         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         printer.textln(f"{now}\n")
-
         # --- Pie de página ---
         printer.textln("Por favor, espere su llamado.")
         printer.textln("Gracias por su visita.")
-        printer.ln(2)
-
         printer.cut()
         print(f"✅ Ticket para {data.get('turno')} enviado a la cola de impresión.")
 
