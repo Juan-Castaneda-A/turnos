@@ -9,7 +9,7 @@ from PIL import Image
 #reemplazar estos valores con los de la impresora Epson
 PRINTER_NAME = "POS-58"
 
-LOGO_PATH = "logo_dimensionado.png"
+LOGO_PATH = "logo_dimensionado.jpg"
 #función para cargar y preparar el logo
 def load_logo():
     try:
@@ -49,16 +49,16 @@ def print_ticket(data):
         printer.textln("--------------------------------")
         printer.textln()
 
+        # --- Texto "Su turno es:" (normal) ---
+        printer.set(align='center', font='a', bold=False, width=1, height=1)
+        printer.textln("Su turno es:") 
+        printer.textln() # Salto de línea
+
         # --- Número del Turno (MÁS GRANDE) ---
         # Aumentamos el ancho y alto a 4 para que sea mucho más grande
         printer.set(align='center', font='a', bold=True, width=4, height=4) 
         printer.textln(f"{data.get('turno', 'N/A')}")
         printer.textln() # Salto de línea después del número grande
-
-        # --- Texto "Su turno es:" (normal) ---
-        printer.set(align='center', font='a', bold=False, width=1, height=1)
-        printer.textln("Su turno es:") 
-        printer.textln() # Salto de línea
 
         # --- Servicio Solicitado (normal) ---
         printer.textln("Servicio:")
