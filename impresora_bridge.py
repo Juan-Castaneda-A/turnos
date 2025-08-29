@@ -2,7 +2,6 @@ import asyncio
 import websockets
 import json
 from escpos.printer import Win32Raw
-from escpos.capabilities import get_profile
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
@@ -25,7 +24,7 @@ NOTARIA_LOGO = load_logo()
 # ======================================================================
 # ¡NUEVA FUNCIÓN MEJORADA PARA CREAR IMAGEN CON PADDING!
 # ======================================================================
-def create_text_image(text, font_path, font_size, padding=10):
+def create_text_image(text, font_path, font_size, padding=25):
     """Crea una imagen a partir de texto, añadiendo un margen blanco alrededor."""
     try:
         font = ImageFont.truetype(font_path, font_size)
@@ -52,8 +51,7 @@ def create_text_image(text, font_path, font_size, padding=10):
 def print_ticket(data):
     printer = None 
     try:
-        profile = get_profile("TEP-220M")
-        printer = Win32Raw(PRINTER_NAME, profile=profile)
+        printer = Win32Raw(PRINTER_NAME)
         
         printer._raw(b'\x1b\x33\x00') # Compactación vertical
 
@@ -70,7 +68,7 @@ def print_ticket(data):
         # --- Número del Turno (IMPRESO COMO IMAGEN CON PADDING) ---
         turno_texto = data.get('turno', 'N/A')
         # Puedes volver a probar con un tamaño grande, como 80
-        font_size_turno = 80 
+        font_size_turno = 100 
         
         turno_imagen = create_text_image(turno_texto, FONT_PATH, font_size_turno)
         
