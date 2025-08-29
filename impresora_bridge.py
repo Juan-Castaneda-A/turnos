@@ -50,7 +50,7 @@ def create_text_image(text, font_path, font_size):
         # Dibujamos el texto en la imagen (fill=0 es color negro)
         draw.text((0, 0), text, font=font, fill=0)
         
-        return image
+        return image, text_height
     except Exception as e:
         print(f"❌ Error al crear la imagen del texto: {e}")
         return None
@@ -76,18 +76,21 @@ def print_ticket(data):
         # --- Número del Turno (IMPRESO COMO IMAGEN) ---
         turno_texto = data.get('turno', 'N/A')
         # ¡Aquí definimos el tamaño! Juega con este número. 100 es un buen punto de partida.
-        font_size_turno = 100 
+        font_size_turno = 80 
         
-        turno_imagen = create_text_image(turno_texto, FONT_PATH, font_size_turno)
+        turno_imagen, turno_altura = create_text_image(turno_texto, FONT_PATH, font_size_turno)
         
         if turno_imagen:
             printer.set(align='center')
             printer.image(turno_imagen) # Imprimimos la imagen que creamos
+            printer._raw(b'\x1b\x4a' + bytes([turno_altura + 10]))
         else:
             # Si falla la creación de la imagen, imprime texto como antes
             printer.set(align='center', font='a', bold=True, width=4, height=4) 
             printer.textln(turno_texto)
+            printer.ln()
         
+        printer.textln("--------------------------------")
         printer.ln()
 
         # --- Servicio (Letra normal) ---
