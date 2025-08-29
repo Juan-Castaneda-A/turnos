@@ -3,12 +3,13 @@ import websockets
 import json
 from escpos.printer import Win32Raw
 from datetime import datetime
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # --- CONFIGURACIÓN ---
 #reemplazar estos valores con los de la impresora Epson
 PRINTER_NAME = "POS-58"
 LOGO_PATH = "logo_dimensionado.jpg"
+FONT_PATH = "ARLRDBD.TTF" 
 
 #función para cargar y preparar el logo
 def load_logo():
@@ -26,67 +27,92 @@ def load_logo():
     
 NOTARIA_LOGO = load_logo() # Carga el logo al inicio del script
 
+# ======================================================================
+# ¡NUEVA FUNCIÓN PARA CREAR UNA IMAGEN A PARTIR DE TEXTO!
+# ======================================================================
+def create_text_image(text, font_path, font_size):
+    try:
+        # Carga la fuente con el tamaño que queramos
+        font = ImageFont.truetype(font_path, font_size)
+        
+        # Calculamos el tamaño que ocupará el texto para crear un lienzo perfecto
+        # .textbbox devuelve (izquierda, arriba, derecha, abajo)
+        bbox = font.getbbox(text)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        # Creamos la imagen en blanco (modo '1' es blanco y negro)
+        image = Image.new('1', (text_width, text_height), color=255)
+        
+        # Creamos un objeto para poder "dibujar" en la imagen
+        draw = ImageDraw.Draw(image)
+        
+        # Dibujamos el texto en la imagen (fill=0 es color negro)
+        draw.text((0, 0), text, font=font, fill=0)
+        
+        return image
+    except Exception as e:
+        print(f"❌ Error al crear la imagen del texto: {e}")
+        return None
+
 # --- FUNCIÓN DE IMPRESIÓN PRECISA
 def print_ticket(data):
-    """Imprime un ticket abriendo y cerrando la conexión en cada llamada."""
     printer = None 
     try:
         printer = Win32Raw(PRINTER_NAME)
-        print(f"✅ Conexión establecida con '{PRINTER_NAME}' para imprimir ticket.")
-        #print(f"📄 Imprimiendo ticket para el turno: {data.get('turno')}")
         
-        #=================================================
-        #INICIO DE LA MAGIA: CONTROL DE PRECISIÓN
-        #se reducirá el espacio entre líneaas al mínimo posible
-        #la idea es compactar el ticket
-        printer._raw(b'\x1b\x33\x00')
-        #=================================================
+        printer._raw(b'\x1b\x33\x00') # Compactación vertical
+
         # --- Logo de la Notaría ---
         if NOTARIA_LOGO:
-            printer.set(align='center') # Centra la imagen
-            printer.image(NOTARIA_LOGO) # Imprime el logo
+            printer.set(align='center')
+            printer.image(NOTARIA_LOGO)
         else:
-            # Si no hay logo, imprime el nombre como antes
             printer.set(align='center', font='a', bold=True, width=2, height=2)
-            printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
-        printer.textln("--------------------------------")
-        # --- Texto "Su turno es:" (normal) ---
+            printer.textln("NOTARIA TERCERA")
+        
+        printer.ln() # Un pequeño espacio
+
+        # --- Número del Turno (IMPRESO COMO IMAGEN) ---
+        turno_texto = data.get('turno', 'N/A')
+        # ¡Aquí definimos el tamaño! Juega con este número. 100 es un buen punto de partida.
+        font_size_turno = 100 
+        
+        turno_imagen = create_text_image(turno_texto, FONT_PATH, font_size_turno)
+        
+        if turno_imagen:
+            printer.set(align='center')
+            printer.image(turno_imagen) # Imprimimos la imagen que creamos
+        else:
+            # Si falla la creación de la imagen, imprime texto como antes
+            printer.set(align='center', font='a', bold=True, width=4, height=4) 
+            printer.textln(turno_texto)
+        
+        printer.ln()
+
+        # --- Servicio (Letra normal) ---
         printer.set(align='center', font='a', bold=False, width=1, height=1)
-        printer.textln("Su turno es:")
-
-        # --- Número del Turno (MÁS GRANDE POSIBLE) ---
-        printer.set(align='center', font='b', bold=True, width=8, height=8) 
-        printer.textln(f"{data.get('turno', 'N/A')}")
-
-        # --- Servicio Solicitado (normal) ---
-        printer.set(align='center',font='a',bold=False,width=1,height=1)
         printer.textln(f"{data.get('servicio', '')}")
         printer.textln("--------------------------------")
+
         # --- Fecha y Hora ---
         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        printer.textln(f"{now}\n")
-        # --- Pie de página ---
-        printer.textln("Por favor, espere su llamado.")
-        printer.textln("Gracias por su visita.")
-        # ======================================================================
-        # FIN DE LA MAGIA: CORTE PRECISO
-        # El comando 'ESC J n' avanza el papel n/203 pulgadas.
-        # Para avanzar ~2mm, necesitamos avanzar unos 16 "puntos" (8 dots/mm * 2mm).
-        # El valor 16 en hexadecimal es \x10.
+        printer.textln(f"{now}")
+        
+        # Avanzamos el papel ~2mm antes de cortar
         printer._raw(b'\x1b\x4a\x10')
-        # ======================================================================
         
         printer.cut()
-        # Reseteamos el espacio entre líneas al valor por defecto para futuros trabajos
-        printer._raw(b'\x1b\x32')
-        print(f"✅ Ticket para {data.get('turno')} enviado a la cola de impresión.")
+        
+        printer._raw(b'\x1b\x32') # Reseteamos el espacio entre líneas
+
+        print(f"✅ Ticket para {data.get('turno')} impreso como imagen.")
 
     except Exception as e:
         print(f"❌ Error durante la impresión: {e}")
     finally:
         if printer:
             printer.close()
-            print("✅ Conexión con la impresora cerrada.")
 
 
 
