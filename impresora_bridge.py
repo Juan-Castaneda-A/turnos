@@ -5,11 +5,11 @@ from escpos.printer import Win32Raw
 from datetime import datetime
 from PIL import Image
 
-# --- CONFIGURACIÓN DE LA IMPRESORA ---
+# --- CONFIGURACIÓN ---
 #reemplazar estos valores con los de la impresora Epson
 PRINTER_NAME = "POS-58"
-
 LOGO_PATH = "logo_dimensionado.jpg"
+
 #función para cargar y preparar el logo
 def load_logo():
     try:
@@ -26,40 +26,41 @@ def load_logo():
     
 NOTARIA_LOGO = load_logo() # Carga el logo al inicio del script
 
-
+# --- FUNCIÓN DE IMPRESIÓN PRECISA
 def print_ticket(data):
     """Imprime un ticket abriendo y cerrando la conexión en cada llamada."""
-    
     printer = None 
     try:
         printer = Win32Raw(PRINTER_NAME)
         print(f"✅ Conexión establecida con '{PRINTER_NAME}' para imprimir ticket.")
+        #print(f"📄 Imprimiendo ticket para el turno: {data.get('turno')}")
         
-        print(f"📄 Imprimiendo ticket para el turno: {data.get('turno')}")
-
+        #=================================================
+        #INICIO DE LA MAGIA: CONTROL DE PRECISIÓN
+        #se reducirá el espacio entre líneaas al mínimo posible
+        #la idea es compactar el ticket
+        printer._raw(b'\x1b\x33\x00')
+        #=================================================
         # --- Logo de la Notaría ---
         if NOTARIA_LOGO:
             printer.set(align='center') # Centra la imagen
             printer.image(NOTARIA_LOGO) # Imprime el logo
-        # else:
-        #     # Si no hay logo, imprime el nombre como antes
-        #     printer.set(align='center', font='a', bold=True, width=1, height=1)
-        #     printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
-        # printer.textln("--------------------------------")
+        else:
+            # Si no hay logo, imprime el nombre como antes
+            printer.set(align='center', font='a', bold=True, width=2, height=2)
+            printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
+        printer.textln("--------------------------------")
         # --- Texto "Su turno es:" (normal) ---
         printer.set(align='center', font='a', bold=False, width=1, height=1)
-        printer.textln("Su turno es:") 
-        printer.textln() # Salto de línea
+        printer.textln("Su turno es:")
 
-        # --- Número del Turno (MÁS GRANDE) ---
-        # Aumentamos el ancho y alto a 4 para que sea mucho más grande
-        printer.set(align='center', font='a', bold=True, width=4, height=4) 
+        # --- Número del Turno (MÁS GRANDE POSIBLE) ---
+        printer.set(align='center', font='b', bold=True, width=8, height=8) 
         printer.textln(f"{data.get('turno', 'N/A')}")
-        printer.textln() # Salto de línea después del número grande
 
         # --- Servicio Solicitado (normal) ---
-        printer.textln("Servicio:")
-        printer.textln(data.get('servicio', ''))
+        printer.set(align='center',font='a',bold=False,width=1,height=1)
+        printer.textln(f"{data.get('servicio', '')}")
         printer.textln("--------------------------------")
         # --- Fecha y Hora ---
         now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -67,7 +68,17 @@ def print_ticket(data):
         # --- Pie de página ---
         printer.textln("Por favor, espere su llamado.")
         printer.textln("Gracias por su visita.")
+        # ======================================================================
+        # FIN DE LA MAGIA: CORTE PRECISO
+        # El comando 'ESC J n' avanza el papel n/203 pulgadas.
+        # Para avanzar ~2mm, necesitamos avanzar unos 16 "puntos" (8 dots/mm * 2mm).
+        # El valor 16 en hexadecimal es \x10.
+        printer._raw(b'\x1b\x4a\x10')
+        # ======================================================================
+        
         printer.cut()
+        # Reseteamos el espacio entre líneas al valor por defecto para futuros trabajos
+        printer._raw(b'\x1b\x32')
         print(f"✅ Ticket para {data.get('turno')} enviado a la cola de impresión.")
 
     except Exception as e:
