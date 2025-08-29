@@ -35,23 +35,42 @@ def create_text_image(text, font_path, font_size):
     except Exception as e:
         print(f"❌ Error al crear la imagen del texto: {e}")
         return None
+    
+# ======================================================================
+# ¡NUEVA FUNCIÓN "REBANADORA" DE IMÁGENES!
+# ======================================================================
+def print_image_sliced(printer, image, max_height=255):
+    """
+    Imprime una imagen alta rebanándola en pedazos horizontales
+    para evitar los límites de altura del firmware de la impresora.
+    """
+    width, height = image.size
+    y = 0
+    while y < height:
+        slice_height = min(max_height, height - y)
+        box = (0, y, width, y + slice_height)
+        slice_img = image.crop(box)
+        
+        printer.set(align='center')
+        printer.image(slice_img)
+        
+        y += slice_height
 
 def print_ticket(data):
     printer = None 
     try:
-        profile = get_profile("TEP-220M")
-        printer = Win32Raw(PRINTER_NAME, profile=profile)
+        #profile = get_profile("TEP-220M")
+        printer = Win32Raw(PRINTER_NAME)
         
         # Compactación vertical
         printer._raw(b'\x1b\x33\x00') 
 
         # --- Logo de la Notaría ---
         if NOTARIA_LOGO:
-            printer.set(align='center')
-            printer.image(NOTARIA_LOGO)
+            print_image_sliced(printer, NOTARIA_LOGO)
         else:
             printer.set(align='center', font='a', bold=True, width=2, height=2)
-            printer.textln("NOTARIA TERCERA")
+            printer.textln("NOTARIA TERCERA DE VALLEDUPAR")
         
         # --- Número del Turno (IMPRESO COMO IMAGEN) ---
         turno_texto = data.get('turno', 'N/A')
@@ -59,21 +78,15 @@ def print_ticket(data):
         turno_imagen = create_text_image(turno_texto, FONT_PATH, font_size_turno)
         
         if turno_imagen:
-            printer.set(align='center')
-            printer.image(turno_imagen)
-            
-            # =======================================================
-            # ¡LA SOLUCIÓN!
-            # Le decimos a la impresora que avance 2 líneas en blanco
-            # después de la imagen para crear espacio.
-            # ¡Puedes jugar con este número! Prueba con 1, 2 o 3.
-            printer.feed(2)
+           print_image_sliced(printer, turno_imagen)
+            #printer._raw(b'\x1b\x4a\x3c')
             # =======================================================
             
         else: # Fallback si la imagen no se pudo crear
             printer.set(align='center', font='a', bold=True, width=4, height=4) 
             printer.textln(turno_texto)
-            printer.ln()
+        
+        printer.ln()
 
         # --- Servicio (Letra normal) ---
         printer.set(align='center', font='a', bold=False, width=1, height=1)
