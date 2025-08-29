@@ -1,31 +1,48 @@
-body {
-    font-family: 'Inter', sans-serif;
-}
+/* Pega esto en tu solicitar_turno.css */
 
-@keyframes fadeInScale {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-.animate-fade-in-scale {
-    animation: fadeInScale 0.8s ease-out;
-}
-
-/* Estilos para el tema oscuro de simple-keyboard */
-.simple-keyboard.hg-theme-default {
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default {
     background-color: #1f2937; /* bg-gray-800 */
-    border-radius: 0.5rem;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
 }
-.simple-keyboard.hg-theme-default .hg-button {
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button {
+    height: 60px;
     background-color: #4b5563; /* bg-gray-600 */
     color: white;
     font-size: 1.5rem;
     font-weight: 600;
+    border: none;
     border-bottom: 4px solid #374151; /* bg-gray-700 */
-    border-radius: 0.5rem;
+    border-radius: 8px;
 }
-.simple-keyboard.hg-theme-default .hg-button:active {
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button:active {
     background-color: #374151; /* bg-gray-700 */
     transform: translateY(2px);
     border-bottom-width: 2px;
 }
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button.hg-functionBtn {
+    background-color: #374151;
+}
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button[data-skbtn="{enter}"] {
+    background-color: #2563eb; /* bg-blue-600 */
+    border-bottom-color: #1d4ed8; /* bg-blue-800 */
+}
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button[data-skbtn="{enter}"]:active {
+    background-color: #1d4ed8;
+}
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button[data-skbtn="{bksp}"] {
+    background-color: #b91c1c; /* bg-red-700 */
+    border-bottom-color: #7f1d1d; /* bg-red-900 */
+}
+
+#virtual-keyboards-wrapper .simple-keyboard.hg-theme-default .hg-button[data-skbtn="{bksp}"]:active {
+    background-color: #7f1d1d;
+}
+

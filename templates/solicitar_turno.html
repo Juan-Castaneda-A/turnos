@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Notaría Tercera - Solicitar Turno</title>
-    
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simple-keyboard@latest/build/css/index.css">
+
+    <link href="../static/css/solicitar_turno.css" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/solicitar_turno.css') }}" rel="stylesheet">
+    
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans flex flex-col justify-center items-center min-h-screen p-4">
 
@@ -31,10 +31,27 @@
                 </div>
                 <p id="loading-message" class="text-gray-400 mt-4 hidden">Verificando...</p>
                 
-                <div class="simple-keyboard-container mt-4">
-                    <div class="simple-keyboard" id="numeric-keyboard"></div>
+                <div id="virtual-keyboards-wrapper">
+                    <div class="simple-keyboard-container mt-4">
+                        <div id="custom-numeric-keyboard" class="w-full max-w-xs mx-auto mt-4">
+                            <div class="grid grid-cols-3 gap-2">
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">1</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">2</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">3</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">4</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">5</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">6</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">7</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">8</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">9</button>
+                                <button type="button" class="keypad-bksp col-span-1 p-4 h-20 text-xl font-bold bg-red-700 rounded-lg hover:bg-red-800 active:bg-red-900 transition">BORRAR</button>
+                                <button type="button" class="keypad-btn p-4 h-20 text-3xl font-bold bg-gray-600 rounded-lg hover:bg-gray-700 active:bg-gray-800 transition">0</button>
+                                <button type="button" class="keypad-enter p-4 h-20 text-xl font-bold bg-blue-600 rounded-lg hover:bg-blue-700 active:bg-blue-800 transition">CONTINUAR</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </div>  
 
             <div id="step-2-services" class="hidden">
                 <div id="welcome-user-message" class="text-2xl font-semibold mb-6"></div>
@@ -44,17 +61,69 @@
                     <input type="text" id="nombre_completo" name="nombre_completo" required readonly
                            class="w-full max-w-lg mx-auto p-4 text-xl text-center bg-gray-700 border border-gray-600 rounded-lg">
                     
-                    <div class="simple-keyboard-container mt-4">
-                        <div class="simple-keyboard" id="qwerty-keyboard"></div>
-                    </div>
+                           <div id="virtual-keyboards-wrapper">
+                            <div class="simple-keyboard-container mt-4">
+                                <div id="custom-qwerty-keyboard" class="w-full max-w-2xl mx-auto mt-4">
+                                    <div class="flex justify-center gap-2 mb-2">
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">Q</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">W</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">E</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">R</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">T</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">Y</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">U</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">I</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">O</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">P</button>
+                                    </div>
+                                    <div class="flex justify-center gap-2 mb-2">
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">A</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">S</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">D</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">F</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">G</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">H</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">J</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">K</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">L</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">Ñ</button>
+                                    </div>
+                                    <div class="flex justify-center gap-2 mb-2">
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">Z</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">X</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">C</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">V</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">B</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">N</button>
+                                        <button type="button" class="keypad-btn h-14 flex-1 bg-gray-600 rounded-lg font-semibold text-xl hover:bg-gray-700 active:bg-gray-800 transition">M</button>
+                                    </div>
+                                    <div class="flex justify-center gap-2">
+                                        <button type="button" class="keypad-bksp h-14 flex-grow-[2] bg-red-700 rounded-lg font-semibold text-lg hover:bg-red-800 active:bg-red-900 transition">BORRAR</button>
+                                        <button type="button" class="keypad-space h-14 flex-grow-[5] bg-gray-500 rounded-lg font-semibold text-lg hover:bg-gray-600 active:bg-gray-700 transition">ESPACIO</button>
+                                        <button type="button" class="keypad-enter h-14 flex-grow-[2] bg-blue-600 rounded-lg font-semibold text-lg hover:bg-blue-700 active:bg-blue-800 transition">LISTO</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                 </div>
 
                 <div id="service-selection-container" class="hidden">
                     <h2 class="text-2xl font-semibold mb-6">Ahora, por favor, seleccione su tipo de trámite:</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {% for servicio in servicios %}
-                            <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}" class="service-button ...">
-                                </button>
+                            <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}" 
+                                    class="service-button w-full flex items-center justify-center gap-4 p-6 bg-gray-700 text-white font-bold text-xl rounded-2xl shadow-lg
+                                           hover:bg-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                <span class="text-3xl">
+                                    {% if 'Biometría' in servicio.nombre_servicio %} ☝️
+                                    {% elif 'Declaración' in servicio.nombre_servicio %} 📝
+                                    {% elif 'Registro Civil' in servicio.nombre_servicio %} 📄
+                                    {% elif 'Salida del País' in servicio.nombre_servicio %} ✈️
+                                    {% elif 'Jurídica' in servicio.nombre_servicio %} ⚖️
+                                    {% else %} ✨ {% endif %}
+                                </span>
+                                {{ servicio.nombre_servicio }}
+                            </button>
                         {% endfor %}
                     </div>
                 </div>
@@ -65,7 +134,6 @@
             {% endwith %}
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/simple-keyboard@latest/build/index.js"></script>
-    <script src="{{ url_for('static', filename='js/solicitar_turno.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/solicitar_turno.js') }}" defer></script>
 </body>
 </html>
