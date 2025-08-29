@@ -57,6 +57,8 @@ def create_text_image(text, font_path, font_size):
 
 # --- FUNCIÓN DE IMPRESIÓN PRECISA
 def print_ticket(data):
+    """Imprime un ticket con la información recibida, usando avance de papel inteligente."""
+    
     printer = None 
     try:
         printer = Win32Raw(PRINTER_NAME)
@@ -71,27 +73,26 @@ def print_ticket(data):
             printer.set(align='center', font='a', bold=True, width=2, height=2)
             printer.textln("NOTARIA TERCERA")
         
-        printer.ln() # Un pequeño espacio
-
         # --- Número del Turno (IMPRESO COMO IMAGEN) ---
         turno_texto = data.get('turno', 'N/A')
-        # ¡Aquí definimos el tamaño! Juega con este número. 100 es un buen punto de partida.
-        font_size_turno = 80 
+        font_size_turno = 80 # Ajusta este valor si es necesario
         
+        # 1. AHORA CAPTURAMOS LA IMAGEN Y SU ALTURA
         turno_imagen, turno_altura = create_text_image(turno_texto, FONT_PATH, font_size_turno)
         
         if turno_imagen:
             printer.set(align='center')
-            printer.image(turno_imagen) # Imprimimos la imagen que creamos
+            printer.image(turno_imagen) # Imprimimos la imagen
+
+            # 2. ¡LA MAGIA! Avanzamos el papel la altura de la imagen + 10 puntos de margen
+            # El comando 'ESC J n' avanza el papel n puntos.
+            # Le pasamos la altura exacta de la imagen para crear el espacio perfecto.
             printer._raw(b'\x1b\x4a' + bytes([turno_altura + 10]))
-        else:
-            # Si falla la creación de la imagen, imprime texto como antes
+
+        else: # Fallback si la imagen no se pudo crear
             printer.set(align='center', font='a', bold=True, width=4, height=4) 
             printer.textln(turno_texto)
             printer.ln()
-        
-        printer.textln("--------------------------------")
-        printer.ln()
 
         # --- Servicio (Letra normal) ---
         printer.set(align='center', font='a', bold=False, width=1, height=1)
@@ -107,9 +108,10 @@ def print_ticket(data):
         
         printer.cut()
         
-        printer._raw(b'\x1b\x32') # Reseteamos el espacio entre líneas
+        # Reseteamos el espacio entre líneas al valor por defecto
+        printer._raw(b'\x1b\x32')
 
-        print(f"✅ Ticket para {data.get('turno')} impreso como imagen.")
+        print(f"✅ Ticket para {data.get('turno')} impreso con precisión.")
 
     except Exception as e:
         print(f"❌ Error durante la impresión: {e}")
