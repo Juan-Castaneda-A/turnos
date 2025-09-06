@@ -12,6 +12,8 @@
 </head>
 <body>
     <div class="confirmation-container">
+        <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="w-auto h-16 mx-auto mb-8">
+
         <p class="success-message">¡Gracias!</p>
         <p class="instruction-message">Su turno es:</p>
         <div class="turn-info">{{ turno_id }}</div>

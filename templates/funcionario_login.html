@@ -12,6 +12,7 @@
 </head>
 <body>
     <div class="login-container">
+        <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="w-auto h-16 mx-auto mb-6">
         <h1 class="login-title">Iniciar Sesión - Notaría Tercera</h1>
         <form action="{{ url_for('funcionario_login') }}" method="post">
             <input type="text" name="username" placeholder="Nombre de Usuario" required class="form-input">

@@ -176,7 +176,7 @@ async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
         const moduleNumber = parseInt(moduleNumberStr, 10);
         const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
 
-        const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase a la ventanilla ${moduleNumberEnPalabras}.`;
+        const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase al módulo ${moduleNumberEnPalabras}.`;
         console.log("Texto a anunciar (nativo):", textToSpeak);
 
         // Cancelar cualquier anuncio anterior para evitar que se solapen
@@ -207,7 +207,7 @@ async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
 async function updateCurrentTurnDisplay(turn) {
     if (turn) {
         currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
-        currentTurnModuleElement.textContent = `Diríjase a la Ventanilla ${turn.modulos.nombre_modulo.split(' ')[1]}`;
+        currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
 
         // Reproducir sonido si es un nuevo turno llamado
         if (turn.id_turno !== lastCalledTurnId) {

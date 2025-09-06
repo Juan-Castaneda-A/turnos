@@ -571,6 +571,38 @@ def check_cliente(identificacion):
 #         logging.error(f"Error al llamar a la API de Gemini: {e}")
 #         return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
 
+@app.route('/api/reports')
+@admin_required #para proteger la ruta
+def get_reports():
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    user_id = request.args.get('user_id')
+    module_id = request.args.get('module_id')
+
+    if not start_date or not end_date:
+        return jsonify({"error": "Se requieren fechas de inicio y fin"}), 400
+    
+    try:
+        params = {
+            'start_date': start_date,
+            'end_date': end_date
+        }
+        if user_id:
+            params['_user_id'] = int(user_id)
+        if module_id:
+            params['_module_id'] = int(module_id)
+        
+        response = supabase.rpc('get_report_data', params).execute()
+
+        if response.data:
+            return jsonify(response.data)
+        else:
+            return jsonify([])
+        
+    except Exception as e:
+        logging.error(f"Error al generar el reporte: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)

@@ -67,6 +67,13 @@ const modalMessage = document.getElementById('modal-message');
 const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
+const btnFilterToday = document.getElementById('filter-today');
+const btnFilterWeek = document.getElementById('filter-week');
+const btnFilterMonth = document.getElementById('filter-month');
+const btnFilterAll = document.getElementById('filter-all');
+const reportStartDateInput = document.getElementById('report-start-date');
+const reportEndDateInput = document.getElementById('report-end-date');
+
 function showConfirmationModal(title, message) {
     return new Promise((resolve) => {
         modalTitle.textContent = title;
@@ -317,6 +324,49 @@ async function loadModulesForUserAssignment() {
     }
 }
 
+async function loadReportFilters() {
+    try {
+        // Cargar empleados
+        const employeeFilterSelect = document.getElementById('employee-filter');
+        const { data: users, error: userError } = await supabase
+            .from('usuarios')
+            .select('id_usuario, nombre_completo');
+        if (userError) throw userError;
+        
+        // Limpiar opciones anteriores (excepto la primera de "Todos")
+        employeeFilterSelect.innerHTML = '<option value="">Todos los Empleados</option>';
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id_usuario;
+            option.textContent = user.nombre_completo;
+            employeeFilterSelect.appendChild(option);
+        });
+
+        // Cargar módulos
+        const moduleFilterSelect = document.getElementById('module-filter');
+        const { data: modules, error: moduleError } = await supabase
+            .from('modulos')
+            .select('id_modulo, nombre_modulo');
+        if (moduleError) throw moduleError;
+
+        moduleFilterSelect.innerHTML = '<option value="">Todos los Módulos</option>';
+        modules.forEach(mod => {
+            const option = document.createElement('option');
+            option.value = mod.id_modulo;
+            option.textContent = mod.nombre_modulo;
+            moduleFilterSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("Error cargando filtros de reporte:", error);
+    }
+}
+
+// Función auxiliar para formatear fechas a YYYY-MM-DD
+function formatDateToISO(date) {
+    return date.toISOString().split('T')[0];
+}
+
 addUserBtn.addEventListener('click', () => {
     userFormContainer.classList.remove('hidden');
     userFormTitle.textContent = 'Crear Nuevo Usuario';
@@ -555,27 +605,57 @@ let allServices = [];
 let currentModuleServiceConfig = {};
 let isSavingConfig = false;
 
+// En static/js/admin_dashboard.js
+
 async function loadServicesConfig() {
-    servicesConfigHeader.innerHTML = '<th class="px-4 py-2 rounded-tl-lg">Módulo</th>';
-    servicesConfigBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Cargando configuración...</td></tr>`;
+    // Referencias a los elementos del DOM
+    const servicesConfigHeader = document.getElementById('services-config-header');
+    const servicesConfigBody = document.getElementById('services-config-body');
+
+    // Limpiamos el contenido anterior
+    servicesConfigHeader.innerHTML = '';
+    servicesConfigBody.innerHTML = `<tr><td colspan="99" class="text-center text-gray-500 py-4">Cargando configuración...</td></tr>`;
 
     try {
+        // Obtenemos los módulos y servicios de la base de datos
         const { data: modules, error: modulesError } = await supabase.from('modulos').select('*').order('nombre_modulo', { ascending: true });
         if (modulesError) throw modulesError;
-        allModules = modules;
+        allModules = modules; // Asumiendo que allModules es una variable global o de ámbito superior
 
         const { data: services, error: servicesError } = await supabase.from('servicios').select('*').order('nombre_servicio', { ascending: true });
         if (servicesError) throw servicesError;
-        allServices = services;
+        allServices = services; // Asumiendo que allServices es una variable global o de ámbito superior
 
-        allServices.forEach(service => {
-            const th = document.createElement('th');
-            th.className = 'px-4 py-2';
-            th.textContent = service.nombre_servicio;
-            servicesConfigHeader.appendChild(th);
+        // --- INICIO DE LA CORRECCIÓN ---
+        
+        // 1. Crear una nueva fila de encabezado en memoria
+        const newHeaderRow = document.createElement('tr');
+        
+        // 2. Crear y añadir la primera celda "Módulo" a la fila
+        const moduleHeaderCell = document.createElement('th');
+        moduleHeaderCell.className = 'px-4 py-2 rounded-tl-lg';
+        moduleHeaderCell.textContent = 'Módulo';
+        newHeaderRow.appendChild(moduleHeaderCell);
+
+        // 3. Recorrer los servicios y añadir cada uno como una celda a la MISMA fila
+        allServices.forEach((service, index) => {
+            const serviceHeaderCell = document.createElement('th');
+            serviceHeaderCell.className = 'px-4 py-2';
+            serviceHeaderCell.textContent = service.nombre_servicio;
+            
+            // Redondear la esquina superior derecha de la última celda
+            if (index === allServices.length - 1) {
+                serviceHeaderCell.classList.add('rounded-tr-lg');
+            }
+            newHeaderRow.appendChild(serviceHeaderCell);
         });
-        servicesConfigHeader.lastChild.classList.add('rounded-tr-lg');
 
+        // 4. Añadir la fila completa al a a la tabla
+        servicesConfigHeader.appendChild(newHeaderRow);
+        
+        // --- FIN DE LA CORRECIÓN ---
+
+        // Cargar las relaciones actuales entre módulos y servicios
         const { data: moduleServices, error: msError } = await supabase.from('modulos_servicios').select('*');
         if (msError) throw msError;
 
@@ -587,31 +667,18 @@ async function loadServicesConfig() {
             currentModuleServiceConfig[ms.id_modulo].push(ms.id_servicio);
         });
 
+        // Renderizar el cuerpo de la tabla (esta lógica no cambia)
         servicesConfigBody.innerHTML = '';
-        if (allModules.length === 0) {
-            servicesConfigBody.innerHTML = `<tr><td colspan="${allServices.length + 1}" class="text-center text-gray-500 py-4">No hay módulos registrados.</td></tr>`;
-            return;
-        }
-        if (allServices.length === 0) {
-            servicesConfigBody.innerHTML = `<tr><td colspan="${allModules.length + 1}" class="text-center text-gray-500 py-4">No hay servicios registrados.</td></tr>`;
-            return;
-        }
-
         allModules.forEach(mod => {
             const tr = document.createElement('tr');
-            tr.className = 'table-row';
             let rowHtml = `<td class="px-4 py-2 font-bold">${mod.nombre_modulo}</td>`;
             allServices.forEach(service => {
                 const isChecked = currentModuleServiceConfig[mod.id_modulo] && currentModuleServiceConfig[mod.id_modulo].includes(service.id_servicio);
                 rowHtml += `
                     <td class="px-4 py-2 text-center">
-                        <input type="checkbox"
-                            class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                            data-module-id="${mod.id_modulo}"
-                            data-service-id="${service.id_servicio}"
-                            ${isChecked ? 'checked' : ''}>
-                    </td>
-                `;
+                        <input type="checkbox" class="w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                               data-module-id="${mod.id_modulo}" data-service-id="${service.id_servicio}" ${isChecked ? 'checked' : ''}>
+                    </td>`;
             });
             tr.innerHTML = rowHtml;
             servicesConfigBody.appendChild(tr);
@@ -773,6 +840,143 @@ resetTurnsBtn.addEventListener('click', async () => {
     } catch (error) {
         console.error("Error al resetear turnos:", error.message);
         await showConfirmationModal('Error', `Error al resetear turnos: ${error.message}`);
+    }
+});
+
+// Pega esto al final de tu admin_dashboard.js
+
+const generateReportBtn = document.getElementById('generate-report-btn');
+const reportStartDate = document.getElementById('report-start-date');
+const reportEndDate = document.getElementById('report-end-date');
+const reportTableBody = document.getElementById('report-table-body');
+const chartCanvas = document.getElementById('turns-by-employee-chart');
+let reportChart = null; // Variable para guardar la instancia del gráfico
+
+btnFilterToday.addEventListener('click', () => {
+    const today = formatDateToISO(new Date());
+    reportStartDateInput.value = today;
+    reportEndDateInput.value = today;
+    generateReportBtn.click(); // Simula clic en generar reporte
+});
+
+btnFilterWeek.addEventListener('click', () => {
+    const today = new Date();
+    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))); // Lunes de esta semana
+    const lastDayOfWeek = new Date(firstDayOfWeek);
+    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6); // Domingo de esta semana
+
+    reportStartDateInput.value = formatDateToISO(firstDayOfWeek);
+    reportEndDateInput.value = formatDateToISO(lastDayOfWeek);
+    generateReportBtn.click();
+});
+
+btnFilterMonth.addEventListener('click', () => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    reportStartDateInput.value = formatDateToISO(firstDayOfMonth);
+    reportEndDateInput.value = formatDateToISO(lastDayOfMonth);
+    generateReportBtn.click();
+});
+
+btnFilterAll.addEventListener('click', () => {
+    reportStartDateInput.value = '2020-01-01'; // Una fecha lejana en el pasado
+    reportEndDateInput.value = formatDateToISO(new Date());
+    generateReportBtn.click();
+});
+
+generateReportBtn.addEventListener('click', async () => {
+    const start = reportStartDateInput.value;
+    const end = reportEndDateInput.value;
+
+    const employeeId = document.getElementById('employee-filter').value;
+    const moduleId = document.getElementById('module-filter').value;
+
+    if (!start || !end) {
+        alert('Por favor, seleccione un rango de fechas.');
+        return;
+    }
+
+    try {
+        let apiUrl = `/api/reports?start=${start}&end=${end}`;
+        if (employeeId) {
+            apiUrl += `&user_id=${employeeId}`;
+        }
+        if (moduleId) {
+            apiUrl += `&module_id=${moduleId}`;
+        }
+
+        const response = await fetch(apiUrl, { credentials: 'include' });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
+        // Limpiar la tabla anterior
+        reportTableBody.innerHTML = '';
+        if (data.length === 0) {
+            reportTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">No se encontraron datos para este rango de fechas.</td></tr>`;
+            if (reportChart) reportChart.destroy(); // Destruir gráfico anterior si existe
+            return;
+        }
+
+        // Rellenar la tabla
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            // Formatear el intervalo de tiempo (ej: "00:05:30.123" -> "5m 30s")
+            const formatInterval = (intervalStr) => {
+                if (!intervalStr) return 'N/A';
+                const parts = intervalStr.split(':');
+                const minutes = parseInt(parts[1], 10);
+                const seconds = Math.round(parseFloat(parts[2]));
+                return `${minutes}m ${seconds}s`;
+            };
+
+            tr.innerHTML = `
+                <td class="p-3">${row.nombre_completo}</td>
+                <td class="p-3 text-center">${row.turnos_atendidos}</td>
+                <td class="p-3">${formatInterval(row.tiempo_espera_promedio)}</td>
+            `;
+            reportTableBody.appendChild(tr);
+        });
+
+        // Preparar datos para el gráfico
+        const labels = data.map(row => row.nombre_completo);
+        const chartData = data.map(row => row.turnos_atendidos);
+
+        // Destruir el gráfico anterior si existe para redibujar
+        if (reportChart) {
+            reportChart.destroy();
+        }
+
+        // Crear el nuevo gráfico
+        reportChart = new Chart(chartCanvas, {
+            type: 'bar', // Tipo de gráfico: barras
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Turnos Atendidos',
+                    data: chartData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Error al generar el reporte:", error);
+        reportTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
+        if (reportChart) reportChart.destroy();
     }
 });
 

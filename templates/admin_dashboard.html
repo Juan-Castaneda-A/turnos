@@ -9,6 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link href="../static/css/admin_dashboard.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-800 text-gray-200 font-sans antialiased">
     <div class="flex flex-col lg:flex-row min-h-screen">
@@ -16,7 +17,7 @@
         <aside class="w-full lg:w-72 bg-gray-900 p-6 shadow-xl flex flex-col">
             
             <div class="mb-10 flex justify-center">
-                <img src="{{ url_for('static', filename='img/logo-notaria.png') }}" alt="Logo Notaría" class="h-16">
+                <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="h-16">
             </div>
 
             <nav class="flex-grow">
@@ -109,7 +110,7 @@
                         <p class="text-5xl font-extrabold text-yellow-400" id="active-modules">0</p>
                     </div>
                 </div>
-                <h3 class="text-xl font-bold text-gray-300 mb-4">Estado de Ventanillas en Tiempo Real</h3>
+                <h3 class="text-xl font-bold text-gray-300 mb-4">Estado de Módulos en Tiempo Real</h3>
                 <div class="overflow-x-auto bg-gray-800 rounded-lg">
                     <table class="w-full text-left">
                         <thead>
@@ -225,14 +226,69 @@
         
             <section id="reports-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
                 <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Reportes Estadísticos</h2>
+            
+                <div class="mb-6 p-4 bg-gray-800 rounded-lg space-y-4">
+                    <div class="flex flex-wrap gap-2">
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-today">Hoy</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-week">Esta Semana</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-month">Este Mes</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-all">Histórico</button>
+                    </div>
+                
+                    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        <div class="lg:col-span-2 grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="report-start-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha Inicio</label>
+                                <input type="date" id="report-start-date" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                            </div>
+                            <div>
+                                <label for="report-end-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha Fin</label>
+                                <input type="date" id="report-end-date" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                            </div>
+                        </div>
+                
+                        <div>
+                            <label for="employee-filter" class="block text-sm font-semibold text-gray-400 mb-1">Empleado</label>
+                            <select id="employee-filter" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                                <option value="">Todos los Empleados</option>
+                                </select>
+                        </div>
+                
+                        <div>
+                            <label for="module-filter" class="block text-sm font-semibold text-gray-400 mb-1">Módulo</label>
+                            <select id="module-filter" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                                <option value="">Todos los Módulos</option>
+                                </select>
+                        </div>
+                
+                        <div class="flex items-end">
+                            <button id="generate-report-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg text-sm h-10">Generar</button>
+                        </div>
+                    </div>
+                </div>
+            
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-gray-800 p-6 rounded-lg">
-                        <h3 class="text-xl font-bold text-white mb-4">Turnos por Servicio</h3>
-                        <div id="chart-turns-by-service" class="h-64 flex items-center justify-center text-gray-500">Gráfico de Turnos por Servicio</div>
+                        <h3 class="text-xl font-bold text-white mb-4">Turnos Atendidos por Funcionario</h3>
+                        <div>
+                            <canvas id="turns-by-employee-chart"></canvas>
+                        </div>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-lg">
-                        <h3 class="text-xl font-bold text-white mb-4">Tiempos Promedio</h3>
-                        <div id="chart-average-times" class="h-64 flex items-center justify-center text-gray-500">Gráfico de Tiempos Promedio</div>
+                        <h3 class="text-xl font-bold text-white mb-4">Datos Detallados</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                        <th class="p-3">Funcionario</th>
+                                        <th class="p-3">Turnos Atendidos</th>
+                                        <th class="p-3">T. Espera Prom.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="report-table-body" class="divide-y divide-gray-700">
+                                    </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>

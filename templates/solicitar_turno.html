@@ -15,8 +15,9 @@
 
     <div class="w-full max-w-4xl bg-gray-800 rounded-3xl shadow-2xl p-8 md:p-12 text-center animate-fade-in-scale">
         
-        <h1 class="text-3xl md:text-5xl font-extrabold text-green-400 mb-10">
-            Bienvenido a la Notaría Tercera
+        <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="w-auto h-20 mx-auto mb-8"> <h1 class="text-3xl md:text-5xl font-extrabold text-green-400 mb-10">
+            <h1 class="text-3xl md:text-5xl font-extrabold text-green-400 mb-10">
+            Bienvenido a la Notaría Tercera de Valledupar
         </h1>
 
         <form action="{{ url_for('solicitar_turno_action') }}" method="post">
