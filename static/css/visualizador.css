@@ -89,7 +89,7 @@ body {
 
 /* Estilo para el NÚMERO DE TURNO (el primer span dentro de .history-item) */
 .history-item span:first-child {
-    font-size: 2.25rem; /* Equivalente a text-4xl de Tailwind */
+    font-size: 3rem; /* Equivalente a text-5xl de Tailwind */
     line-height: 2.5rem;
     font-weight: 700; /* bold */
     color: #e5e7eb; /* text-gray-200 */
