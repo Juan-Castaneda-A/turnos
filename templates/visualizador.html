@@ -16,49 +16,30 @@
 
     <div class="container mx-auto p-4 lg:p-6 flex flex-col min-h-screen">
         
-        <header class="text-center py-6 bg-blue-800 rounded-2xl shadow-lg">
+        <header class="text-center py-6 bg-gray-700 rounded-2xl shadow-lg">
             <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="w-auto h-12 sm:h-16 mx-auto mb-4">
 
             <!-- <h1 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
                 Notaría Tercera
             </h1> -->
-            <h2 class="text-xl sm:text-3xl font-semibold text-blue-200 mt-2">Turnos en Atención</h2>
+            <h2 class="text-xl sm:text-3xl font-semibold text-gray-400 mt-2">Turnos en Atención</h2>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow mt-6">
-            
-            <section class="lg:col-span-2 bg-gray-900 rounded-2xl shadow-lg flex flex-col justify-center items-center text-center p-6 min-h-[300px]" id="current-turn-display">
-                <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
-                <div id="current-turn-number" class="text-7xl sm:text-8xl lg:text-9xl font-extrabold text-green-400 leading-none tracking-tight">---</div>
-                <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">Esperando turno...</p>
-            </section>
+    
+    <section class="lg:col-span-2 bg-gray-900 rounded-2xl shadow-lg flex flex-col justify-center items-center text-center p-6 min-h-[300px] transition-all duration-500 ease-in-out" id="current-turn-display">
+        <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
+        <div id="current-turn-number" class="turn-font-size font-extrabold text-green-400 leading-none tracking-tight">---</div>
+        <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">Esperando turno...</p>
+    </section>
 
-            <section class="lg:col-span-1 bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col">
-                <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
-                <div id="call-history" class="space-y-3 overflow-y-auto flex-grow">
-                    <div class="flex justify-between items-center text-2xl font-semibold text-gray-400 p-2">
-                        <span>Cargando...</span>
-                    </div>
-                </div>
-            </section>
+    <section class="lg:col-span-1 bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col">
+        <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
+        <div id="call-history" class="space-y-3 overflow-y-auto flex-grow">
+            </div>
+    </section>
 
-            <section class="col-span-1 lg:col-span-3 bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h3 class="text-2xl font-bold text-gray-300 mb-4">Estado de Módulos</h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-sm font-semibold text-gray-400 uppercase">
-                                <th class="p-3">Módulo</th>
-                                <th class="p-3">Funcionario</th>
-                                <th class="p-3">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modules-status-body" class="divide-y divide-gray-700">
-                            </tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
+    </main>
     </div>
 
     <script>
@@ -66,6 +47,14 @@
         window.SUPABASE_KEY = "{{ supabase_key }}";
     </script>
     <script type="module" src="{{ url_for('static', filename='js/visualizador.js') }}"></script>
+
+<div id="fullscreen-alert" class="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center z-50 hidden transition-opacity duration-500 opacity-0">
+    <div id="fullscreen-turn-number" class="font-extrabold text-green-400 leading-none tracking-tight" style="font-size: 45vw;">---</div>
+    <div id="fullscreen-turn-module" class="font-semibold text-gray-300" style="font-size: 10vw;">---</div>
+</div>
+<div id="silence-banner" class="fixed top-0 inset-x-0 bg-red-600 text-white text-4xl font-bold p-4 text-center z-50 hidden shadow-lg">
+    🤫 POR FAVOR, GUARDAR SILENCIO 🤫
+</div>
 </body>
 
 </html>

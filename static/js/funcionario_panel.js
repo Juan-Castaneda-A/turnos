@@ -40,6 +40,9 @@ const modalMessage = document.getElementById('modal-message');
 const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 const modalCancelBtn = document.getElementById('modal-cancel-btn');
 
+const silenceAlertBtn = document.getElementById('silence-alert-btn');
+
+
 let currentAttendingTurnId = null;
 let channels = [];
 // ==========================================================
@@ -469,7 +472,14 @@ btnFinish.addEventListener('click', async () => {
     }
 });
 
-
+silenceAlertBtn.addEventListener('click', () => {
+    turnosChannel.send({
+        type: 'broadcast',
+        event: 'silence_alert',
+        payload: { message: 'Por favor, guardar silencio' }
+    });
+    console.log("Alerta de silencio enviada.");
+});
 
 // ==========================================================
 // INICIO DE LA APLICACIÓN

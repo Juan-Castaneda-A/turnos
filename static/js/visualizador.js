@@ -18,6 +18,10 @@ const currentTurnDisplayElement = document.getElementById('current-turn-display'
 const callHistoryElement = document.getElementById('call-history');
 const modulesStatusBodyElement = document.getElementById('modules-status-body');
 //const callSound = document.getElementById('call-sound');
+const fullscreenAlert = document.getElementById('fullscreen-alert');
+const fullscreenTurnNumber = document.getElementById('fullscreen-turn-number');
+const fullscreenTurnModule = document.getElementById('fullscreen-turn-module');
+
 
 let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples veces para el mismo turno
 
@@ -163,43 +167,94 @@ function loadSpanishVoice() {
 // El evento 'voiceschanged' se dispara cuando la lista de voces está lista
 window.speechSynthesis.onvoiceschanged = loadSpanishVoice;
 
-async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
-    // Primero, nos aseguramos de que las voces se hayan cargado
+// async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
+//     // Primero, nos aseguramos de que las voces se hayan cargado
+//     if (!spanishVoice) {
+//         loadSpanishVoice();
+//     }
+
+//     try {
+//         // La función que convierte números a palabras sigue siendo útil
+//         const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
+//         const moduleNumberStr = nombreModulo.split(' ')[1] || '';
+//         const moduleNumber = parseInt(moduleNumberStr, 10);
+//         const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
+
+//         const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase al módulo ${moduleNumberEnPalabras}.`;
+//         console.log("Texto a anunciar (nativo):", textToSpeak);
+
+//         // Cancelar cualquier anuncio anterior para evitar que se solapen
+//         window.speechSynthesis.cancel();
+
+//         // Crear el objeto de síntesis de voz
+//         const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+//         // Asignar la voz en español que encontramos
+//         if (spanishVoice) {
+//             utterance.voice = spanishVoice;
+//         }
+
+//         // (Opcional) Ajustar velocidad y tono
+//         utterance.rate = 0.9; // Un poco más lento que lo normal
+//         utterance.pitch = 1.0; 
+
+//         // ¡Hablar!
+//         window.speechSynthesis.speak(utterance);
+
+//     } catch (error) {
+//         console.error("Error al anunciar el turno con la Web Speech API:", error);
+//     }
+// }
+
+function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
     if (!spanishVoice) {
         loadSpanishVoice();
     }
 
-    try {
-        // La función que convierte números a palabras sigue siendo útil
-        const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
-        const moduleNumberStr = nombreModulo.split(' ')[1] || '';
-        const moduleNumber = parseInt(moduleNumberStr, 10);
-        const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
+    // Obtenemos la referencia al panel que vamos a animar
+    const turnDisplaySection = document.getElementById('current-turn-display');
 
-        const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase al módulo ${moduleNumberEnPalabras}.`;
-        console.log("Texto a anunciar (nativo):", textToSpeak);
+    const turnoCompleto = `${prefijoTurno}-${String(numeroTurno).padStart(3, '0')}`;
+    const moduloCompleto = `Diríjase al Módulo ${nombreModulo.split(' ')[1]}`;
 
-        // Cancelar cualquier anuncio anterior para evitar que se solapen
-        window.speechSynthesis.cancel();
+    // Actualizamos el contenido del panel
+    document.getElementById('current-turn-number').textContent = turnoCompleto;
+    document.getElementById('current-turn-module').textContent = moduloCompleto;
 
-        // Crear el objeto de síntesis de voz
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    // 1. AÑADIMOS la clase para activar la animación de crecimiento
+    turnDisplaySection.classList.add('fullscreen-mode');
 
-        // Asignar la voz en español que encontramos
-        if (spanishVoice) {
-            utterance.voice = spanishVoice;
-        }
+    // Función para revertir la animación
+    const shrinkPanel = () => {
+        turnDisplaySection.classList.remove('fullscreen-mode');
+    };
+
+    // 2. Preparamos la voz
+    const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
+    const moduleNumberStr = nombreModulo.split(' ')[1] || '';
+    const moduleNumber = parseInt(moduleNumberStr, 10);
+    const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
+    const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase al módulo ${moduleNumberEnPalabras}.`;
+    console.log("Texto a anunciar (nativo):", textToSpeak);
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    // ... (tu configuración de voz: spanishVoice, rate, etc.) ...
+    if (spanishVoice) {
+        utterance.voice = spanishVoice;
+    }
 
         // (Opcional) Ajustar velocidad y tono
-        utterance.rate = 0.9; // Un poco más lento que lo normal
-        utterance.pitch = 1.0; 
+    utterance.rate = 0.9; // Un poco más lento que lo normal
+    utterance.pitch = 1.0; 
+    
+    // 3. Cuando la voz termine, quitamos la clase para que vuelva a su tamaño normal
+    utterance.onend = shrinkPanel;
 
-        // ¡Hablar!
-        window.speechSynthesis.speak(utterance);
+    // 4. ¡PLAN B! Si 'onend' falla, un temporizador lo quitará de todas formas
+    // Esto soluciona el problema de que se quede "pegado" en pantalla completa.
+    setTimeout(shrinkPanel, 8000); // 8 segundos como máximo
 
-    } catch (error) {
-        console.error("Error al anunciar el turno con la Web Speech API:", error);
-    }
+    window.speechSynthesis.speak(utterance);
 }
 
 
@@ -316,30 +371,48 @@ const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0
 
 // Pega esta nueva función en visualizador.js
 
-async function forceAnnounceTurnById(turnId) {
+// async function forceAnnounceTurnById(turnId) {
+//     if (!turnId) return;
+//     try {
+//         const { data: turn, error } = await supabase
+//             .from('turnos')
+//             .select('*, modulos(nombre_modulo)')
+//             .eq('id_turno', turnId)
+//             .single(); // .single() para obtener un solo objeto
+
+//         if (error) throw error;
+
+//         if (turn) {
+//             // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
+//             updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
+//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+//         }
+//     } catch (error) {
+//         console.error("Error al forzar el anuncio del turno:", error);
+//     }
+// }
+
+function forceAnnounceTurnById(turnId) {
     if (!turnId) return;
-    try {
-        const { data: turn, error } = await supabase
-            .from('turnos')
-            .select('*, modulos(nombre_modulo)')
-            .eq('id_turno', turnId)
-            .single(); // .single() para obtener un solo objeto
-
-        if (error) throw error;
-
-        if (turn) {
-            // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
-            updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
-            await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-        }
-    } catch (error) {
-        console.error("Error al forzar el anuncio del turno:", error);
-    }
+    // La sintaxis de Supabase V2 es un poco diferente, la ajustamos
+    supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single()
+        .then(({ data: turn, error }) => {
+            if (error) {
+                console.error("Error al forzar anuncio:", error);
+                return;
+            }
+            if (turn) {
+                // Llamamos a la nueva función que maneja la animación y la voz
+                announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+            }
+        });
 }
 
 function setupRealtimeSubscriptions() {
     // 1. Definimos UN SOLO CANAL con el nombre que acordamos
     const channel = supabase.channel('turnos_channel');
+
+    const silenceBanner = document.getElementById('silence-banner');
 
     // 2. Le decimos a ESE MISMO CANAL que escuche todo lo que nos interesa
 
@@ -382,6 +455,20 @@ function setupRealtimeSubscriptions() {
             forceAnnounceTurnById(message.payload.id_turno);
         }
     );
+
+    channel.on('broadcast', { event: 'silence_alert' }, (payload) => {
+        console.log('Alerta de silencio recibida!', payload);
+        silenceBanner.classList.remove('hidden');
+
+        // Opcional: añade un sonido de alerta suave aquí si quieres
+        const alertSound = new Audio('/static/audio/silencio.mp3');
+        alertSound.play().catch(e => console.error("Error al reproducir sonido de alerta:", e));
+
+        // Oculta el banner después de 10 segundos
+        setTimeout(() => {
+            silenceBanner.classList.add('hidden');
+        }, 4000); 
+    });
 
     // 3. Finalmente, nos suscribimos al canal UNA SOLA VEZ para activar todos los listeners
     channel.subscribe((status) => {

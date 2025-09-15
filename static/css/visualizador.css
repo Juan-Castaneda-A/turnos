@@ -34,3 +34,37 @@ body {
 .pulse-animation {
     animation: pulseGreen 1.5s; /* La quitamos de 'infinite' para que solo se ejecute una vez por llamado */
 }
+
+/* En static/css/visualizador.css */
+.turn-font-size {
+    /* vw significa "viewport width". El texto ocupará el 20% del ancho de la pantalla. */
+    /* Esto hace que se ajuste automáticamente a cualquier tamaño de TV. */
+    font-size: 20vw;
+}
+
+/* Pega esto al final de tu visualizador.css */
+
+/* 1. Preparamos el panel original para la animación */
+#current-turn-display {
+    /* Le decimos que la transición de sus propiedades (transform, tamaño, etc.) dure 0.5s */
+    transition: all 0.5s ease-in-out;
+}
+
+/* 2. Definimos el estado de "pantalla completa" */
+#current-turn-display.fullscreen-mode {
+    position: fixed; /* Lo saca de su sitio normal y lo pone sobre todo */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 100; /* Asegura que esté por encima de todo lo demás */
+    border-radius: 0; /* Quitamos los bordes redondeados en pantalla completa */
+}
+
+/* 3. Agrandamos el texto SOLO cuando está en modo pantalla completa */
+#current-turn-display.fullscreen-mode #current-turn-number {
+    font-size: 35vw; /* Ocupará el 35% del ancho de la pantalla */
+}
+#current-turn-display.fullscreen-mode #current-turn-module {
+    font-size: 8vw; /* Un tamaño grande pero secundario */
+}
