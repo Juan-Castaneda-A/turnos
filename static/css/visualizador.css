@@ -39,7 +39,7 @@ body {
 .turn-font-size {
     /* vw significa "viewport width". El texto ocupará el 20% del ancho de la pantalla. */
     /* Esto hace que se ajuste automáticamente a cualquier tamaño de TV. */
-    font-size: 20vw;
+    font-size: 18vw;
 }
 
 /* Pega esto al final de tu visualizador.css */
@@ -63,8 +63,42 @@ body {
 
 /* 3. Agrandamos el texto SOLO cuando está en modo pantalla completa */
 #current-turn-display.fullscreen-mode #current-turn-number {
-    font-size: 35vw; /* Ocupará el 35% del ancho de la pantalla */
+    font-size: 30vw; /* Ocupará el 35% del ancho de la pantalla */
 }
 #current-turn-display.fullscreen-mode #current-turn-module {
     font-size: 8vw; /* Un tamaño grande pero secundario */
+}
+
+/* En static/css/visualizador.css */
+
+/* AÑADE ESTAS REGLAS AL FINAL DEL ARCHIVO */
+
+/* Estilo para cada fila en la lista de 'Últimos Llamados' */
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0.25rem; /* 12px de espacio vertical, 4px horizontal */
+    border-bottom: 1px solid #374151; /* Un borde sutil (color de gray-700) */
+}
+
+/* Quitar el borde del último elemento de la lista para que se vea limpio */
+.history-item:last-child {
+    border-bottom: none;
+}
+
+/* Estilo para el NÚMERO DE TURNO (el primer span dentro de .history-item) */
+.history-item span:first-child {
+    font-size: 2.25rem; /* Equivalente a text-4xl de Tailwind */
+    line-height: 2.5rem;
+    font-weight: 700; /* bold */
+    color: #e5e7eb; /* text-gray-200 */
+}
+
+/* Estilo para el MÓDULO (el último span dentro de .history-item) */
+.history-item span:last-child {
+    font-size: 1.5rem; /* Equivalente a text-2xl de Tailwind */
+    line-height: 2rem;
+    font-weight: 600; /* semibold */
+    /* El color text-gray-400 ya lo tienes en el HTML, así que se mantiene */
 }
