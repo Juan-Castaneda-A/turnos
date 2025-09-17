@@ -297,14 +297,48 @@ function setupRealtimeSubscriptions() {
 
     turnosChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'turnos' },
         (payload) => {
-            console.log('Cambio en la tabla de turnos detectado!', payload.eventType);
-            loadPendingTurns();
-            loadCurrentTurn();
-            loadDailyHistory();
-        }
-    );
+            console.log(`Cambio en 'turnos' detectado: ${payload.eventType}`);
 
-    turnosChannel.subscribe((status) => {
+            switch (payload.eventType) {
+                case 'INSERT':
+                    // Un nuevo turno fue solicitado por un cliente.
+                    // Todos los funcionarios deben actualizar su lista de pendientes.
+                    console.log("Nuevo turno en espera. Actualizando lista de pendientes.");
+                    loadPendingTurns();
+                    break;
+
+                case 'UPDATE':
+                    // Un turno fue modificado. Lo más común es un cambio de estado.
+
+                    // 1. SIEMPRE actualizamos la lista de pendientes.
+                    // Si otro funcionario llamó un turno, éste desaparece de la lista de pendientes.
+                    loadPendingTurns();
+
+                    // 2. Verificamos si el cambio fue una FINALIZACIÓN.
+                    // Esto es mucho más preciso que solo mirar el nuevo estado.
+                    if (payload.old.estado === 'en atencion' && payload.new.estado === 'atendido') {
+                        console.log("Un turno fue finalizado. Actualizando el historial del día.");
+                        
+                        // Recargamos el historial. Tu función ya filtra por tu módulo, así que es seguro.
+                        loadDailyHistory();
+                        
+                        // ADICIONAL: Si el turno finalizado era el que TÚ estabas atendiendo,
+                        // debemos limpiar tu panel de "Turno Actual".
+                        if (payload.old.id_turno === currentAttendingTurnId) {
+                             console.log("Era mi turno, limpiando el panel de atención actual.");
+                             loadCurrentTurn(); // Esta función ya sabe mostrar "---" si no hay turno.
+                        }
+                    }
+                    break;
+                
+                case 'DELETE':
+                    // Si por alguna razón se elimina un turno, actualizamos la lista.
+                    console.log("Un turno fue eliminado. Actualizando lista de pendientes.");
+                    loadPendingTurns();
+                    break;
+            }
+        }
+    ).subscribe((status) => {
         if (status === 'SUBSCRIBED') {
             console.log('Panel de funcionario conectado al canal de tiempo real.');
         }
@@ -339,7 +373,7 @@ btnCallNext.addEventListener('click', async () => {
         console.log("Buscando siguiente turno disponible...");
         const { data: nextTurn, error: nextTurnError } = await supabase
             .from('turnos')
-            .select('id_turno, prefijo_turno, numero_turno, id_servicio')
+            .select('id_turno, prefijo_turno, numero_turno, id_servicio, servicios(nombre_servicio)')
             .eq('estado', 'en espera')
             .in('id_servicio', serviceIds)
             .order('hora_solicitud', { ascending: true })
@@ -372,6 +406,22 @@ btnCallNext.addEventListener('click', async () => {
             .eq('id_turno', nextTurn.id_turno);
 
         if (updateError) throw updateError;
+
+        // Enviamos un mensaje explícito al visualizador con los datos del nuevo turno.
+        console.log("Enviando evento de broadcast 'nuevo_llamado'");
+        
+        const { data: moduloData } = await supabase.from('modulos').select('nombre_modulo').eq('id_modulo', window.ASSIGNED_MODULE_ID).single();
+
+        turnosChannel.send({
+            type: 'broadcast',
+            event: 'nuevo_llamado',
+            payload: {
+                id_turno: nextTurn.id_turno,
+                prefijo_turno: nextTurn.prefijo_turno,
+                numero_turno: nextTurn.numero_turno,
+                nombre_modulo: moduloData.nombre_modulo
+            },
+        });
 
         console.log("Registrando log de llamado...");
         await supabase.from('logs_turnos').insert({
@@ -446,6 +496,9 @@ btnFinish.addEventListener('click', async () => {
 
     btnFinish.disabled = true;
     try {
+
+        const finishedTurnId = currentAttendingTurnId; // Guardamos el ID antes de finalizar
+
         const { error: updateError } = await supabase
             .from('turnos')
             .update({
@@ -457,13 +510,23 @@ btnFinish.addEventListener('click', async () => {
         if (updateError) throw updateError;
 
         await supabase.from('logs_turnos').insert({
-            id_turno: currentAttendingTurnId,
+            id_turno: finishedTurnId,
             id_usuario: window.USER_ID,
             accion: 'finalizado'
         });
 
-        console.log(`Turno ${currentAttendingTurnId} finalizado.`);
+        console.log(`Turno ${finishedTurnId} finalizado.`);
         currentAttendingTurnId = null;
+
+        //le decimos explícitamente a la UI que se actualice AHORA MISMO
+        await loadCurrentTurn();
+        await loadDailyHistory();
+        //también enviamos un mensaje para que el visualizador se entere
+        turnosChannel.send({
+            type: 'broadcast',
+            event: 'turno_finalizado',
+            payload: { id_turno: finishedTurnId }
+        });
     } catch (error) {
         console.error("Error al finalizar turno:", error.message);
         await showConfirmationModal('Error', `Error al finalizar turno: ${error.message}`);

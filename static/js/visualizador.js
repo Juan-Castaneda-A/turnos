@@ -1,9 +1,4 @@
-// Importar el cliente de Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
-
-// Variables de configuración (pasadas desde Flask)
-//const SUPABASE_URL = "{{ supabase_url }}";
-//const SUPABASE_KEY = "{{ supabase_key }}";
 
 // Inicializar Supabase
 const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
@@ -11,21 +6,28 @@ console.log("Supabase Client inicializado para Visualizador.");
 console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
 console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
 
-// Referencias a los elementos del DOM
-const currentTurnNumberElement = document.getElementById('current-turn-number');
-const currentTurnModuleElement = document.getElementById('current-turn-module');
-const currentTurnDisplayElement = document.getElementById('current-turn-display');
-const callHistoryElement = document.getElementById('call-history');
-const modulesStatusBodyElement = document.getElementById('modules-status-body');
-//const callSound = document.getElementById('call-sound');
-const fullscreenAlert = document.getElementById('fullscreen-alert');
-const fullscreenTurnNumber = document.getElementById('fullscreen-turn-number');
-const fullscreenTurnModule = document.getElementById('fullscreen-turn-module');
+// // Referencias a los elementos del DOM
+// const currentTurnNumberElement = document.getElementById('current-turn-number');
+// const currentTurnModuleElement = document.getElementById('current-turn-module');
+// const currentTurnDisplayElement = document.getElementById('current-turn-display');
+// const callHistoryElement = document.getElementById('call-history');
+// const modulesStatusBodyElement = document.getElementById('modules-status-body');
+// //const callSound = document.getElementById('call-sound');
+// const fullscreenAlert = document.getElementById('fullscreen-alert');
+// const fullscreenTurnNumber = document.getElementById('fullscreen-turn-number');
+// const fullscreenTurnModule = document.getElementById('fullscreen-turn-module');
 
+// Declaramos las variables aquí, pero las asignaremos cuando el DOM esté listo.
+let currentTurnNumberElement, currentTurnModuleElement, currentTurnDisplayElement,
+    callHistoryElement, modulesStatusBodyElement, silenceBanner;
 
 let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples veces para el mismo turno
-
+let spanishVoice = null;// Variable global para guardar la voz en español una vez que la encontremos
 //let audioEnabled = false;
+
+// ==========================================================
+// FUNCIONES DE LÓGICA (Tus funciones de TTS y otras se quedan igual)
+// ==========================================================
 
 /*document.addEventListener('click', () => {
     audioEnabled = true;
@@ -150,12 +152,6 @@ function numberToWordsSpanish(num) {
     return words.join(" ").trim();
 }
 
-// Function to announce the turn using TTS
-// REEMPLAZA tu antigua función announceTurn con esta nueva versión
-
-// Variable global para guardar la voz en español una vez que la encontremos
-let spanishVoice = null;
-
 // Función para cargar y seleccionar la voz en español
 function loadSpanishVoice() {
     // getVoices() puede cargar las voces de forma asíncrona
@@ -259,27 +255,91 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
 
 
 // Función para actualizar el display del turno actual
-async function updateCurrentTurnDisplay(turn) {
-    if (turn) {
-        currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
-        currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
+// async function updateCurrentTurnDisplay(turn) {
+//     if (turn) {
+//         currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
+//         currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
 
-        // Reproducir sonido si es un nuevo turno llamado
-        if (turn.id_turno !== lastCalledTurnId) {
-            await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-            lastCalledTurnId = turn.id_turno;
+//         // Reproducir sonido si es un nuevo turno llamado
+//         if (turn.id_turno !== lastCalledTurnId) {
+//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+//             lastCalledTurnId = turn.id_turno;
 
-            // Añadir animación de pulso al display principal
-            currentTurnDisplayElement.classList.add('pulse-animation');
-            setTimeout(() => {
-                currentTurnDisplayElement.classList.remove('pulse-animation');
-            }, 1500); // Duración de la animación
+//             // Añadir animación de pulso al display principal
+//             currentTurnDisplayElement.classList.add('pulse-animation');
+//             setTimeout(() => {
+//                 currentTurnDisplayElement.classList.remove('pulse-animation');
+//             }, 1500); // Duración de la animación
+//         }
+//     } else {
+//         currentTurnNumberElement.textContent = '---';
+//         currentTurnModuleElement.textContent = 'Esperando nuevo turno...';
+//         lastCalledTurnId = null;
+//     }
+// }
+
+// --- Suscripciones en tiempo real a Supabase ---
+
+// Pega esta nueva función en visualizador.js
+
+// async function forceAnnounceTurnById(turnId) {
+//     if (!turnId) return;
+//     try {
+//         const { data: turn, error } = await supabase
+//             .from('turnos')
+//             .select('*, modulos(nombre_modulo)')
+//             .eq('id_turno', turnId)
+//             .single(); // .single() para obtener un solo objeto
+
+//         if (error) throw error;
+
+//         if (turn) {
+//             // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
+//             updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
+//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+//         }
+//     } catch (error) {
+//         console.error("Error al forzar el anuncio del turno:", error);
+//     }
+// }
+
+async function forceAnnounceTurnById(turnId) {
+    if (!turnId) return;
+    // La sintaxis de Supabase V2 es un poco diferente, la ajustamos
+    // supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single()
+    //     .then(({ data: turn, error }) => {
+    //         if (error) {
+    //             console.error("Error al forzar anuncio:", error);
+    //             return;
+    //         }
+    //         if (turn) {
+    //             // Llamamos a la nueva función que maneja la animación y la voz
+    //             announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+    //         }
+    //     });
+    try {
+        const { data: turn, error } = await supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single();
+        if (error) throw error;
+        if (turn) {
+            announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+            lastCalledTurnId = turn.id_turno; // <-- **AÑADIDO**: Actualizamos el estado
         }
-    } else {
-        currentTurnNumberElement.textContent = '---';
-        currentTurnModuleElement.textContent = 'Esperando nuevo turno...';
-        lastCalledTurnId = null;
+    } catch (error) {
+        console.error("Error al forzar anuncio:", error);
     }
+}
+
+function clearMainTurnDisplay() {
+    currentTurnNumberElement.textContent = '---';
+    currentTurnModuleElement.textContent = 'Esperando nuevo turno...';
+    lastCalledTurnId = null; // Reseteamos la variable para el próximo llamado
+}
+
+// **NUEVA FUNCIÓN**: Para mostrar un turno sin anunciarlo (sin sonido)
+function displayTurnSilently(turn) {
+    currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
+    currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
+    lastCalledTurnId = turn.id_turno;
 }
 
 // Función para actualizar el historial de llamados
@@ -367,92 +427,157 @@ const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0
     });
 }
 
-// --- Suscripciones en tiempo real a Supabase ---
+// Esta función actualiza las partes "silenciosas" de la pantalla.
+async function updateSecondaryData() {
+    try {
 
-// Pega esta nueva función en visualizador.js
+        // **CORRECCIÓN**: Verificamos si los elementos existen antes de usarlos
+        if (!callHistoryElement || !modulesStatusBodyElement) {
+            console.warn("Elementos del DOM para datos secundarios no encontrados. Omitiendo actualización.");
+            return;
+        }
 
-// async function forceAnnounceTurnById(turnId) {
-//     if (!turnId) return;
-//     try {
-//         const { data: turn, error } = await supabase
-//             .from('turnos')
-//             .select('*, modulos(nombre_modulo)')
-//             .eq('id_turno', turnId)
-//             .single(); // .single() para obtener un solo objeto
+        // Actualizar historial de llamados (sin tocar el turno principal)
+        const { data: historyData, error: historyError } = await supabase
+            .from('turnos')
+            .select('*, modulos(nombre_modulo)')
+            .or('estado.eq.atendido,estado.eq.en atencion')
+            .order('hora_llamado', { ascending: false })
+            .limit(5);
+        if (historyError) throw historyError;
+        updateCallHistory(historyData || []);
 
-//         if (error) throw error;
+        // Actualizar estado de módulos
+        const { data: modulesData, error: modulesError } = await supabase
+            .from('modulos')
+            .select('*, usuarios!usuarios_id_modulo_asignado_fkey(nombre_completo), turnos(prefijo_turno, numero_turno, estado)')
+            .order('nombre_modulo', { ascending: true });
+        if (modulesError) throw modulesError;
+        await updateModulesStatus(modulesData || []);
 
-//         if (turn) {
-//             // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
-//             updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
-//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-//         }
-//     } catch (error) {
-//         console.error("Error al forzar el anuncio del turno:", error);
-//     }
-// }
-
-function forceAnnounceTurnById(turnId) {
-    if (!turnId) return;
-    // La sintaxis de Supabase V2 es un poco diferente, la ajustamos
-    supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single()
-        .then(({ data: turn, error }) => {
-            if (error) {
-                console.error("Error al forzar anuncio:", error);
-                return;
-            }
-            if (turn) {
-                // Llamamos a la nueva función que maneja la animación y la voz
-                announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-            }
-        });
+    } catch (error) {
+        console.error('Error actualizando datos secundarios:', error.message);
+    }
 }
+
+// Esta función actualiza el display principal y el historial al recibir un nuevo llamado
+function updateCallHistoryWithNewTurn(turn) {
+    const turnText = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
+    const moduleText = `Módulo ${turn.nombre_modulo.split(' ')[1]}`;
+
+    // Actualiza el display principal
+    currentTurnNumberElement.textContent = turnText;
+    currentTurnModuleElement.textContent = `Diríjase al ${moduleText.toLowerCase()}`;
+    
+    // Añade el nuevo turno al principio del historial en el DOM
+    const firstHistoryItem = callHistoryElement.querySelector('.history-item');
+    const newHistoryDiv = document.createElement('div');
+    newHistoryDiv.className = 'history-item';
+    newHistoryDiv.innerHTML = `<span>${turnText}</span><span class="text-gray-400">${moduleText}</span>`;
+    
+    callHistoryElement.insertBefore(newHistoryDiv, firstHistoryItem);
+
+    // Mantiene el historial con un máximo de 5 elementos
+    if (callHistoryElement.children.length > 5) {
+        callHistoryElement.removeChild(callHistoryElement.lastChild);
+    }
+}
+
+
 
 function setupRealtimeSubscriptions() {
     // 1. Definimos UN SOLO CANAL con el nombre que acordamos
     const channel = supabase.channel('turnos_channel');
-
     const silenceBanner = document.getElementById('silence-banner');
 
-    // 2. Le decimos a ESE MISMO CANAL que escuche todo lo que nos interesa
-
-    // Escucha cambios en la tabla 'turnos'
-    channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'turnos' },
+    // Listener para cuando se actualiza CUALQUIER COSA (módulos, historial, etc.)
+    // Esto mantiene los datos secundarios actualizados sin provocar sonidos.
+    channel.on('postgres_changes', { event: '*', schema: 'public' },
         (payload) => {
-            console.log('Cambio en turnos recibido:', payload.eventType);
-            loadInitialData();
+            console.log('Cambio general detectado, recargando datos silenciosamente:', payload.table);
+            // Llama a una función que actualiza todo MENOS el turno principal y el sonido.
+            updateSecondaryData(); 
         }
     );
 
     // Escucha cambios en la tabla 'modulos'
-    channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'modulos' },
-        (payload) => {
-            console.log('Cambio en modulos recibido:', payload.eventType);
-            loadInitialData();
-        }
-    );
+    // channel.on(
+    //     'postgres_changes',
+    //     { event: '*', schema: 'public', table: 'modulos' },
+    //     (payload) => {
+    //         console.log('Cambio en modulos recibido:', payload.eventType);
+    //         loadInitialData();
+    //     }
+    // );
 
-    // Escucha cambios en la tabla 'usuarios'
-    channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'usuarios' },
-        (payload) => {
-            console.log('Cambio en usuarios recibido:', payload.eventType);
-            loadInitialData();
+    // // Escucha cambios en la tabla 'usuarios'
+    // channel.on(
+    //     'postgres_changes',
+    //     { event: '*', schema: 'public', table: 'usuarios' },
+    //     (payload) => {
+    //         console.log('Cambio en usuarios recibido:', payload.eventType);
+    //         loadInitialData();
+    //     }
+    // );
+
+    // Escucha el mensaje específico de 'nuevo_llamado'
+    channel.on('broadcast', { event: 'nuevo_llamado' },
+        (message) => {
+            console.log('¡Evento de NUEVO LLAMADO recibido!', message.payload);
+            const turn = message.payload;
+            lastCalledTurnId = turn.id_turno; // <-- **AÑADIDO**: Actualizamos el estado
+            // Actualizamos el historial y el display principal
+            updateCallHistoryWithNewTurn(turn);
+            
+            // Llamamos directamente a la función de anuncio con los datos recibidos.
+            announceTurn(turn.prefijo_turno, turn.numero_turno, turn.nombre_modulo);
         }
     );
 
     // Escucha el mensaje específico de 'rellamar'
-    channel.on(
-        'broadcast',
-        { event: 'rellamar' },
+    channel.on('broadcast', { event: 'rellamar' },
         (message) => {
             console.log('¡Evento de RELLAMADO recibido!', message.payload);
             forceAnnounceTurnById(message.payload.id_turno);
+        }
+    );
+
+    // Escucha el mensaje de que un turno ha terminado.
+    channel.on('broadcast', { event: 'turno_finalizado' }, 
+        async (message) => {
+            console.log('Evento de TURNO FINALIZADO recibido.', message.payload);
+            
+            // Comprobamos si el turno que se finalizó es el que está en pantalla
+            // para evitar limpiar la pantalla si un turno antiguo se finaliza.
+            // if (message.payload.id_turno === lastCalledTurnId) {
+            //     clearMainTurnDisplay();
+            // }
+            
+            // // Refrescamos los datos secundarios (historial, estado de módulos)
+            // updateSecondaryData();
+            try {
+                const { data: nextTurnToShow, error } = await supabase
+                    .from('turnos')
+                    .select('*, modulos(nombre_modulo)')
+                    .eq('estado', 'en atencion')
+                    .order('hora_llamado', { ascending: false })
+                    .limit(1)
+                    .maybeSingle(); // .maybeSingle() es genial porque no da error si no encuentra nada
+
+                if (error) throw error;
+
+                if (nextTurnToShow) {
+                    // Si encontramos otro turno activo, lo mostramos (sin sonido).
+                    console.log(`Mostrando el siguiente turno activo: ${nextTurnToShow.prefijo_turno}-${nextTurnToShow.numero_turno}`);
+                    displayTurnSilently(nextTurnToShow);
+                } else {
+                    // Si no hay NINGÚN turno en atención, ahora sí limpiamos la pantalla.
+                    console.log("No hay más turnos en atención. Limpiando pantalla.");
+                    clearMainTurnDisplay();
+                }
+            } catch (e) {
+                console.error("Error al procesar turno finalizado:", e);
+            }
         }
     );
 
@@ -480,11 +605,27 @@ function setupRealtimeSubscriptions() {
     console.log("Todas las suscripciones Realtime han sido configuradas en un solo canal.");
 }
 
+// ==========================================================
+// INICIO DE LA APLICACIÓN
+// ==========================================================
+function init() {
+    // **CORRECCIÓN**: Asignamos las variables del DOM aquí, cuando estamos seguros de que existen.
+    currentTurnNumberElement = document.getElementById('current-turn-number');
+    currentTurnModuleElement = document.getElementById('current-turn-module');
+    currentTurnDisplayElement = document.getElementById('current-turn-display');
+    callHistoryElement = document.getElementById('call-history');
+    modulesStatusBodyElement = document.getElementById('modules-status-body');
+    silenceBanner = document.getElementById('silence-banner');
+    
+    // El resto de la inicialización
+    loadInitialData();
+    setupRealtimeSubscriptions();
+}
 
 // Función para cargar los datos iniciales y mantener actualizados los displays
 async function loadInitialData() {
+    // Cargar turno principal solo una vez al inicio
     try {
-        // 1. Cargar el último turno llamado (estado 'en atencion')
         const { data: currentTurnData, error: currentTurnError } = await supabase
             .from('turnos')
             .select('*, modulos(nombre_modulo)')
@@ -493,46 +634,24 @@ async function loadInitialData() {
             .limit(1);
 
         if (currentTurnError) throw currentTurnError;
-        updateCurrentTurnDisplay(currentTurnData && currentTurnData.length > 0 ? currentTurnData[0] : null);
-
-        // 2. Cargar el historial de los últimos 5 turnos llamados (estado 'atendido' o 'en atencion')
-        const { data: historyData, error: historyError } = await supabase
-            .from('turnos')
-            .select('*, modulos(nombre_modulo)')
-            .or('estado.eq.atendido,estado.eq.en atencion')
-            .order('hora_llamado', { ascending: false })
-            .limit(5);
-
-        if (historyError) throw historyError;
-        updateCallHistory(historyData || []);
-
-        // 3. Cargar el estado de todos los módulos, incluyendo el ID del funcionario asignado
-        const { data: modulesData, error: modulesError } = await supabase
-.from('modulos')
-.select(`
-*,
-usuarios!usuarios_id_modulo_asignado_fkey(nombre_completo, id_usuario),
-turnos(id_turno, numero_turno, prefijo_turno, estado)
-`)
-.order('nombre_modulo', { ascending: true }); // Ordenar por nombre para consistencia
-
-        if (modulesError) throw modulesError;
-
-        // Filtrar turnos para mostrar solo el que está 'en atencion' por ese módulo
-        const processedModulesData = modulesData.map(mod => ({
-            ...mod,
-            turnos: mod.turnos ? mod.turnos.filter(t => t.estado === 'en atencion') : []
-        }));
-
-        await updateModulesStatus(processedModulesData || []); // Usar await aquí
-    } catch (error) {
-        console.error('Error al cargar datos iniciales para el visualizador:', error.message);
+        if (currentTurnData && currentTurnData.length > 0) {
+            const turn = currentTurnData[0];
+            currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
+            currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
+        }
+    } catch (e) {
+        console.error("Error cargando turno inicial", e);
     }
+    
+    // Carga el resto de datos
+    await updateSecondaryData();
 }
 
 // Cargar datos iniciales al cargar la página
-window.onload = () => {
-    loadInitialData();
-    // Retrasar la configuración de las suscripciones en tiempo real
-    setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
-};
+// window.onload = () => {
+//     loadInitialData();
+//     // Retrasar la configuración de las suscripciones en tiempo real
+//     setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
+// };
+
+document.addEventListener('DOMContentLoaded', init);
