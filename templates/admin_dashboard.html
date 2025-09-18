@@ -8,6 +8,8 @@
     <!-- Carga de Tailwind CSS desde CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
     <link href="../static/css/admin_dashboard.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -44,6 +46,12 @@
                         <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="configure-services">
                             <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
                             Configurar Servicios
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="manage-priorities">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" /></svg>
+                            Gestionar Prioridades
                         </a>
                     </li>
                     <li>
@@ -333,7 +341,23 @@
                         Resetear Turnos
                     </button>
                 </div>
-                </section>
+            </section>
+            <section id="manage-priorities-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Prioridades de Servicios</h2>
+                <div class="max-w-md mb-6">
+                    <label for="priority-module-select" class="block text-sm font-semibold text-gray-400 mb-2">Seleccione un Módulo para configurar sus prioridades:</label>
+                    <select id="priority-module-select" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Elija un módulo --</option>
+                    </select>
+                </div>
+
+                <div id="priority-list-container" class="hidden">
+                    <p class="text-gray-400 mb-4">Arrastre y suelte los servicios para ordenarlos. El que esté más arriba tendrá la mayor prioridad.</p>
+                    <div id="priority-sortable-list" class="space-y-3">
+                        </div>
+                    <button id="save-priorities-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Prioridades</button>
+                </div>
+            </section>
         
         </main>
     </div>

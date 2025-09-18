@@ -74,6 +74,12 @@ const btnFilterAll = document.getElementById('filter-all');
 const reportStartDateInput = document.getElementById('report-start-date');
 const reportEndDateInput = document.getElementById('report-end-date');
 
+// **NUEVAS REFERENCIAS PARA LA VISTA DE PRIORIDADES**
+const priorityModuleSelect = document.getElementById('priority-module-select');
+const priorityListContainer = document.getElementById('priority-list-container');
+const prioritySortableList = document.getElementById('priority-sortable-list');
+const savePrioritiesBtn = document.getElementById('save-priorities-btn');
+
 function showConfirmationModal(title, message) {
     return new Promise((resolve) => {
         modalTitle.textContent = title;
@@ -126,6 +132,9 @@ function showView(viewId) {
             break;
         case 'configure-services':
             loadServicesConfig();
+            break;
+        case 'manage-priorities':
+            loadPriorityEditor();
             break;
         case 'reports':
             // Lógica para cargar reportes (si aplica)
@@ -432,6 +441,8 @@ userForm.addEventListener('submit', async (e) => {
         await showConfirmationModal('Error', `Error al guardar usuario: ${error.message}`);
     }
 });
+
+
 
 async function editUser(id) {
     try {
@@ -980,6 +991,129 @@ generateReportBtn.addEventListener('click', async () => {
     }
 });
 
+// ==========================================================
+// ======> NUEVAS FUNCIONES PARA EL EDITOR DE PRIORIDADES <======
+// ==========================================================
+
+// Función principal que se llama al entrar en la vista "Gestionar Prioridades"
+async function loadPriorityEditor() {
+    priorityModuleSelect.innerHTML = '<option value="">-- Cargando módulos... --</option>';
+    priorityListContainer.classList.add('hidden');
+    
+    try {
+        const { data: modules, error } = await supabase
+            .from('modulos')
+            .select('id_modulo, nombre_modulo')
+            .order('nombre_modulo');
+        
+        if (error) throw error;
+        
+        priorityModuleSelect.innerHTML = '<option value="">-- Elija un módulo --</option>';
+        modules.forEach(module => {
+            const option = document.createElement('option');
+            option.value = module.id_modulo;
+            option.textContent = module.nombre_modulo;
+            priorityModuleSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("Error cargando módulos para el editor de prioridades:", error);
+        priorityModuleSelect.innerHTML = '<option value="">Error al cargar módulos</option>';
+    }
+}
+
+// Se activa cuando el admin selecciona un módulo del dropdown
+priorityModuleSelect.addEventListener('change', async () => {
+    const moduleId = priorityModuleSelect.value;
+    if (!moduleId) {
+        priorityListContainer.classList.add('hidden');
+        return;
+    }
+
+    priorityListContainer.classList.remove('hidden');
+    prioritySortableList.innerHTML = `<p class="text-gray-400">Cargando servicios para este módulo...</p>`;
+
+    try {
+        // Buscamos los servicios asignados a este módulo, ordenados por su prioridad actual
+        const { data: services, error } = await supabase
+            .from('modulos_servicios')
+            .select(`
+                prioridad,
+                servicios (id_servicio, nombre_servicio)
+            `)
+            .eq('id_modulo', moduleId)
+            .order('prioridad', { ascending: true });
+
+        if (error) throw error;
+        
+        prioritySortableList.innerHTML = '';
+        if (services.length === 0) {
+            prioritySortableList.innerHTML = `<p class="text-gray-400">Este módulo no tiene servicios asignados. Vaya a "Configurar Servicios" para asignarlos.</p>`;
+            return;
+        }
+
+        // Creamos los elementos HTML para cada servicio
+        services.forEach(item => {
+            const service = item.servicios;
+            const listItem = document.createElement('div');
+            listItem.className = 'priority-item';
+            listItem.dataset.serviceId = service.id_servicio; // Guardamos el ID del servicio
+            
+            listItem.innerHTML = `
+                <svg class="handle w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                <span>${service.nombre_servicio}</span>
+            `;
+            prioritySortableList.appendChild(listItem);
+        });
+
+        // ¡Magia! Activamos la funcionalidad de arrastrar y soltar en la lista
+        new Sortable(prioritySortableList, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            handle: '.handle'
+        });
+
+    } catch (error) {
+        console.error("Error cargando la lista de prioridades:", error);
+        prioritySortableList.innerHTML = `<p class="text-red-400">Error al cargar los servicios de este módulo.</p>`;
+    }
+});
+
+// Se activa al hacer clic en el botón "Guardar Prioridades"
+savePrioritiesBtn.addEventListener('click', async () => {
+    const moduleId = priorityModuleSelect.value;
+    if (!moduleId) return;
+
+    const confirmed = await showConfirmationModal('Guardar Prioridades', `¿Está seguro de que desea guardar el nuevo orden de prioridad para este módulo?`);
+    if (!confirmed) return;
+
+    // Obtenemos todos los elementos de la lista en su nuevo orden
+    const listItems = prioritySortableList.querySelectorAll('.priority-item');
+    
+    // Creamos un array de objetos para actualizar la base de datos
+    const updates = Array.from(listItems).map((item, index) => ({
+        id_modulo: parseInt(moduleId),
+        id_servicio: parseInt(item.dataset.serviceId),
+        prioridad: index + 1 // El índice (0, 1, 2...) se convierte en la prioridad (1, 2, 3...)
+    }));
+
+    try {
+        // Usamos upsert para actualizar las filas existentes.
+        // onConflict le dice a Supabase que la combinación de módulo y servicio es única.
+        const { error } = await supabase.from('modulos_servicios').upsert(updates, {
+            onConflict: 'id_modulo, id_servicio'
+        });
+
+        if (error) throw error;
+
+        await showConfirmationModal('Éxito', 'El orden de prioridad se ha guardado correctamente.');
+
+    } catch (error) {
+        console.error('Error al guardar las prioridades:', error);
+        await showConfirmationModal('Error', `No se pudo guardar el orden de prioridades: ${error.message}`);
+    }
+});
+
 function setupRealtimeSubscriptions() {
     // Suscribirse a cambios en la tabla 'turnos'
     const turnosChannel = supabase.channel('admin_turnos_channel');
@@ -1064,8 +1198,14 @@ function setupRealtimeSubscriptions() {
     console.log("Suscripciones Realtime configuradas para el Panel de Administración.");
 }
 
+// window.onload = () => {
+//     showView('dashboard'); // Carga la vista de Dashboard por defecto
+//     // Retrasar la configuración de las suscripciones en tiempo real
+//     setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
+// };
+
 window.onload = () => {
-    showView('dashboard'); // Carga la vista de Dashboard por defecto
-    // Retrasar la configuración de las suscripciones en tiempo real
-    setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
-};
+    showView('dashboard');
+    setupRealtimeSubscriptions(); // Configurar suscripciones en tiempo real inmediatamente
+    loadReportFilters(); // Cargar filtros del reporte inmediatamente
+}

@@ -3,3 +3,29 @@
     background-color: #3b82f6; /* azul de Tailwind (blue-500) */
     color: white;
 }
+
+.priority-item {
+    background-color: #374151; /* gray-700 */
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid #4b5563; /* gray-600 */
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+}
+
+.priority-item:hover {
+    background-color: #4b5563; /* gray-600 */
+}
+
+.priority-item .handle {
+    margin-right: 1rem;
+    color: #9ca3af; /* gray-400 */
+    cursor: grab;
+}
+
+.sortable-ghost {
+    opacity: 0.4;
+    background: #4f46e5; /* indigo-600 */
+}

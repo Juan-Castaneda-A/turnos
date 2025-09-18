@@ -45,6 +45,7 @@ const silenceAlertBtn = document.getElementById('silence-alert-btn');
 
 let currentAttendingTurnId = null;
 let channels = [];
+let sortedPendingTurns = [];
 // ==========================================================
 // FUNCIONES DE LÓGICA
 // ==========================================================
@@ -109,37 +110,60 @@ async function loadPendingTurns() {
     }
 
     try {
-        // Primero obtenemos los servicios del módulo
+        // 1. Obtenemos las asignaciones y PRIORIDADES de los servicios para nuestro módulo
         const { data: moduleServices, error: msError } = await supabase
             .from('modulos_servicios')
-            .select('id_servicio')
+            .select('id_servicio, prioridad')
             .eq('id_modulo', window.ASSIGNED_MODULE_ID);
 
         if (msError) throw msError;
 
-        const serviceIds = moduleServices.map(ms => ms.id_servicio);
-
-        if (serviceIds.length === 0) {
+        if (moduleServices.length === 0) {
             pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Este módulo no tiene servicios configurados.</td></tr>`;
             btnCallNext.disabled = true;
             return;
         }
+        
+        // Creamos un mapa para buscar la prioridad de un servicio rápidamente
+        const priorityMap = new Map(moduleServices.map(ms => [ms.id_servicio, ms.prioridad]));
+        const serviceIds = moduleServices.map(ms => ms.id_servicio);
+
+        // if (serviceIds.length === 0) {
+        //     pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Este módulo no tiene servicios configurados.</td></tr>`;
+        //     btnCallNext.disabled = true;
+        //     return;
+        // }
 
         // Luego obtenemos los turnos pendientes para esos servicios
         const { data: turns, error: turnsError } = await supabase
             .from('turnos')
-            .select('id_turno, prefijo_turno, numero_turno, hora_solicitud, servicios(nombre_servicio)')
+            .select('id_turno, prefijo_turno, numero_turno, hora_solicitud, id_servicio, servicios(nombre_servicio)')
             .eq('estado', 'en espera')
             .in('id_servicio', serviceIds)
-            .order('hora_solicitud', { ascending: true });
+            .order('hora_solicitud', { ascending: true });// Aún ordenamos por hora para el desempate
 
         if (turnsError) throw turnsError;
 
+        // 3. ¡LA MAGIA! Ordenamos los turnos en JavaScript usando nuestro mapa de prioridades
+        turns.sort((a, b) => {
+            const priorityA = priorityMap.get(a.id_servicio) ?? 99; // Usamos 99 si no hay prioridad definida
+            const priorityB = priorityMap.get(b.id_servicio) ?? 99;
+            
+            if (priorityA < priorityB) return -1; // El de menor número (mayor prioridad) va primero
+            if (priorityA > priorityB) return 1;
+            
+            // Si tienen la misma prioridad, el que llegó primero (hora_solicitud) va primero
+            return new Date(a.hora_solicitud) - new Date(b.hora_solicitud);
+        });
+
+        sortedPendingTurns = turns; // Guardamos la lista ordenada para que el botón la pueda usar
+
+        // Renderizamos la tabla con los turnos ya ordenados
         pendingTurnsBody.innerHTML = '';
 
         if (turns.length === 0) {
             pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">No hay turnos pendientes.</td></tr>`;
-            btnCallNext.disabled = true;
+            btnCallNext.disabled = true; // Se cambia a false para que el siguiente paso lo evalúe
         } else {
             turns.forEach(turn => {
                 const tr = document.createElement('tr');
@@ -350,44 +374,50 @@ function setupRealtimeSubscriptions() {
 // ==========================================================
 
 btnCallNext.addEventListener('click', async () => {
+
+    if (sortedPendingTurns.length === 0) {
+        await showConfirmationModal('Atención', 'No hay turnos pendientes para llamar.');
+        return;
+    }
+
     const confirmed = await showConfirmationModal('Llamar Siguiente Turno', '¿Está seguro de que desea llamar al siguiente turno disponible?');
     if (!confirmed) return;
 
     btnCallNext.disabled = true;
     try {
-        console.log("Obteniendo servicios del módulo...");
-        const { data: moduleServices, error: msError } = await supabase
-            .from('modulos_servicios')
-            .select('id_servicio')
-            .eq('id_modulo', window.ASSIGNED_MODULE_ID);
+        // console.log("Obteniendo servicios del módulo...");
+        // const { data: moduleServices, error: msError } = await supabase
+        //     .from('modulos_servicios')
+        //     .select('id_servicio')
+        //     .eq('id_modulo', window.ASSIGNED_MODULE_ID);
 
-        if (msError) throw msError;
+        // if (msError) throw msError;
 
-        const serviceIds = moduleServices.map(ms => ms.id_servicio);
-        console.log("Servicios del módulo:", serviceIds);
+        // const serviceIds = moduleServices.map(ms => ms.id_servicio);
+        // console.log("Servicios del módulo:", serviceIds);
 
-        if (serviceIds.length === 0) {
-            throw new Error("Este módulo no tiene servicios configurados");
-        }
+        // if (serviceIds.length === 0) {
+        //     throw new Error("Este módulo no tiene servicios configurados");
+        // }
 
-        console.log("Buscando siguiente turno disponible...");
-        const { data: nextTurn, error: nextTurnError } = await supabase
-            .from('turnos')
-            .select('id_turno, prefijo_turno, numero_turno, id_servicio, servicios(nombre_servicio)')
-            .eq('estado', 'en espera')
-            .in('id_servicio', serviceIds)
-            .order('hora_solicitud', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        // console.log("Buscando siguiente turno disponible...");
+        // const { data: nextTurn, error: nextTurnError } = await supabase
+        //     .from('turnos')
+        //     .select('id_turno, prefijo_turno, numero_turno, id_servicio, servicios(nombre_servicio)')
+        //     .eq('estado', 'en espera')
+        //     .in('id_servicio', serviceIds)
+        //     .order('hora_solicitud', { ascending: true })
+        //     .limit(1)
+        //     .maybeSingle();
 
-        if (nextTurnError) throw nextTurnError;
+        // if (nextTurnError) throw nextTurnError;
 
-        if (!nextTurn) {
-            console.log("No hay turnos pendientes para llamar");
-            await showConfirmationModal('Atención', 'No hay turnos pendientes para llamar.');
-            return;
-        }
-
+        // if (!nextTurn) {
+        //     console.log("No hay turnos pendientes para llamar");
+        //     await showConfirmationModal('Atención', 'No hay turnos pendientes para llamar.');
+        //     return;
+        // }
+        const nextTurn = sortedPendingTurns[0];
         console.log(`Llamando turno ${nextTurn.prefijo_turno}-${nextTurn.numero_turno}`);
 
         // Objeto de actualización sin id_funcionario
