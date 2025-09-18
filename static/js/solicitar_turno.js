@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!event.target.matches('button')) return;
         
         const button = event.target;
+        const allKeys = qwertyKeyboard.querySelectorAll('button');
         const currentValue = fullNameInput.value;
 
         if (button.classList.contains('keypad-btn')) {
@@ -63,9 +64,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
             loadingMessage.textContent = "Guardando nombre...";
             loadingMessage.classList.remove('hidden');
+            allKeys.forEach(key => key.disabled = true);
 
             try {
-                const response = await fetch('/api/update-cliente', {
+                const response = await fetch('/api/register-cliente', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -83,11 +85,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 showServices();
 
             } catch (error) {
-                console.error("Error al actualizar el nombre:", error);
+                console.error("Error al registrar el nombre:", error);
                 alert(`Error al guardar el nombre: ${error.message}`);
             } finally {
                 loadingMessage.classList.add('hidden');
                 loadingMessage.textContent = "Verificando..."; // Revertir texto
+                allKeys.forEach(key => key.disabled = false);
             }
         }
     });

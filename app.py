@@ -505,38 +505,38 @@ def api_save_user():
         logging.error(f"Error en api_save_user: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/update-cliente', methods=['POST'])
-def update_cliente():
+@app.route('/api/register-cliente', methods=['POST'])
+def register_cliente():
     """
-    API para actualizar el nombre de un cliente existente.
-    Recibe un JSON con 'numero_identificacion' y 'nombre_completo'.
+    API inteligente que CREA un cliente si es nuevo, o ACTUALIZA su nombre si ya existe.
     """
     if not request.is_json:
         return jsonify({"success": False, "error": "La solicitud debe ser JSON"}), 400
 
     data = request.get_json()
     identificacion = data.get('numero_identificacion')
-    nuevo_nombre = data.get('nombre_completo')
+    nombre = data.get('nombre_completo')
 
-    if not identificacion or not nuevo_nombre:
+    if not identificacion or not nombre:
         return jsonify({"success": False, "error": "Faltan datos requeridos"}), 400
 
     try:
-        response = supabase.table('clientes') \
-            .update({'nombre_completo': nuevo_nombre}) \
-            .eq('numero_identificacion', identificacion) \
-            .execute()
+        # Usamos upsert (update or insert).
+        # Primero intenta hacer un UPDATE donde coincida el 'numero_identificacion'.
+        # Si no encuentra coincidencia, hace un INSERT con todos los datos.
+        response = supabase.table('clientes').upsert({
+            'numero_identificacion': identificacion,
+            'nombre_completo': nombre
+        }, on_conflict='numero_identificacion').execute()
 
         if response.data:
-            logging.info(f"Cliente {identificacion} actualizado a '{nuevo_nombre}'.")
-            return jsonify({"success": True, "message": "Nombre actualizado correctamente."})
+            logging.info(f"Cliente {identificacion} registrado/actualizado como '{nombre}'.")
+            return jsonify({"success": True, "message": "Cliente registrado correctamente."})
         else:
-            # Esto podría pasar si la identificación no se encuentra, aunque es poco probable en este flujo.
-            logging.warning(f"Intento de actualizar cliente inexistente: {identificacion}")
-            return jsonify({"success": False, "error": "No se pudo encontrar al cliente para actualizar."}), 404
+            raise Exception(response.error.message if response.error else "Error desconocido en upsert")
 
     except Exception as e:
-        logging.error(f"Error al actualizar cliente {identificacion}: {e}")
+        logging.error(f"Error en register_cliente para {identificacion}: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/check-cliente/<identificacion>')
@@ -546,7 +546,7 @@ def check_cliente(identificacion):
     y devuelve su nombre si lo encuentra.
     """
     try:
-        response = supabase.table('clientes').select('nombre_completo').eq('numero_identificacion', identificacion).single().execute()
+        response = supabase.table('clientes').select('nombre_completo').eq('numero_identificacion', identificacion).maybe_Single().execute()
         if response.data:
             return jsonify(response.data) # Devuelve {"nombre_completo": "Juan Perez"} si lo encuentra
         else:
