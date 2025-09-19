@@ -614,31 +614,41 @@ def check_cliente(identificacion):
 #         return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
 
 @app.route('/api/reports')
-@admin_required #para proteger la ruta
+@admin_required # Asegúrate de que siga protegida
 def get_reports():
+    # 1. Recopilamos todos los parámetros de la URL
     start_date = request.args.get('start')
     end_date = request.args.get('end')
-    user_id = request.args.get('user_id')
-    module_id = request.args.get('module_id')
+    group_by = request.args.get('group_by') # El que agrupa
+    user_id = request.args.get('user_id')     # Filtro opcional
+    module_id = request.args.get('module_id') # Filtro opcional
 
-    if not start_date or not end_date:
-        return jsonify({"error": "Se requieren fechas de inicio y fin"}), 400
+    if not all([start_date, end_date, group_by]):
+        return jsonify({"error": "Faltan parámetros requeridos (start, end, group_by)"}), 400
     
     try:
+        # 2. Creamos un diccionario de parámetros con los NOMBRES EXACTOS que la función SQL espera
         params = {
             'start_date': start_date,
-            'end_date': end_date
+            'end_date': end_date,
+            'group_by_param': group_by # 'group_by' se convierte en 'group_by_param'
         }
+
+        # 3. Añadimos los parámetros OPCIONALES solo si existen, usando los nombres con guion bajo
         if user_id:
             params['_user_id'] = int(user_id)
         if module_id:
             params['_module_id'] = int(module_id)
         
+        # 4. Llamamos a la función RPC con el diccionario de parámetros correcto
         response = supabase.rpc('get_report_data', params).execute()
 
         if response.data:
             return jsonify(response.data)
         else:
+            # Si hay un error en la respuesta de Supabase, lo mostramos
+            if response.error:
+                raise Exception(response.error.message)
             return jsonify([])
         
     except Exception as e:

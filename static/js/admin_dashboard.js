@@ -1,120 +1,585 @@
 // Importar el cliente de Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
-// Variables de configuración (pasadas desde Flask)
-//const SUPABASE_URL = "{{ supabase_url }}";
-//const SUPABASE_KEY = "{{ supabase_key }}";
-//const USER_ID = "{{ g.user.id }}"; // Ahora se lee de g.user
-//const USER_NAME = "{{ g.user.name }}"; // Ahora se lee de g.user
+// 1. DECLARAMOS las variables aquí, pero NO las asignamos todavía.
+let supabase;
+let navLinks, contentSections, turnsWaitingElement, turnsAttendedTodayElement, activeModulesElement,
+    realtimeModulesStatusBody, addUserBtn, userFormContainer, userFormTitle, userForm,
+    userIdField, fullNameField, usernameField, passwordField, roleField, assignedModuleField,
+    cancelUserFormBtn, usersTableBody, addModuleBtn, moduleFormContainer, moduleFormTitle,
+    moduleForm, moduleIdField, moduleNameField, moduleDescriptionField, moduleStatusField,
+    moduleStatusText, cancelModuleFormBtn, modulesTableBody, servicesConfigHeader,
+    servicesConfigBody, saveServicesConfigBtn, priorityModuleSelect, priorityListContainer,
+    prioritySortableList, savePrioritiesBtn, btnFilterToday, btnFilterWeek, btnFilterMonth,
+    btnFilterAll, reportStartDate, reportEndDate, reportTableBody, chartCanvas,
+    generateReportBtn, historyStartDate, historyEndDate, historyServiceFilter,
+    filterHistoryBtn, turnHistoryTableBody, resetTurnsBtn, confirmationModal, modalTitle,
+    modalMessage, modalConfirmBtn, modalCancelBtn, moduleFilter;
 
-// Inicializar Supabase
-const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-console.log("Supabase Client inicializado para Panel de Administración.");
-console.log("Objeto Supabase:", supabase);
-console.log("¿Existe supabase.from?", typeof supabase.from);
+let reportChart = null;
+let isSavingConfig = false;
+let allModules = [];
+let allServices = [];
+let currentModuleServiceConfig = {};
 
-const navLinks = document.querySelectorAll('nav .nav-link');
-const contentSections = document.querySelectorAll('.view-section');
 
-const turnsWaitingElement = document.getElementById('turns-waiting');
-const turnsAttendedTodayElement = document.getElementById('turns-attended-today');
-const activeModulesElement = document.getElementById('active-modules');
-const realtimeModulesStatusBody = document.getElementById('realtime-modules-status-body');
+function init() {
+    // Inicializar Supabase
+    supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+    console.log("Supabase Client inicializado para Panel de Administración.");
+    console.log("Objeto Supabase:", supabase);
+    console.log("¿Existe supabase.from?", typeof supabase.from);
 
-const addUserBtn = document.getElementById('add-user-btn');
-const userFormContainer = document.getElementById('user-form-container');
-const userFormTitle = document.getElementById('user-form-title');
-const userForm = document.getElementById('user-form');
-const userIdField = document.getElementById('user-id-field');
-const fullNameField = document.getElementById('full-name-field');
-const usernameField = document.getElementById('username-field');
-const passwordField = document.getElementById('password-field');
-const roleField = document.getElementById('role-field');
-const assignedModuleField = document.getElementById('assigned-module-field');
-const saveUserBtn = document.getElementById('save-user-btn');
-const cancelUserFormBtn = document.getElementById('cancel-user-form-btn');
-const usersTableBody = document.getElementById('users-table-body');
+    // Referencias al DOM
+    navLinks = document.querySelectorAll('nav .nav-link');
+    contentSections = document.querySelectorAll('.view-section');
+    turnsWaitingElement = document.getElementById('turns-waiting');
+    turnsAttendedTodayElement = document.getElementById('turns-attended-today');
+    activeModulesElement = document.getElementById('active-modules');
+    realtimeModulesStatusBody = document.getElementById('realtime-modules-status-body');
+    addUserBtn = document.getElementById('add-user-btn');
+    userFormContainer = document.getElementById('user-form-container');
+    userFormTitle = document.getElementById('user-form-title');
+    userForm = document.getElementById('user-form');
+    userIdField = document.getElementById('user-id-field');
+    fullNameField = document.getElementById('full-name-field');
+    usernameField = document.getElementById('username-field');
+    passwordField = document.getElementById('password-field');
+    roleField = document.getElementById('role-field');
+    assignedModuleField = document.getElementById('assigned-module-field');
+    cancelUserFormBtn = document.getElementById('cancel-user-form-btn');
+    usersTableBody = document.getElementById('users-table-body');
+    addModuleBtn = document.getElementById('add-module-btn');
+    moduleFormContainer = document.getElementById('module-form-container');
+    moduleFormTitle = document.getElementById('module-form-title');
+    moduleForm = document.getElementById('module-form');
+    moduleIdField = document.getElementById('module-id-field');
+    moduleNameField = document.getElementById('module-name-field');
+    moduleDescriptionField = document.getElementById('module-description-field');
+    moduleStatusField = document.getElementById('module-status-field');
+    moduleStatusText = document.getElementById('module-status-text');
+    cancelModuleFormBtn = document.getElementById('cancel-module-form-btn');
+    modulesTableBody = document.getElementById('modules-table-body');
+    servicesConfigHeader = document.getElementById('services-config-header');
+    servicesConfigBody = document.getElementById('services-config-body');
+    saveServicesConfigBtn = document.getElementById('save-services-config-btn');
+    priorityModuleSelect = document.getElementById('priority-module-select');
+    priorityListContainer = document.getElementById('priority-list-container');
+    prioritySortableList = document.getElementById('priority-sortable-list');
+    savePrioritiesBtn = document.getElementById('save-priorities-btn');
+    btnFilterToday = document.getElementById('filter-today');
+    btnFilterWeek = document.getElementById('filter-week');
+    btnFilterMonth = document.getElementById('filter-month');
+    btnFilterAll = document.getElementById('filter-all');
+    reportStartDate = document.getElementById('report-start-date');
+    reportEndDate = document.getElementById('report-end-date');
+    reportTableBody = document.getElementById('report-table-body');
+    chartCanvas = document.getElementById('turns-by-employee-chart');
+    generateReportBtn = document.getElementById('generate-report-btn');
+    historyStartDate = document.getElementById('history-start-date');
+    historyEndDate = document.getElementById('history-end-date');
+    historyServiceFilter = document.getElementById('history-service-filter');
+    filterHistoryBtn = document.getElementById('filter-history-btn');
+    turnHistoryTableBody = document.getElementById('turn-history-table-body');
+    resetTurnsBtn = document.getElementById('reset-turns-btn');
+    confirmationModal = document.getElementById('confirmation-modal');
+    modalTitle = document.getElementById('modal-title');
+    modalMessage = document.getElementById('modal-message');
+    modalConfirmBtn = document.getElementById('modal-confirm-btn');
+    modalCancelBtn = document.getElementById('modal-cancel-btn');
 
-const addModuleBtn = document.getElementById('add-module-btn');
-const moduleFormContainer = document.getElementById('module-form-container');
-const moduleFormTitle = document.getElementById('module-form-title');
-const moduleForm = document.getElementById('module-form');
-const moduleIdField = document.getElementById('module-id-field');
-// CORRECCIÓN: Eliminado el error de tipeo "document ="
-const moduleNameField = document.getElementById('module-name-field');
-const moduleDescriptionField = document.getElementById('module-description-field');
-const moduleStatusField = document.getElementById('module-status-field');
-const moduleStatusText = document.getElementById('module-status-text');
-const saveModuleBtn = document.getElementById('save-module-btn');
-const cancelModuleFormBtn = document.getElementById('cancel-module-form-btn');
-const modulesTableBody = document.getElementById('modules-table-body');
+    const moduleFilterElement = document.getElementById('module-filter');
+    if (moduleFilterElement) {
+        moduleFilter = moduleFilterElement;
+    }
 
-const servicesConfigHeader = document.getElementById('services-config-header');
-const servicesConfigBody = document.getElementById('services-config-body');
-const saveServicesConfigBtn = document.getElementById('save-services-config-btn');
+    // 4. Asignamos todos los Event Listeners aquí.
+    assignEventListeners();
 
-const historyStartDate = document.getElementById('history-start-date');
-const historyEndDate = document.getElementById('history-end-date');
-const historyServiceFilter = document.getElementById('history-service-filter');
-const filterHistoryBtn = document.getElementById('filter-history-btn');
-const turnHistoryTableBody = document.getElementById('turn-history-table-body');
+    // 5. Cargamos la vista inicial y los datos.
+    showView('dashboard');
+    setupRealtimeSubscriptions();
+    loadReportFilters();
 
-const resetTurnsBtn = document.getElementById('reset-turns-btn');
+}
 
-const confirmationModal = document.getElementById('confirmation-modal');
-const modalTitle = document.getElementById('modal-title');
-const modalMessage = document.getElementById('modal-message');
-const modalConfirmBtn = document.getElementById('modal-confirm-btn');
-const modalCancelBtn = document.getElementById('modal-cancel-btn');
+// ==========================================================
+// SECCIÓN DE EVENT LISTENERS
+// ==========================================================
 
-const btnFilterToday = document.getElementById('filter-today');
-const btnFilterWeek = document.getElementById('filter-week');
-const btnFilterMonth = document.getElementById('filter-month');
-const btnFilterAll = document.getElementById('filter-all');
+function assignEventListeners() {
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            showView(e.currentTarget.dataset.view);
+        });
+    });
 
-const reportStartDate = document.getElementById('report-start-date'); // <--- Nombre original y correcto
-const reportEndDate = document.getElementById('report-end-date');     // <--- Nombre original y correcto
+    // Listener para el botón de generar reporte
+    generateReportBtn.addEventListener('click', generateReport);
 
-const reportStartDateInput = document.getElementById('report-start-date');
-const reportEndDateInput = document.getElementById('report-end-date');
+    // Listeners para los filtros rápidos de fecha
+    btnFilterToday.addEventListener('click', () => {
+        reportStartDate.value = formatDateToISO(new Date());
+        reportEndDate.value = reportStartDate.value;
+        generateReportBtn.click();
+    });
 
-// **NUEVAS REFERENCIAS PARA LA VISTA DE PRIORIDADES**
-const priorityModuleSelect = document.getElementById('priority-module-select');
-const priorityListContainer = document.getElementById('priority-list-container');
-const prioritySortableList = document.getElementById('priority-sortable-list');
-const savePrioritiesBtn = document.getElementById('save-priorities-btn');
+    btnFilterWeek.addEventListener('click', () => {
+        const today = new Date();
+        const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)));
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+        reportStartDate.value = formatDateToISO(firstDayOfWeek);
+        reportEndDate.value = formatDateToISO(lastDayOfWeek);
+        generateReportBtn.click();
+    });
 
-function showConfirmationModal(title, message) {
-    return new Promise((resolve) => {
-        modalTitle.textContent = title;
-        modalMessage.textContent = message;
-        confirmationModal.classList.remove('hidden');
+    btnFilterMonth.addEventListener('click', () => {
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        reportStartDate.value = formatDateToISO(firstDayOfMonth);
+        reportEndDate.value = formatDateToISO(lastDayOfMonth);
+        generateReportBtn.click();
+    });
 
-        const handleConfirm = () => {
-            confirmationModal.classList.add('hidden');
-            modalConfirmBtn.removeEventListener('click', handleConfirm);
-            modalCancelBtn.removeEventListener('click', handleCancel);
-            resolve(true);
+    btnFilterAll.addEventListener('click', () => {
+        reportStartDate.value = '2020-01-01';
+        reportEndDate.value = formatDateToISO(new Date());
+        generateReportBtn.click();
+    });
+
+    // ... (Aquí irían todos los demás event listeners: addUserBtn, savePrioritiesBtn, etc.)
+    // Por simplicidad, los dejo dentro de sus funciones de carga por ahora,
+    // pero idealmente también se centralizarían aquí.
+    addUserBtn.addEventListener('click', () => {
+        userFormContainer.classList.remove('hidden');
+        userFormTitle.textContent = 'Crear Nuevo Usuario';
+        userForm.reset();
+        userIdField.value = '';
+        passwordField.required = true;
+    });
+
+    cancelUserFormBtn.addEventListener('click', () => {
+        userFormContainer.classList.add('hidden');
+    });
+
+    userForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = userIdField.value;
+        const password = passwordField.value;
+
+        // Construir el objeto de datos para enviar a la API
+        const userData = {
+            nombre_completo: fullNameField.value,
+            nombre_usuario: usernameField.value,
+            rol: roleField.value,
+            id_modulo_asignado: assignedModuleField.value || null
         };
 
-        const handleCancel = () => {
-            confirmationModal.classList.add('hidden');
-            modalConfirmBtn.removeEventListener('click', handleConfirm);
-            modalCancelBtn.removeEventListener('click', handleCancel);
-            resolve(false);
+        // Solo incluir el ID si estamos editando
+        if (id) {
+            userData.id_usuario = id;
+        }
+
+        // Solo incluir la contraseña si el usuario escribió una
+        if (password) {
+            userData.password = password;
+        }
+
+        const actionText = id ? 'Editar Usuario' : 'Crear Usuario';
+        const confirmed = await showConfirmationModal(actionText, `¿Está seguro de que desea guardar este usuario?`);
+        if (!confirmed) return;
+
+        try {
+            // --- Llamada a nuestra API segura en Flask ---
+            const response = await fetch('/api/save-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(userData),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                // Si la respuesta del servidor no es OK o el JSON indica un error
+                throw new Error(result.error || 'Error desconocido del servidor.');
+            }
+
+            await showConfirmationModal('Éxito', result.message);
+            userFormContainer.classList.add('hidden');
+            loadUsers(); // Recargar la tabla de usuarios
+
+        } catch (error) {
+            console.error("Error al guardar usuario:", error.message);
+            await showConfirmationModal('Error', `Error al guardar usuario: ${error.message}`);
+        }
+    });
+    addModuleBtn.addEventListener('click', () => {
+        moduleFormContainer.classList.remove('hidden');
+        moduleFormTitle.textContent = 'Crear Nuevo Módulo';
+        moduleForm.reset();
+        moduleIdField.value = '';
+        moduleStatusField.checked = true;
+        moduleStatusText.textContent = 'Activo';
+    });
+
+    cancelModuleFormBtn.addEventListener('click', () => {
+        moduleFormContainer.classList.add('hidden');
+    });
+
+    moduleStatusField.addEventListener('change', () => {
+        moduleStatusText.textContent = moduleStatusField.checked ? 'Activo' : 'Inactivo';
+    });
+
+    moduleForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = moduleIdField.value;
+        const name = moduleNameField.value;
+        const description = moduleDescriptionField.value;
+        const status = moduleStatusField.checked ? 'activo' : 'inactivo';
+
+        const moduleData = {
+            nombre_modulo: name,
+            descripcion: description,
+            estado: status
         };
 
-        modalConfirmBtn.addEventListener('click', handleConfirm);
-        modalCancelBtn.addEventListener('click', handleCancel);
+        try {
+            if (id) {
+                const confirmed = await showConfirmationModal('Editar Módulo', '¿Está seguro de que desea guardar los cambios de este módulo?');
+                if (!confirmed) return;
+
+                const { error } = await supabase.from('modulos').update(moduleData).eq('id_modulo', id);
+                if (error) throw error;
+                await showConfirmationModal('Éxito', 'Módulo actualizado exitosamente.');
+            } else {
+                const confirmed = await showConfirmationModal('Crear Módulo', '¿Está seguro de que desea crear este nuevo módulo?');
+                if (!confirmed) return;
+
+                const { error } = await supabase.from('modulos').insert(moduleData);
+                if (error) throw error;
+                await showConfirmationModal('Éxito', 'Módulo creado exitosamente.');
+            }
+            moduleFormContainer.classList.add('hidden');
+            loadModules();
+        } catch (error) {
+            console.error("Error al guardar módulo:", error.message);
+            await showConfirmationModal('Error', `Error al guardar módulo: ${error.message}`);
+        }
+    });
+    saveServicesConfigBtn.addEventListener('click', async () => {
+        const confirmed = await showConfirmationModal('Guardar Configuración de Servicios', '¿Está seguro de que desea guardar los cambios en la asignación de servicios?');
+        if (!confirmed) return;
+
+        isSavingConfig = true;
+
+        const newConfig = {};
+        servicesConfigBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const moduleId = parseInt(checkbox.dataset.moduleId);
+            const serviceId = parseInt(checkbox.dataset.serviceId);
+            if (checkbox.checked) {
+                if (!newConfig[moduleId]) {
+                    newConfig[moduleId] = [];
+                }
+                newConfig[moduleId].push(serviceId);
+            }
+        });
+
+        try {
+            const { error: deleteError } = await supabase.from('modulos_servicios').delete().neq('id', 0);
+            if (deleteError) throw deleteError;
+
+            const inserts = [];
+            for (const moduleId in newConfig) {
+                newConfig[moduleId].forEach(serviceId => {
+                    inserts.push({ id_modulo: moduleId, id_servicio: serviceId });
+                });
+            }
+
+            if (inserts.length > 0) {
+                const { error: insertError } = await supabase.from('modulos_servicios').insert(inserts);
+                if (insertError) throw insertError;
+            }
+
+            await showConfirmationModal('Éxito', 'Configuración de servicios guardada exitosamente.');
+            loadServicesConfig();
+        } catch (error) {
+            console.error("Error al guardar configuración de servicios:", error.message);
+            await showConfirmationModal('Error', `Error al guardar configuración de servicios: ${error.message}`);
+        } finally {
+            isSavingConfig = false;
+        }
+    });
+
+    filterHistoryBtn.addEventListener('click', loadTurnHistory);
+
+    resetTurnsBtn.addEventListener('click', async () => {
+        const confirmed = await showConfirmationModal(
+            'Confirmar Reseteo de Turnos',
+            '¿Está ABSOLUTAMENTE seguro de que desea resetear la numeración de TODOS los turnos para el día? Esta acción no se puede deshacer y afectará a todos los servicios.'
+        );
+        if (!confirmed) return;
+
+        try {
+            const { error } = await supabase.from('turnos').delete().neq('id_turno', 0);
+            if (error) throw error;
+
+            await showConfirmationModal('Éxito', 'Numeración de turnos reseteada exitosamente para el día.');
+            loadDashboardSummary();
+            loadRealtimeModulesStatus();
+        } catch (error) {
+            console.error("Error al resetear turnos:", error.message);
+            await showConfirmationModal('Error', `Error al resetear turnos: ${error.message}`);
+        }
+    });
+
+    btnFilterToday.addEventListener('click', () => {
+        const today = formatDateToISO(new Date());
+        reportStartDate.value = today;
+        reportEndDate.value = today;
+        generateReportBtn.click();
+    });
+
+    btnFilterWeek.addEventListener('click', () => {
+        const today = new Date();
+        const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)));
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+        reportStartDate.value = formatDateToISO(firstDayOfWeek);
+        reportEndDate.value = formatDateToISO(lastDayOfWeek);
+        generateReportBtn.click();
+    });
+
+    btnFilterMonth.addEventListener('click', () => {
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        reportStartDate.value = formatDateToISO(firstDayOfMonth);
+        reportEndDate.value = formatDateToISO(lastDayOfMonth);
+        generateReportBtn.click();
+    });
+
+
+    btnFilterAll.addEventListener('click', () => {
+        reportStartDate.value = '2020-01-01';
+        reportEndDate.value = formatDateToISO(new Date());
+        generateReportBtn.click();
+    });
+
+    generateReportBtn.addEventListener('click', async () => {
+        // CORRECCIÓN: Usamos los nombres de variable correctos 'reportStartDate' y 'reportEndDate'
+        const start = reportStartDate.value;
+        const end = reportEndDate.value;
+        const employeeId = document.getElementById('employee-filter').value;
+        const moduleId = document.getElementById('module-filter').value;
+
+        const groupBy = document.querySelector('input[name="group-by"]:checked').value;
+
+        if (!start || !end) {
+            alert('Por favor, seleccione un rango de fechas.');
+            return;
+        }
+
+        try {
+            let apiUrl = `/api/reports?start=${start}&end=${end}&group_by=${groupBy}`;
+            if (employeeId) apiUrl += `&user_id=${employeeId}`;
+            if (moduleId) apiUrl += `&module_id=${moduleId}`;
+
+            const response = await fetch(apiUrl, { credentials: 'include' });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Error del servidor: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Limpiar la tabla y las tarjetas de KPIs
+            reportTableBody.innerHTML = '';
+            document.getElementById('kpi-total-turns').textContent = '--';
+            document.getElementById('kpi-avg-wait').textContent = '--';
+            document.getElementById('kpi-avg-service').textContent = '--';
+            if (reportChart) reportChart.destroy();
+
+            if (data.length === 0) {
+                reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">No se encontraron datos.</td></tr>`;
+                return;
+            }
+
+            const formatInterval = (intervalStr) => {
+                if (!intervalStr) return 'N/A';
+                const parts = intervalStr.split(':');
+                const minutes = parseInt(parts[1], 10);
+                const seconds = Math.round(parseFloat(parts[2]));
+                return `${minutes}m ${seconds}s`;
+            };
+
+            // Calculamos los KPIs
+            const totalTurns = data.reduce((sum, row) => sum + row.turnos_atendidos, 0);
+            document.getElementById('kpi-total-turns').textContent = totalTurns;
+            // (Estos promedios son aproximados, para un promedio ponderado real necesitaríamos otra consulta)
+            document.getElementById('kpi-avg-wait').textContent = formatInterval(data[0].tiempo_espera_promedio);
+            document.getElementById('kpi-avg-service').textContent = formatInterval(data[0].tiempo_atencion_promedio);
+
+            // Actualizamos la tabla dinámicamente
+            const tableHeader = document.getElementById('table-header-group');
+            tableHeader.textContent = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td class="p-3">${row.group_name}</td>
+                <td class="p-3 text-center">${row.turnos_atendidos}</td>
+                <td class="p-3">${formatInterval(row.tiempo_espera_promedio)}</td>
+                <td class="p-3">${formatInterval(row.tiempo_atencion_promedio)}</td>
+            `;
+                reportTableBody.appendChild(tr);
+            });
+
+            // Hacemos el gráfico inteligente
+            document.getElementById('chart-title').textContent = `Turnos por ${groupBy}`;
+            const chartType = groupBy === 'servicio' ? 'doughnut' : 'bar';
+            const labels = data.map(row => row.group_name);
+            const chartData = data.map(row => row.turnos_atendidos);
+
+            reportChart = new Chart(chartCanvas, {
+                type: chartType,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Turnos Atendidos',
+                        data: chartData,
+                        backgroundColor: chartType === 'bar' ? 'rgba(59, 130, 246, 0.5)' : [
+                            'rgba(59, 130, 246, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(245, 158, 11, 0.7)',
+                            'rgba(16, 185, 129, 0.7)', 'rgba(139, 92, 246, 0.7)', 'rgba(236, 72, 153, 0.7)'
+                        ],
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1
+                    }]
+                },
+                options: chartType === 'bar' ? { scales: { y: { beginAtZero: true } } } : {}
+            });
+
+        } catch (error) {
+            console.error("Error al generar el reporte:", error);
+            reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
+            if (reportChart) reportChart.destroy();
+        }
+    });
+
+    priorityModuleSelect.addEventListener('change', async () => {
+        const moduleId = priorityModuleSelect.value;
+        if (!moduleId) {
+            priorityListContainer.classList.add('hidden');
+            return;
+        }
+
+        priorityListContainer.classList.remove('hidden');
+        prioritySortableList.innerHTML = `<p class="text-gray-400">Cargando servicios para este módulo...</p>`;
+
+        try {
+            // Buscamos los servicios asignados a este módulo, ordenados por su prioridad actual
+            const { data: services, error } = await supabase
+                .from('modulos_servicios')
+                .select(`
+                prioridad,
+                servicios (id_servicio, nombre_servicio)
+            `)
+                .eq('id_modulo', moduleId)
+                .order('prioridad', { ascending: true });
+
+            if (error) throw error;
+
+            prioritySortableList.innerHTML = '';
+            if (services.length === 0) {
+                prioritySortableList.innerHTML = `<p class="text-gray-400">Este módulo no tiene servicios asignados. Vaya a "Configurar Servicios" para asignarlos.</p>`;
+                return;
+            }
+
+            // Creamos los elementos HTML para cada servicio
+            services.forEach(item => {
+                const service = item.servicios;
+                const listItem = document.createElement('div');
+                listItem.className = 'priority-item';
+                listItem.dataset.serviceId = service.id_servicio; // Guardamos el ID del servicio
+
+                listItem.innerHTML = `
+                <svg class="handle w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                <span>${service.nombre_servicio}</span>
+            `;
+                prioritySortableList.appendChild(listItem);
+            });
+
+            // ¡Magia! Activamos la funcionalidad de arrastrar y soltar en la lista
+            new Sortable(prioritySortableList, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                handle: '.handle'
+            });
+
+        } catch (error) {
+            console.error("Error cargando la lista de prioridades:", error);
+            prioritySortableList.innerHTML = `<p class="text-red-400">Error al cargar los servicios de este módulo.</p>`;
+        }
+    });
+
+    // Se activa al hacer clic en el botón "Guardar Prioridades"
+    savePrioritiesBtn.addEventListener('click', async () => {
+        const moduleId = priorityModuleSelect.value;
+        if (!moduleId) return;
+
+        const confirmed = await showConfirmationModal('Guardar Prioridades', `¿Está seguro de que desea guardar el nuevo orden de prioridad para este módulo?`);
+        if (!confirmed) return;
+
+        // Obtenemos todos los elementos de la lista en su nuevo orden
+        const listItems = prioritySortableList.querySelectorAll('.priority-item');
+
+        // Creamos un array de objetos para actualizar la base de datos
+        const updates = Array.from(listItems).map((item, index) => ({
+            id_modulo: parseInt(moduleId),
+            id_servicio: parseInt(item.dataset.serviceId),
+            prioridad: index + 1 // El índice (0, 1, 2...) se convierte en la prioridad (1, 2, 3...)
+        }));
+
+        try {
+            // Usamos upsert para actualizar las filas existentes.
+            // onConflict le dice a Supabase que la combinación de módulo y servicio es única.
+            const { error } = await supabase.from('modulos_servicios').upsert(updates, {
+                onConflict: 'id_modulo, id_servicio'
+            });
+
+            if (error) throw error;
+
+            await showConfirmationModal('Éxito', 'El orden de prioridad se ha guardado correctamente.');
+
+        } catch (error) {
+            console.error('Error al guardar las prioridades:', error);
+            await showConfirmationModal('Error', `No se pudo guardar el orden de prioridades: ${error.message}`);
+        }
     });
 }
 
+// ==========================================================
+// SECCIÓN DE FUNCIONES
+// ==========================================================
+
+// --- Funciones de Lógica de Vistas y UI ---
 function showView(viewId) {
     contentSections.forEach(section => {
         if (section.id !== 'confirmation-modal') {
             section.classList.add('hidden');
         }
     });
+
+    const targetView = document.getElementById(viewId + '-view');
+    if (targetView) {
+        targetView.classList.remove('hidden');
+    }
+
     document.getElementById(viewId + '-view').classList.remove('hidden');
 
     navLinks.forEach(link => {
@@ -141,7 +606,10 @@ function showView(viewId) {
             loadPriorityEditor();
             break;
         case 'reports':
-            // Lógica para cargar reportes (si aplica)
+            // Solo cargar filtros si la vista existe
+            if (targetView) {
+                loadReportFilters();
+            }
             break;
         case 'turn-history':
             loadHistoryServicesFilter();
@@ -153,13 +621,36 @@ function showView(viewId) {
     }
 }
 
-navLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-        e.preventDefault();
-        showView(e.currentTarget.dataset.view);
-    });
-});
+function showConfirmationModal(title, message) {
+    return new Promise((resolve) => {
+        modalTitle.textContent = title;
+        modalMessage.textContent = message;
+        confirmationModal.classList.remove('hidden');
 
+        const handleConfirm = () => {
+            confirmationModal.classList.add('hidden');
+            modalConfirmBtn.removeEventListener('click', handleConfirm);
+            modalCancelBtn.removeEventListener('click', handleCancel);
+            resolve(true);
+        };
+
+        const handleCancel = () => {
+            confirmationModal.classList.add('hidden');
+            modalConfirmBtn.removeEventListener('click', handleConfirm);
+            modalCancelBtn.removeEventListener('click', handleCancel);
+            resolve(false);
+        };
+
+        modalConfirmBtn.addEventListener('click', handleConfirm);
+        modalCancelBtn.addEventListener('click', handleCancel);
+    });
+}
+
+function formatDateToISO(date) {
+    return date.toISOString().split('T')[0];
+}
+
+// --- Funciones de Carga de Datos (load...) ---
 async function loadDashboardSummary() {
     try {
         const { count: waitingCount, error: waitingError } = await supabase
@@ -203,7 +694,7 @@ async function loadRealtimeModulesStatus() {
                 .from('usuarios')
                 .select('id_usuario, nombre_completo, id_modulo_asignado');
             if (usersError) throw usersError;
-            
+
             users.forEach(user => {
                 if (user.id_modulo_asignado) {
                     moduleToUserNameMap[user.id_modulo_asignado] = user.nombre_completo;
@@ -339,14 +830,26 @@ async function loadModulesForUserAssignment() {
 
 async function loadReportFilters() {
     try {
-        // Cargar empleados
         const employeeFilterSelect = document.getElementById('employee-filter');
-        const { data: users, error: userError } = await supabase
-            .from('usuarios')
-            .select('id_usuario, nombre_completo');
+        const moduleFilterSelect = document.getElementById('module-filter');
+
+        // Verificar que los elementos existen antes de manipularlos
+        if (!employeeFilterSelect || !moduleFilterSelect) {
+            console.warn("Elementos de filtro no encontrados, puede que la vista de reportes no esté cargada");
+            return;
+        }
+
+        const [{ data: users, error: userError }, { data: modules, error: moduleError }] = await Promise.all([
+            supabase.from('usuarios').select('id_usuario, nombre_completo'),
+            supabase.from('modulos').select('id_modulo, nombre_modulo')
+        ]);
+
         if (userError) throw userError;
+        if (moduleError) throw moduleError;
+
+        //const { data: users, error: userError } = await supabase.from('usuarios').select('id_usuario, nombre_completo');
         
-        // Limpiar opciones anteriores (excepto la primera de "Todos")
+        
         employeeFilterSelect.innerHTML = '<option value="">Todos los Empleados</option>';
         users.forEach(user => {
             const option = document.createElement('option');
@@ -355,12 +858,8 @@ async function loadReportFilters() {
             employeeFilterSelect.appendChild(option);
         });
 
-        // Cargar módulos
-        const moduleFilterSelect = document.getElementById('module-filter');
-        const { data: modules, error: moduleError } = await supabase
-            .from('modulos')
-            .select('id_modulo, nombre_modulo');
-        if (moduleError) throw moduleError;
+        //const { data: modules, error: moduleError } = await supabase.from('modulos').select('id_modulo, nombre_modulo');
+        
 
         moduleFilterSelect.innerHTML = '<option value="">Todos los Módulos</option>';
         modules.forEach(mod => {
@@ -369,117 +868,8 @@ async function loadReportFilters() {
             option.textContent = mod.nombre_modulo;
             moduleFilterSelect.appendChild(option);
         });
-
     } catch (error) {
         console.error("Error cargando filtros de reporte:", error);
-    }
-}
-
-// Función auxiliar para formatear fechas a YYYY-MM-DD
-function formatDateToISO(date) {
-    return date.toISOString().split('T')[0];
-}
-
-addUserBtn.addEventListener('click', () => {
-    userFormContainer.classList.remove('hidden');
-    userFormTitle.textContent = 'Crear Nuevo Usuario';
-    userForm.reset();
-    userIdField.value = '';
-    passwordField.required = true;
-});
-
-cancelUserFormBtn.addEventListener('click', () => {
-    userFormContainer.classList.add('hidden');
-});
-
-userForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = userIdField.value; 
-    const password = passwordField.value;
-
-    // Construir el objeto de datos para enviar a la API
-    const userData = {
-        nombre_completo: fullNameField.value,
-        nombre_usuario: usernameField.value,
-        rol: roleField.value,
-        id_modulo_asignado: assignedModuleField.value || null
-    };
-
-    // Solo incluir el ID si estamos editando
-    if (id) {
-        userData.id_usuario = id;
-    }
-
-    // Solo incluir la contraseña si el usuario escribió una
-    if (password) {
-        userData.password = password;
-    }
-
-    const actionText = id ? 'Editar Usuario' : 'Crear Usuario';
-    const confirmed = await showConfirmationModal(actionText, `¿Está seguro de que desea guardar este usuario?`);
-    if (!confirmed) return;
-
-    try {
-        // --- Llamada a nuestra API segura en Flask ---
-        const response = await fetch('/api/save-user', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(userData),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-            // Si la respuesta del servidor no es OK o el JSON indica un error
-            throw new Error(result.error || 'Error desconocido del servidor.');
-        }
-
-        await showConfirmationModal('Éxito', result.message);
-        userFormContainer.classList.add('hidden');
-        loadUsers(); // Recargar la tabla de usuarios
-
-    } catch (error) {
-        console.error("Error al guardar usuario:", error.message);
-        await showConfirmationModal('Error', `Error al guardar usuario: ${error.message}`);
-    }
-});
-
-
-
-async function editUser(id) {
-    try {
-        const { data: user, error } = await supabase.from('usuarios').select('*').eq('id_usuario', id).single();
-        if (error) throw error;
-
-        userFormContainer.classList.remove('hidden');
-        userFormTitle.textContent = `Editar Usuario: ${user.nombre_completo}`;
-        userIdField.value = user.id_usuario;
-        fullNameField.value = user.nombre_completo;
-        usernameField.value = user.nombre_usuario;
-        passwordField.value = '';
-        passwordField.required = false;
-        roleField.value = user.rol;
-        assignedModuleField.value = user.id_modulo_asignado || '';
-    } catch (error) {
-        console.error("Error al cargar usuario para edición:", error.message);
-        await showConfirmationModal('Error', `Error al cargar usuario para edición: ${error.message}`);
-    }
-}
-
-async function deleteUser(id) {
-    const confirmed = await showConfirmationModal('Eliminar Usuario', '¿Está seguro de que desea eliminar este usuario? Esta acción no se puede deshacer.');
-    if (!confirmed) return;
-
-    try {
-        const { error } = await supabase.from('usuarios').delete().eq('id_usuario', id);
-        if (error) throw error;
-        await showConfirmationModal('Éxito', 'Usuario eliminado exitosamente.');
-        loadUsers();
-    } catch (error) {
-        console.error("Error al eliminar usuario:", error.message);
-        await showConfirmationModal('Error', `Error al eliminar usuario: ${error.message}`);
     }
 }
 
@@ -528,100 +918,6 @@ async function loadModules() {
     }
 }
 
-addModuleBtn.addEventListener('click', () => {
-    moduleFormContainer.classList.remove('hidden');
-    moduleFormTitle.textContent = 'Crear Nuevo Módulo';
-    moduleForm.reset();
-    moduleIdField.value = '';
-    moduleStatusField.checked = true;
-    moduleStatusText.textContent = 'Activo';
-});
-
-cancelModuleFormBtn.addEventListener('click', () => {
-    moduleFormContainer.classList.add('hidden');
-});
-
-moduleStatusField.addEventListener('change', () => {
-    moduleStatusText.textContent = moduleStatusField.checked ? 'Activo' : 'Inactivo';
-});
-
-moduleForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = moduleIdField.value;
-    const name = moduleNameField.value;
-    const description = moduleDescriptionField.value;
-    const status = moduleStatusField.checked ? 'activo' : 'inactivo';
-
-    const moduleData = {
-        nombre_modulo: name,
-        descripcion: description,
-        estado: status
-    };
-
-    try {
-        if (id) {
-            const confirmed = await showConfirmationModal('Editar Módulo', '¿Está seguro de que desea guardar los cambios de este módulo?');
-            if (!confirmed) return;
-
-            const { error } = await supabase.from('modulos').update(moduleData).eq('id_modulo', id);
-            if (error) throw error;
-            await showConfirmationModal('Éxito', 'Módulo actualizado exitosamente.');
-        } else {
-            const confirmed = await showConfirmationModal('Crear Módulo', '¿Está seguro de que desea crear este nuevo módulo?');
-            if (!confirmed) return;
-
-            const { error } = await supabase.from('modulos').insert(moduleData);
-            if (error) throw error;
-            await showConfirmationModal('Éxito', 'Módulo creado exitosamente.');
-        }
-        moduleFormContainer.classList.add('hidden');
-        loadModules();
-    } catch (error) {
-        console.error("Error al guardar módulo:", error.message);
-        await showConfirmationModal('Error', `Error al guardar módulo: ${error.message}`);
-    }
-});
-
-async function editModule(id) {
-    try {
-        const { data: mod, error } = await supabase.from('modulos').select('*').eq('id_modulo', id).single();
-        if (error) throw error;
-
-        moduleFormContainer.classList.remove('hidden');
-        moduleFormTitle.textContent = `Editar Módulo: ${mod.nombre_modulo}`;
-        moduleIdField.value = mod.id_modulo;
-        moduleNameField.value = mod.nombre_modulo;
-        moduleDescriptionField.value = mod.descripcion || '';
-        moduleStatusField.checked = mod.estado === 'activo';
-        moduleStatusText.textContent = mod.estado === 'activo' ? 'Activo' : 'Inactivo';
-    } catch (error) {
-        console.error("Error al cargar módulo para edición:", error.message);
-        await showConfirmationModal('Error', `Error al cargar módulo para edición: ${error.message}`);
-    }
-}
-
-async function deleteModule(id) {
-    const confirmed = await showConfirmationModal('Eliminar Módulo', '¿Está seguro de que desea eliminar este módulo? Esto también eliminará sus asignaciones de servicio y cualquier usuario asignado. Esta acción no se puede deshacer.');
-    if (!confirmed) return;
-
-    try {
-        const { error } = await supabase.from('modulos').delete().eq('id_modulo', id);
-        if (error) throw error;
-        await showConfirmationModal('Éxito', 'Módulo eliminado exitosamente.');
-        loadModules();
-    } catch (error) {
-        console.error("Error al eliminar módulo:", error.message);
-        await showConfirmationModal('Error', `Error al eliminar módulo: ${error.message}`);
-    }
-}
-
-let allModules = [];
-let allServices = [];
-let currentModuleServiceConfig = {};
-let isSavingConfig = false;
-
-// En static/js/admin_dashboard.js
-
 async function loadServicesConfig() {
     // Referencias a los elementos del DOM
     const servicesConfigHeader = document.getElementById('services-config-header');
@@ -642,10 +938,10 @@ async function loadServicesConfig() {
         allServices = services; // Asumiendo que allServices es una variable global o de ámbito superior
 
         // --- INICIO DE LA CORRECCIÓN ---
-        
+
         // 1. Crear una nueva fila de encabezado en memoria
         const newHeaderRow = document.createElement('tr');
-        
+
         // 2. Crear y añadir la primera celda "Módulo" a la fila
         const moduleHeaderCell = document.createElement('th');
         moduleHeaderCell.className = 'px-4 py-2 rounded-tl-lg';
@@ -657,7 +953,7 @@ async function loadServicesConfig() {
             const serviceHeaderCell = document.createElement('th');
             serviceHeaderCell.className = 'px-4 py-2';
             serviceHeaderCell.textContent = service.nombre_servicio;
-            
+
             // Redondear la esquina superior derecha de la última celda
             if (index === allServices.length - 1) {
                 serviceHeaderCell.classList.add('rounded-tr-lg');
@@ -667,7 +963,7 @@ async function loadServicesConfig() {
 
         // 4. Añadir la fila completa al a a la tabla
         servicesConfigHeader.appendChild(newHeaderRow);
-        
+
         // --- FIN DE LA CORRECIÓN ---
 
         // Cargar las relaciones actuales entre módulos y servicios
@@ -704,50 +1000,6 @@ async function loadServicesConfig() {
         servicesConfigBody.innerHTML = `<tr><td colspan="${allServices.length + 1}" class="text-center text-red-400 py-4">Error al cargar configuración.</td></tr>`;
     }
 }
-
-saveServicesConfigBtn.addEventListener('click', async () => {
-    const confirmed = await showConfirmationModal('Guardar Configuración de Servicios', '¿Está seguro de que desea guardar los cambios en la asignación de servicios?');
-    if (!confirmed) return;
-
-    isSavingConfig = true;
-
-    const newConfig = {};
-    servicesConfigBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        const moduleId = parseInt(checkbox.dataset.moduleId);
-        const serviceId = parseInt(checkbox.dataset.serviceId);
-        if (checkbox.checked) {
-            if (!newConfig[moduleId]) {
-                newConfig[moduleId] = [];
-            }
-            newConfig[moduleId].push(serviceId);
-        }
-    });
-
-    try {
-        const { error: deleteError } = await supabase.from('modulos_servicios').delete().neq('id', 0);
-        if (deleteError) throw deleteError;
-
-        const inserts = [];
-        for (const moduleId in newConfig) {
-            newConfig[moduleId].forEach(serviceId => {
-                inserts.push({ id_modulo: moduleId, id_servicio: serviceId });
-            });
-        }
-
-        if (inserts.length > 0) {
-            const { error: insertError } = await supabase.from('modulos_servicios').insert(inserts);
-            if (insertError) throw insertError;
-        }
-
-        await showConfirmationModal('Éxito', 'Configuración de servicios guardada exitosamente.');
-        loadServicesConfig();
-    } catch (error) {
-        console.error("Error al guardar configuración de servicios:", error.message);
-        await showConfirmationModal('Error', `Error al guardar configuración de servicios: ${error.message}`);
-    } finally {
-        isSavingConfig = false;
-    }
-});
 
 async function loadHistoryServicesFilter() {
     try {
@@ -836,82 +1088,112 @@ async function loadTurnHistory() {
     }
 }
 
-filterHistoryBtn.addEventListener('click', loadTurnHistory);
+async function loadPriorityEditor() {
+    priorityModuleSelect.innerHTML = '<option value="">-- Cargando módulos... --</option>';
+    priorityListContainer.classList.add('hidden');
 
-resetTurnsBtn.addEventListener('click', async () => {
-    const confirmed = await showConfirmationModal(
-        'Confirmar Reseteo de Turnos',
-        '¿Está ABSOLUTAMENTE seguro de que desea resetear la numeración de TODOS los turnos para el día? Esta acción no se puede deshacer y afectará a todos los servicios.'
-    );
+    try {
+        const { data: modules, error } = await supabase
+            .from('modulos')
+            .select('id_modulo, nombre_modulo')
+            .order('nombre_modulo');
+
+        if (error) throw error;
+
+        priorityModuleSelect.innerHTML = '<option value="">-- Elija un módulo --</option>';
+        modules.forEach(module => {
+            const option = document.createElement('option');
+            option.value = module.id_modulo;
+            option.textContent = module.nombre_modulo;
+            priorityModuleSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("Error cargando módulos para el editor de prioridades:", error);
+        priorityModuleSelect.innerHTML = '<option value="">Error al cargar módulos</option>';
+    }
+}
+
+// --- Funciones de Manejo de Acciones (handle...) ---
+async function editUser(id) {
+    try {
+        const { data: user, error } = await supabase.from('usuarios').select('*').eq('id_usuario', id).single();
+        if (error) throw error;
+
+        userFormContainer.classList.remove('hidden');
+        userFormTitle.textContent = `Editar Usuario: ${user.nombre_completo}`;
+        userIdField.value = user.id_usuario;
+        fullNameField.value = user.nombre_completo;
+        usernameField.value = user.nombre_usuario;
+        passwordField.value = '';
+        passwordField.required = false;
+        roleField.value = user.rol;
+        assignedModuleField.value = user.id_modulo_asignado || '';
+    } catch (error) {
+        console.error("Error al cargar usuario para edición:", error.message);
+        await showConfirmationModal('Error', `Error al cargar usuario para edición: ${error.message}`);
+    }
+}
+
+async function deleteUser(id) {
+    const confirmed = await showConfirmationModal('Eliminar Usuario', '¿Está seguro de que desea eliminar este usuario? Esta acción no se puede deshacer.');
     if (!confirmed) return;
 
     try {
-        const { error } = await supabase.from('turnos').delete().neq('id_turno', 0);
+        const { error } = await supabase.from('usuarios').delete().eq('id_usuario', id);
+        if (error) throw error;
+        await showConfirmationModal('Éxito', 'Usuario eliminado exitosamente.');
+        loadUsers();
+    } catch (error) {
+        console.error("Error al eliminar usuario:", error.message);
+        await showConfirmationModal('Error', `Error al eliminar usuario: ${error.message}`);
+    }
+}
+
+async function editModule(id) {
+    try {
+        const { data: mod, error } = await supabase.from('modulos').select('*').eq('id_modulo', id).single();
         if (error) throw error;
 
-        await showConfirmationModal('Éxito', 'Numeración de turnos reseteada exitosamente para el día.');
-        loadDashboardSummary();
-        loadRealtimeModulesStatus();
+        moduleFormContainer.classList.remove('hidden');
+        moduleFormTitle.textContent = `Editar Módulo: ${mod.nombre_modulo}`;
+        moduleIdField.value = mod.id_modulo;
+        moduleNameField.value = mod.nombre_modulo;
+        moduleDescriptionField.value = mod.descripcion || '';
+        moduleStatusField.checked = mod.estado === 'activo';
+        moduleStatusText.textContent = mod.estado === 'activo' ? 'Activo' : 'Inactivo';
     } catch (error) {
-        console.error("Error al resetear turnos:", error.message);
-        await showConfirmationModal('Error', `Error al resetear turnos: ${error.message}`);
+        console.error("Error al cargar módulo para edición:", error.message);
+        await showConfirmationModal('Error', `Error al cargar módulo para edición: ${error.message}`);
     }
-});
+}
 
-// Pega esto al final de tu admin_dashboard.js
+async function deleteModule(id) {
+    const confirmed = await showConfirmationModal('Eliminar Módulo', '¿Está seguro de que desea eliminar este módulo? Esto también eliminará sus asignaciones de servicio y cualquier usuario asignado. Esta acción no se puede deshacer.');
+    if (!confirmed) return;
 
-const generateReportBtn = document.getElementById('generate-report-btn');
-//const reportStartDate = document.getElementById('report-start-date');
-//const reportEndDate = document.getElementById('report-end-date');
-const reportTableBody = document.getElementById('report-table-body');
-const chartCanvas = document.getElementById('turns-by-employee-chart');
-let reportChart = null; // Variable para guardar la instancia del gráfico
+    try {
+        const { error } = await supabase.from('modulos').delete().eq('id_modulo', id);
+        if (error) throw error;
+        await showConfirmationModal('Éxito', 'Módulo eliminado exitosamente.');
+        loadModules();
+    } catch (error) {
+        console.error("Error al eliminar módulo:", error.message);
+        await showConfirmationModal('Error', `Error al eliminar módulo: ${error.message}`);
+    }
+}
 
-btnFilterToday.addEventListener('click', () => {
-    const today = formatDateToISO(new Date());
-    reportStartDate.value = today;
-    reportEndDate.value = today;
-    generateReportBtn.click();
-});
+async function generateReport() {
+    const start = reportStartDate?.value;
+    const end = reportEndDate?.value;
+    const employeeId = document.getElementById('employee-filter')?.value || '';
+    const moduleId = document.getElementById('module-filter')?.value || '';
 
-btnFilterWeek.addEventListener('click', () => {
-    const today = new Date();
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)));
-    const lastDayOfWeek = new Date(firstDayOfWeek);
-    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
-    reportStartDate.value = formatDateToISO(firstDayOfWeek);
-    reportEndDate.value = formatDateToISO(lastDayOfWeek);
-    generateReportBtn.click();
-});
-
-btnFilterMonth.addEventListener('click', () => {
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    reportStartDate.value = formatDateToISO(firstDayOfMonth);
-    reportEndDate.value = formatDateToISO(lastDayOfMonth);
-    generateReportBtn.click();
-});
-
-
-btnFilterAll.addEventListener('click', () => {
-    reportStartDate.value = '2020-01-01';
-    reportEndDate.value = formatDateToISO(new Date());
-    generateReportBtn.click();
-});
-
-generateReportBtn.addEventListener('click', async () => {
-    // CORRECCIÓN: Usamos los nombres de variable correctos 'reportStartDate' y 'reportEndDate'
-    const start = reportStartDate.value;
-    const end = reportEndDate.value;
-    const employeeId = document.getElementById('employee-filter').value;
-    const moduleId = document.getElementById('module-filter').value;
-    
-    const groupBy = document.querySelector('input[name="group-by"]:checked').value;
+    const groupByElement = document.querySelector('input[name="group-by"]:checked');
+    const groupBy = groupByElement ? groupByElement.value : 'funcionario';
 
     if (!start || !end) {
-        alert('Por favor, seleccione un rango de fechas.');
-        return;
+        return alert('Por favor, seleccione un rango de fechas.');
     }
 
     try {
@@ -920,15 +1202,13 @@ generateReportBtn.addEventListener('click', async () => {
         if (moduleId) apiUrl += `&module_id=${moduleId}`;
 
         const response = await fetch(apiUrl, { credentials: 'include' });
-        
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error || `Error del servidor: ${response.status}`);
         }
-        
         const data = await response.json();
 
-        // Limpiar la tabla y las tarjetas de KPIs
+        // Limpiar UI
         reportTableBody.innerHTML = '';
         document.getElementById('kpi-total-turns').textContent = '--';
         document.getElementById('kpi-avg-wait').textContent = '--';
@@ -941,21 +1221,48 @@ generateReportBtn.addEventListener('click', async () => {
         }
 
         const formatInterval = (intervalStr) => {
-            if (!intervalStr) return 'N/A';
+            if (!intervalStr || typeof intervalStr !== 'string') return 'N/A';
             const parts = intervalStr.split(':');
+            if (parts.length < 3) return 'N/A';
+            const hours = parseInt(parts[0], 10);
             const minutes = parseInt(parts[1], 10);
             const seconds = Math.round(parseFloat(parts[2]));
+            const totalMinutes = hours * 60 + minutes;
+            return `${totalMinutes}m ${seconds}s`;
+        };
+
+        const totalTurns = data.reduce((sum, row) => sum + (row.turnos_atendidos || 0), 0);
+        document.getElementById('kpi-total-turns').textContent = totalTurns;
+        
+        // Calcular promedios generales correctamente (ponderado)
+        let totalWaitSeconds = 0;
+        let totalServiceSeconds = 0;
+        data.forEach(row => {
+            const turns = row.turnos_atendidos || 0;
+            if (row.tiempo_espera_promedio) {
+                const parts = row.tiempo_espera_promedio.split(':');
+                const seconds = (parseInt(parts[0])*3600) + (parseInt(parts[1])*60) + parseFloat(parts[2]);
+                totalWaitSeconds += seconds * turns;
+            }
+            if (row.tiempo_atencion_promedio) {
+                const parts = row.tiempo_atencion_promedio.split(':');
+                const seconds = (parseInt(parts[0])*3600) + (parseInt(parts[1])*60) + parseFloat(parts[2]);
+                totalServiceSeconds += seconds * turns;
+            }
+        });
+
+        const avgWaitSeconds = totalTurns > 0 ? totalWaitSeconds / totalTurns : 0;
+        const avgServiceSeconds = totalTurns > 0 ? totalServiceSeconds / totalTurns : 0;
+        
+        const formatSeconds = (totalSeconds) => {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = Math.round(totalSeconds % 60);
             return `${minutes}m ${seconds}s`;
         };
 
-        // Calculamos los KPIs
-        const totalTurns = data.reduce((sum, row) => sum + row.turnos_atendidos, 0);
-        document.getElementById('kpi-total-turns').textContent = totalTurns;
-        // (Estos promedios son aproximados, para un promedio ponderado real necesitaríamos otra consulta)
-        document.getElementById('kpi-avg-wait').textContent = formatInterval(data[0].tiempo_espera_promedio);
-        document.getElementById('kpi-avg-service').textContent = formatInterval(data[0].tiempo_atencion_promedio);
+        document.getElementById('kpi-avg-wait').textContent = formatSeconds(avgWaitSeconds);
+        document.getElementById('kpi-avg-service').textContent = formatSeconds(avgServiceSeconds);
 
-        // Actualizamos la tabla dinámicamente
         const tableHeader = document.getElementById('table-header-group');
         tableHeader.textContent = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
         
@@ -970,7 +1277,6 @@ generateReportBtn.addEventListener('click', async () => {
             reportTableBody.appendChild(tr);
         });
 
-        // Hacemos el gráfico inteligente
         document.getElementById('chart-title').textContent = `Turnos por ${groupBy}`;
         const chartType = groupBy === 'servicio' ? 'doughnut' : 'bar';
         const labels = data.map(row => row.group_name);
@@ -991,139 +1297,22 @@ generateReportBtn.addEventListener('click', async () => {
                     borderWidth: 1
                 }]
             },
-            options: chartType === 'bar' ? { scales: { y: { beginAtZero: true } } } : {}
+            options: {
+                plugins: { legend: { labels: { color: '#9ca3af' } } },
+                scales: chartType === 'bar' ? {
+                    y: { beginAtZero: true, ticks: { color: '#9ca3af' } },
+                    x: { ticks: { color: '#9ca3af' } }
+                } : {}
+            }
         });
-
     } catch (error) {
         console.error("Error al generar el reporte:", error);
         reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
         if (reportChart) reportChart.destroy();
     }
-});
-
-// ==========================================================
-// ======> NUEVAS FUNCIONES PARA EL EDITOR DE PRIORIDADES <======
-// ==========================================================
-
-// Función principal que se llama al entrar en la vista "Gestionar Prioridades"
-async function loadPriorityEditor() {
-    priorityModuleSelect.innerHTML = '<option value="">-- Cargando módulos... --</option>';
-    priorityListContainer.classList.add('hidden');
-    
-    try {
-        const { data: modules, error } = await supabase
-            .from('modulos')
-            .select('id_modulo, nombre_modulo')
-            .order('nombre_modulo');
-        
-        if (error) throw error;
-        
-        priorityModuleSelect.innerHTML = '<option value="">-- Elija un módulo --</option>';
-        modules.forEach(module => {
-            const option = document.createElement('option');
-            option.value = module.id_modulo;
-            option.textContent = module.nombre_modulo;
-            priorityModuleSelect.appendChild(option);
-        });
-
-    } catch (error) {
-        console.error("Error cargando módulos para el editor de prioridades:", error);
-        priorityModuleSelect.innerHTML = '<option value="">Error al cargar módulos</option>';
-    }
 }
 
-// Se activa cuando el admin selecciona un módulo del dropdown
-priorityModuleSelect.addEventListener('change', async () => {
-    const moduleId = priorityModuleSelect.value;
-    if (!moduleId) {
-        priorityListContainer.classList.add('hidden');
-        return;
-    }
-
-    priorityListContainer.classList.remove('hidden');
-    prioritySortableList.innerHTML = `<p class="text-gray-400">Cargando servicios para este módulo...</p>`;
-
-    try {
-        // Buscamos los servicios asignados a este módulo, ordenados por su prioridad actual
-        const { data: services, error } = await supabase
-            .from('modulos_servicios')
-            .select(`
-                prioridad,
-                servicios (id_servicio, nombre_servicio)
-            `)
-            .eq('id_modulo', moduleId)
-            .order('prioridad', { ascending: true });
-
-        if (error) throw error;
-        
-        prioritySortableList.innerHTML = '';
-        if (services.length === 0) {
-            prioritySortableList.innerHTML = `<p class="text-gray-400">Este módulo no tiene servicios asignados. Vaya a "Configurar Servicios" para asignarlos.</p>`;
-            return;
-        }
-
-        // Creamos los elementos HTML para cada servicio
-        services.forEach(item => {
-            const service = item.servicios;
-            const listItem = document.createElement('div');
-            listItem.className = 'priority-item';
-            listItem.dataset.serviceId = service.id_servicio; // Guardamos el ID del servicio
-            
-            listItem.innerHTML = `
-                <svg class="handle w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-                <span>${service.nombre_servicio}</span>
-            `;
-            prioritySortableList.appendChild(listItem);
-        });
-
-        // ¡Magia! Activamos la funcionalidad de arrastrar y soltar en la lista
-        new Sortable(prioritySortableList, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            handle: '.handle'
-        });
-
-    } catch (error) {
-        console.error("Error cargando la lista de prioridades:", error);
-        prioritySortableList.innerHTML = `<p class="text-red-400">Error al cargar los servicios de este módulo.</p>`;
-    }
-});
-
-// Se activa al hacer clic en el botón "Guardar Prioridades"
-savePrioritiesBtn.addEventListener('click', async () => {
-    const moduleId = priorityModuleSelect.value;
-    if (!moduleId) return;
-
-    const confirmed = await showConfirmationModal('Guardar Prioridades', `¿Está seguro de que desea guardar el nuevo orden de prioridad para este módulo?`);
-    if (!confirmed) return;
-
-    // Obtenemos todos los elementos de la lista en su nuevo orden
-    const listItems = prioritySortableList.querySelectorAll('.priority-item');
-    
-    // Creamos un array de objetos para actualizar la base de datos
-    const updates = Array.from(listItems).map((item, index) => ({
-        id_modulo: parseInt(moduleId),
-        id_servicio: parseInt(item.dataset.serviceId),
-        prioridad: index + 1 // El índice (0, 1, 2...) se convierte en la prioridad (1, 2, 3...)
-    }));
-
-    try {
-        // Usamos upsert para actualizar las filas existentes.
-        // onConflict le dice a Supabase que la combinación de módulo y servicio es única.
-        const { error } = await supabase.from('modulos_servicios').upsert(updates, {
-            onConflict: 'id_modulo, id_servicio'
-        });
-
-        if (error) throw error;
-
-        await showConfirmationModal('Éxito', 'El orden de prioridad se ha guardado correctamente.');
-
-    } catch (error) {
-        console.error('Error al guardar las prioridades:', error);
-        await showConfirmationModal('Error', `No se pudo guardar el orden de prioridades: ${error.message}`);
-    }
-});
-
+// --- suscripciones realtime ---
 function setupRealtimeSubscriptions() {
     // Suscribirse a cambios en la tabla 'turnos'
     const turnosChannel = supabase.channel('admin_turnos_channel');
@@ -1208,17 +1397,60 @@ function setupRealtimeSubscriptions() {
     console.log("Suscripciones Realtime configuradas para el Panel de Administración.");
 }
 
+// ==========================================================
+// PUNTO DE ENTRADA DE LA APLICACIÓN
+// ==========================================================
+document.addEventListener('DOMContentLoaded', init);
+
+
+// navLinks.forEach(link => {
+//     link.addEventListener('click', (e) => {
+//         e.preventDefault();
+//         showView(e.currentTarget.dataset.view);
+//     });
+// });
+
+// let isSavingConfig = false;
+
+// En static/js/admin_dashboard.js
+
+
+
+
+
+
+
+// Pega esto al final de tu admin_dashboard.js
+
+//const generateReportBtn = document.getElementById('generate-report-btn');
+//const reportStartDate = document.getElementById('report-start-date');
+//const reportEndDate = document.getElementById('report-end-date');
+//const reportTableBody = document.getElementById('report-table-body');
+//const chartCanvas = document.getElementById('turns-by-employee-chart');
+//let reportChart = null; // Variable para guardar la instancia del gráfico
+
+
+
+// ==========================================================
+// ======> NUEVAS FUNCIONES PARA EL EDITOR DE PRIORIDADES <======
+// ==========================================================
+
+// Función principal que se llama al entrar en la vista "Gestionar Prioridades"
+
+
+// Se activa cuando el admin selecciona un módulo del dropdown
+
 // window.onload = () => {
 //     showView('dashboard'); // Carga la vista de Dashboard por defecto
 //     // Retrasar la configuración de las suscripciones en tiempo real
 //     setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
 // };
 
-window.onload = () => {
-    showView('dashboard');
-    setupRealtimeSubscriptions(); // Configurar suscripciones en tiempo real inmediatamente
-    loadReportFilters(); // Cargar filtros del reporte inmediatamente
-}
+// window.onload = () => {
+//     showView('dashboard');
+//     setupRealtimeSubscriptions(); // Configurar suscripciones en tiempo real inmediatamente
+//     loadReportFilters(); // Cargar filtros del reporte inmediatamente
+// }
 
 /**
  BEGIN
@@ -1284,4 +1516,99 @@ window.onload = () => {
         turnos_atendidos DESC;
 
 END;
+*/
+
+
+/* código sql para la función get_report_data "antigua"
+-- Pega este bloque completo en el Editor de SQL y presiona "RUN"
+
+CREATE OR REPLACE FUNCTION public.get_report_data(
+    start_date text,
+    end_date text,
+    group_by_param text,
+    _user_id integer DEFAULT NULL,
+    _module_id integer DEFAULT NULL
+)
+RETURNS TABLE(
+    group_name text,
+    turnos_atendidos bigint,
+    tiempo_espera_promedio interval,
+    tiempo_atencion_promedio interval
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- CASO 1: Agrupar por FUNCIONARIO
+    IF group_by_param = 'funcionario' THEN
+        RETURN QUERY
+        SELECT
+            u.nombre_completo::TEXT AS group_name,
+            COUNT(t.id_turno) AS turnos_atendidos,
+            CASE 
+                WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_llamado - t.hora_solicitud)
+                ELSE '0 seconds'::INTERVAL
+            END AS tiempo_espera_promedio,
+            CASE 
+                WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_finalizacion - t.hora_llamado)
+                ELSE '0 seconds'::INTERVAL
+            END AS tiempo_atencion_promedio
+        FROM
+            public.usuarios u
+        LEFT JOIN
+            public.logs_turnos lt ON u.id_usuario = lt.id_usuario
+        LEFT JOIN
+            public.turnos t ON lt.id_turno = t.id_turno
+        WHERE
+            t.estado = 'atendido' AND
+            lt.accion = 'finalizado' AND
+            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
+            AND (_user_id IS NULL OR u.id_usuario = _user_id)
+            AND (_module_id IS NULL OR t.id_modulo_atencion = _module_id)
+        GROUP BY
+            u.id_usuario, u.nombre_completo
+        ORDER BY
+            turnos_atendidos DESC;
+
+    -- CASO 2: Agrupar por SERVICIO
+    ELSIF group_by_param = 'servicio' THEN
+        RETURN QUERY
+        SELECT
+            s.nombre_servicio::TEXT AS group_name,
+            COUNT(t.id_turno) AS turnos_atendidos,
+            AVG(t.hora_llamado - t.hora_solicitud) AS tiempo_espera_promedio,
+            AVG(t.hora_finalizacion - t.hora_llamado) AS tiempo_atencion_promedio
+        FROM
+            public.servicios s
+        JOIN
+            public.turnos t ON s.id_servicio = t.id_servicio
+        WHERE
+            t.estado = 'atendido' AND
+            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
+        GROUP BY
+            s.nombre_servicio
+        ORDER BY
+            turnos_atendidos DESC;
+
+    -- CASO 3: Agrupar por MÓDULO
+    ELSIF group_by_param = 'modulo' THEN
+        RETURN QUERY
+        SELECT
+            m.nombre_modulo::TEXT AS group_name,
+            COUNT(t.id_turno) AS turnos_atendidos,
+            AVG(t.hora_llamado - t.hora_solicitud) AS tiempo_espera_promedio,
+            AVG(t.hora_finalizacion - t.hora_llamado) AS tiempo_atencion_promedio
+        FROM
+            public.modulos m
+        JOIN
+            public.turnos t ON m.id_modulo = t.id_modulo_atencion
+        WHERE
+            t.estado = 'atendido' AND
+            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
+        GROUP BY
+            m.nombre_modulo
+        ORDER BY
+            turnos_atendidos DESC;
+    END IF;
+END;
+$$;
 */

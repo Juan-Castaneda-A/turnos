@@ -195,3 +195,38 @@ document.addEventListener('DOMContentLoaded', function () {
         numericKeyboard.classList.remove('hidden');
     }
 });
+
+/* arguments: _id_servicio integer
+
+DECLARE
+  prefijo_ticket TEXT;
+  nuevo_numero_turno INT;
+  nuevo_turno turnos%ROWTYPE;
+BEGIN
+  -- 1. Obtener el prefijo del servicio Y BLOQUEAR LA FILA DE ESE SERVICIO.
+  -- Esto previene que otra transacción intente crear un turno para el MISMO servicio al mismo tiempo.
+  SELECT s.prefijo_ticket INTO prefijo_ticket
+  FROM public.servicios s
+  WHERE s.id_servicio = _id_servicio
+  FOR UPDATE; -- El bloqueo ahora se aplica a la fila de la tabla 'servicios'.
+
+  -- Si el servicio no existe, la consulta no encontrará filas y la función terminará.
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'El servicio con id % no existe', _id_servicio;
+  END IF;
+
+  -- 2. Calcular el siguiente número. Esta operación ahora es segura porque la fila del servicio está bloqueada.
+  -- Ya no se necesita el "FOR UPDATE" aquí.
+  SELECT COALESCE(MAX(t.numero_turno), 0) + 1 INTO nuevo_numero_turno
+  FROM public.turnos t
+  WHERE t.prefijo_turno = prefijo_ticket;
+
+  -- 3. Insertar el nuevo turno y devolver la fila creada
+  INSERT INTO public.turnos (numero_turno, prefijo_turno, id_servicio, estado)
+  VALUES (nuevo_numero_turno, prefijo_ticket, _id_servicio, 'en espera')
+  RETURNING * INTO nuevo_turno;
+
+  RETURN nuevo_turno;
+END;
+
+*/
