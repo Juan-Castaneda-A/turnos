@@ -29,3 +29,20 @@
     opacity: 0.4;
     background: #4f46e5; /* indigo-600 */
 }
+
+/* En admin_dashboard.css, añade esto al final */
+
+.report-group-btn {
+    padding: 8px 16px;
+    background-color: #374151; /* gray-700 */
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+input[type="radio"]:checked + .report-group-btn {
+    background-color: #3b82f6; /* blue-500 */
+    color: white;
+    font-weight: 600;
+}

@@ -71,6 +71,10 @@ const btnFilterToday = document.getElementById('filter-today');
 const btnFilterWeek = document.getElementById('filter-week');
 const btnFilterMonth = document.getElementById('filter-month');
 const btnFilterAll = document.getElementById('filter-all');
+
+const reportStartDate = document.getElementById('report-start-date'); // <--- Nombre original y correcto
+const reportEndDate = document.getElementById('report-end-date');     // <--- Nombre original y correcto
+
 const reportStartDateInput = document.getElementById('report-start-date');
 const reportEndDateInput = document.getElementById('report-end-date');
 
@@ -857,27 +861,26 @@ resetTurnsBtn.addEventListener('click', async () => {
 // Pega esto al final de tu admin_dashboard.js
 
 const generateReportBtn = document.getElementById('generate-report-btn');
-const reportStartDate = document.getElementById('report-start-date');
-const reportEndDate = document.getElementById('report-end-date');
+//const reportStartDate = document.getElementById('report-start-date');
+//const reportEndDate = document.getElementById('report-end-date');
 const reportTableBody = document.getElementById('report-table-body');
 const chartCanvas = document.getElementById('turns-by-employee-chart');
 let reportChart = null; // Variable para guardar la instancia del gráfico
 
 btnFilterToday.addEventListener('click', () => {
     const today = formatDateToISO(new Date());
-    reportStartDateInput.value = today;
-    reportEndDateInput.value = today;
-    generateReportBtn.click(); // Simula clic en generar reporte
+    reportStartDate.value = today;
+    reportEndDate.value = today;
+    generateReportBtn.click();
 });
 
 btnFilterWeek.addEventListener('click', () => {
     const today = new Date();
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))); // Lunes de esta semana
+    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1)));
     const lastDayOfWeek = new Date(firstDayOfWeek);
-    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6); // Domingo de esta semana
-
-    reportStartDateInput.value = formatDateToISO(firstDayOfWeek);
-    reportEndDateInput.value = formatDateToISO(lastDayOfWeek);
+    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + 6);
+    reportStartDate.value = formatDateToISO(firstDayOfWeek);
+    reportEndDate.value = formatDateToISO(lastDayOfWeek);
     generateReportBtn.click();
 });
 
@@ -885,24 +888,26 @@ btnFilterMonth.addEventListener('click', () => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-    reportStartDateInput.value = formatDateToISO(firstDayOfMonth);
-    reportEndDateInput.value = formatDateToISO(lastDayOfMonth);
+    reportStartDate.value = formatDateToISO(firstDayOfMonth);
+    reportEndDate.value = formatDateToISO(lastDayOfMonth);
     generateReportBtn.click();
 });
 
+
 btnFilterAll.addEventListener('click', () => {
-    reportStartDateInput.value = '2020-01-01'; // Una fecha lejana en el pasado
-    reportEndDateInput.value = formatDateToISO(new Date());
+    reportStartDate.value = '2020-01-01';
+    reportEndDate.value = formatDateToISO(new Date());
     generateReportBtn.click();
 });
 
 generateReportBtn.addEventListener('click', async () => {
-    const start = reportStartDateInput.value;
-    const end = reportEndDateInput.value;
-
+    // CORRECCIÓN: Usamos los nombres de variable correctos 'reportStartDate' y 'reportEndDate'
+    const start = reportStartDate.value;
+    const end = reportEndDate.value;
     const employeeId = document.getElementById('employee-filter').value;
     const moduleId = document.getElementById('module-filter').value;
+    
+    const groupBy = document.querySelector('input[name="group-by"]:checked').value;
 
     if (!start || !end) {
         alert('Por favor, seleccione un rango de fechas.');
@@ -910,13 +915,9 @@ generateReportBtn.addEventListener('click', async () => {
     }
 
     try {
-        let apiUrl = `/api/reports?start=${start}&end=${end}`;
-        if (employeeId) {
-            apiUrl += `&user_id=${employeeId}`;
-        }
-        if (moduleId) {
-            apiUrl += `&module_id=${moduleId}`;
-        }
+        let apiUrl = `/api/reports?start=${start}&end=${end}&group_by=${groupBy}`;
+        if (employeeId) apiUrl += `&user_id=${employeeId}`;
+        if (moduleId) apiUrl += `&module_id=${moduleId}`;
 
         const response = await fetch(apiUrl, { credentials: 'include' });
         
@@ -927,66 +928,75 @@ generateReportBtn.addEventListener('click', async () => {
         
         const data = await response.json();
 
-        // Limpiar la tabla anterior
+        // Limpiar la tabla y las tarjetas de KPIs
         reportTableBody.innerHTML = '';
+        document.getElementById('kpi-total-turns').textContent = '--';
+        document.getElementById('kpi-avg-wait').textContent = '--';
+        document.getElementById('kpi-avg-service').textContent = '--';
+        if (reportChart) reportChart.destroy();
+
         if (data.length === 0) {
-            reportTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">No se encontraron datos para este rango de fechas.</td></tr>`;
-            if (reportChart) reportChart.destroy(); // Destruir gráfico anterior si existe
+            reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">No se encontraron datos.</td></tr>`;
             return;
         }
 
-        // Rellenar la tabla
+        const formatInterval = (intervalStr) => {
+            if (!intervalStr) return 'N/A';
+            const parts = intervalStr.split(':');
+            const minutes = parseInt(parts[1], 10);
+            const seconds = Math.round(parseFloat(parts[2]));
+            return `${minutes}m ${seconds}s`;
+        };
+
+        // Calculamos los KPIs
+        const totalTurns = data.reduce((sum, row) => sum + row.turnos_atendidos, 0);
+        document.getElementById('kpi-total-turns').textContent = totalTurns;
+        // (Estos promedios son aproximados, para un promedio ponderado real necesitaríamos otra consulta)
+        document.getElementById('kpi-avg-wait').textContent = formatInterval(data[0].tiempo_espera_promedio);
+        document.getElementById('kpi-avg-service').textContent = formatInterval(data[0].tiempo_atencion_promedio);
+
+        // Actualizamos la tabla dinámicamente
+        const tableHeader = document.getElementById('table-header-group');
+        tableHeader.textContent = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
+        
         data.forEach(row => {
             const tr = document.createElement('tr');
-            // Formatear el intervalo de tiempo (ej: "00:05:30.123" -> "5m 30s")
-            const formatInterval = (intervalStr) => {
-                if (!intervalStr) return 'N/A';
-                const parts = intervalStr.split(':');
-                const minutes = parseInt(parts[1], 10);
-                const seconds = Math.round(parseFloat(parts[2]));
-                return `${minutes}m ${seconds}s`;
-            };
-
             tr.innerHTML = `
-                <td class="p-3">${row.nombre_completo}</td>
+                <td class="p-3">${row.group_name}</td>
                 <td class="p-3 text-center">${row.turnos_atendidos}</td>
                 <td class="p-3">${formatInterval(row.tiempo_espera_promedio)}</td>
+                <td class="p-3">${formatInterval(row.tiempo_atencion_promedio)}</td>
             `;
             reportTableBody.appendChild(tr);
         });
 
-        // Preparar datos para el gráfico
-        const labels = data.map(row => row.nombre_completo);
+        // Hacemos el gráfico inteligente
+        document.getElementById('chart-title').textContent = `Turnos por ${groupBy}`;
+        const chartType = groupBy === 'servicio' ? 'doughnut' : 'bar';
+        const labels = data.map(row => row.group_name);
         const chartData = data.map(row => row.turnos_atendidos);
 
-        // Destruir el gráfico anterior si existe para redibujar
-        if (reportChart) {
-            reportChart.destroy();
-        }
-
-        // Crear el nuevo gráfico
         reportChart = new Chart(chartCanvas, {
-            type: 'bar', // Tipo de gráfico: barras
+            type: chartType,
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Turnos Atendidos',
                     data: chartData,
-                    backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                    borderColor: 'rgba(59, 130, 246, 1)',
+                    backgroundColor: chartType === 'bar' ? 'rgba(59, 130, 246, 0.5)' : [
+                        'rgba(59, 130, 246, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(245, 158, 11, 0.7)',
+                        'rgba(16, 185, 129, 0.7)', 'rgba(139, 92, 246, 0.7)', 'rgba(236, 72, 153, 0.7)'
+                    ],
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
                     borderWidth: 1
                 }]
             },
-            options: {
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
+            options: chartType === 'bar' ? { scales: { y: { beginAtZero: true } } } : {}
         });
 
     } catch (error) {
         console.error("Error al generar el reporte:", error);
-        reportTableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
+        reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
         if (reportChart) reportChart.destroy();
     }
 });
@@ -1209,3 +1219,69 @@ window.onload = () => {
     setupRealtimeSubscriptions(); // Configurar suscripciones en tiempo real inmediatamente
     loadReportFilters(); // Cargar filtros del reporte inmediatamente
 }
+
+/**
+ BEGIN
+
+    RETURN QUERY
+
+    SELECT
+
+        u.id_usuario,
+
+        u.nombre_completo::TEXT,
+
+        COUNT(t.id_turno) AS turnos_atendidos,
+
+        CASE 
+
+            WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_llamado - t.hora_solicitud)
+
+            ELSE '0 seconds'::INTERVAL
+
+        END AS tiempo_espera_promedio,
+
+        CASE 
+
+            WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_finalizacion - t.hora_llamado)
+
+            ELSE '0 seconds'::INTERVAL
+
+        END AS tiempo_atencion_promedio
+
+    FROM
+
+        public.usuarios u
+
+    LEFT JOIN
+
+        public.logs_turnos lt ON u.id_usuario = lt.id_usuario
+
+    LEFT JOIN
+
+        public.turnos t ON lt.id_turno = t.id_turno
+
+    WHERE
+
+        t.estado = 'atendido' AND
+
+        lt.accion = 'finalizado' AND
+
+        t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
+
+        -- Lógica de filtro opcional: si el parámetro es NULL, ignora el filtro.
+
+        AND (_user_id IS NULL OR u.id_usuario = _user_id)
+
+        AND (_module_id IS NULL OR t.id_modulo_atencion = _module_id)
+
+    GROUP BY
+
+        u.id_usuario, u.nombre_completo
+
+    ORDER BY
+
+        turnos_atendidos DESC;
+
+END;
+*/

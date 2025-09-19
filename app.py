@@ -542,16 +542,24 @@ def register_cliente():
 @app.route('/api/check-cliente/<identificacion>')
 def check_cliente(identificacion):
     """
-    Verifica si un cliente existe por su número de identificación
-    y devuelve su nombre si lo encuentra.
+    Verifica si un cliente existe por su número de identificación.
     """
     try:
-        response = supabase.table('clientes').select('nombre_completo').eq('numero_identificacion', identificacion).maybe_Single().execute()
+        # CORRECCIÓN: Usamos el nombre correcto de la función con guion bajo: maybe_single()
+        response = supabase.table('clientes') \
+            .select('nombre_completo') \
+            .eq('numero_identificacion', identificacion) \
+            .maybe_single() \
+            .execute()
+
+        # La lógica de aquí en adelante ya era correcta
         if response.data:
-            return jsonify(response.data) # Devuelve {"nombre_completo": "Juan Perez"} si lo encuentra
+            return jsonify(response.data)
         else:
-            return jsonify(None) # Devuelve null si no lo encuentra
+            return jsonify(None)
+            
     except Exception as e:
+        logging.error(f"Error en check_cliente para {identificacion}: {e}")
         return jsonify({"error": str(e)}), 500
 
 # @app.route('/api/text-to-speech', methods=['POST'])

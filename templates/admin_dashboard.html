@@ -1,6 +1,7 @@
 <!-- templates/admin_dashboard.html -->
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,11 +14,12 @@
     <link href="../static/css/admin_dashboard.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body class="bg-gray-800 text-gray-200 font-sans antialiased">
     <div class="flex flex-col lg:flex-row min-h-screen">
-        
+
         <aside class="w-full lg:w-72 bg-gray-900 p-6 shadow-xl flex flex-col">
-            
+
             <div class="mb-10 flex justify-center">
                 <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="h-16">
             </div>
@@ -25,92 +27,148 @@
             <nav class="flex-grow">
                 <ul>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="dashboard">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="dashboard">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                            </svg>
                             Inicio
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="manage-users">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.69c.125.13.248.26.37.39a6.375 6.375 0 01-3.834 1.06M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="manage-users">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.69c.125.13.248.26.37.39a6.375 6.375 0 01-3.834 1.06M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Gestionar Usuarios
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="manage-modules">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.375 .75A3 3 0 017.5 21H6a3 3 0 01-3-3v-1.5a3 3 0 013-3h1.5a3 3 0 013 3v.75m0-6V7.5a3 3 0 00-3-3H6a3 3 0 00-3 3v1.5a3 3 0 003 3h1.5a3 3 0 003-3m0 0h1.5m-1.5 0v-1.5m0 0A2.25 2.25 0 0113.5 9h1.5a2.25 2.25 0 012.25 2.25v1.5A2.25 2.25 0 0115 15h-1.5a2.25 2.25 0 01-2.25-2.25z" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="manage-modules">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 17.25v1.007a3 3 0 01-.375 .75A3 3 0 017.5 21H6a3 3 0 01-3-3v-1.5a3 3 0 013-3h1.5a3 3 0 013 3v.75m0-6V7.5a3 3 0 00-3-3H6a3 3 0 00-3 3v1.5a3 3 0 003 3h1.5a3 3 0 003-3m0 0h1.5m-1.5 0v-1.5m0 0A2.25 2.25 0 0113.5 9h1.5a2.25 2.25 0 012.25 2.25v1.5A2.25 2.25 0 0115 15h-1.5a2.25 2.25 0 01-2.25-2.25z" />
+                            </svg>
                             Gestionar Módulos
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="configure-services">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="configure-services">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+                            </svg>
                             Configurar Servicios
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="manage-priorities">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="manage-priorities">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 4.5h14.25M3 9h9.75M3 13.5h9.75m4.5-4.5v12m0 0l-3.75-3.75M17.25 21L21 17.25" />
+                            </svg>
                             Gestionar Prioridades
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="reports">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h3.75c.621 0 1.125.504 1.125 1.125v6.75c0 .621-.504 1.125-1.125 1.125h-3.75A1.125 1.125 0 013 21v-7.875zM12.75 8.625c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-3.75a1.125 1.125 0 01-1.125-1.125V8.625zM21 16.875c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125v3.375c0 .621-.504 1.125-1.125 1.125h-3.75a1.125 1.125 0 01-1.125-1.125V16.875z" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="reports">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M3 13.125C3 12.504 3.504 12 4.125 12h3.75c.621 0 1.125.504 1.125 1.125v6.75c0 .621-.504 1.125-1.125 1.125h-3.75A1.125 1.125 0 013 21v-7.875zM12.75 8.625c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-3.75a1.125 1.125 0 01-1.125-1.125V8.625zM21 16.875c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125v3.375c0 .621-.504 1.125-1.125 1.125h-3.75a1.125 1.125 0 01-1.125-1.125V16.875z" />
+                            </svg>
                             Reportes Estadísticos
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="turn-history">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="turn-history">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Historial de Turnos
                         </a>
                     </li>
                     <li>
-                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200" data-view="notary-settings">
-                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-1.008 1.11-1.226.55-.218 1.19-.218 1.74 0 .55.218 1.02.684 1.11 1.226l.082.498a4.5 4.5 0 016.92 2.316l.32.318c.44.44.66.99.66 1.546l0 .322a4.5 4.5 0 01-2.317 6.92l-.498.082c-.542.09-1.008.56-1.226 1.11-.218.55-.218 1.19 0 1.74.218.55.684 1.02 1.226 1.11l.498.082a4.5 4.5 0 01-2.316 6.92l-.318.32c-.44.44-.99.66-1.546.66l-.322 0a4.5 4.5 0 01-6.92-2.317l-.082-.498c-.09-.542-.56-1.008-1.11-1.226-.55-.218-1.19-.218-1.74 0-.55.218-1.02.684-1.11 1.226l-.082.498a4.5 4.5 0 01-6.92-2.316l-.32-.318c-.44-.44-.66-.99-.66-1.546l0-.322a4.5 4.5 0 012.317-6.92l.498-.082c.542-.09 1.008-.56 1.226-1.11.218-.55.218-1.19 0-1.74-.218-.55-.684-1.02-1.226-1.11l-.498-.082a4.5 4.5 0 012.316-6.92l.318-.32c.44-.44.99-.66 1.546-.66l.322 0a4.5 4.5 0 016.92 2.317l.082.498z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <a href="#"
+                            class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
+                            data-view="notary-settings">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9.594 3.94c.09-.542.56-1.008 1.11-1.226.55-.218 1.19-.218 1.74 0 .55.218 1.02.684 1.11 1.226l.082.498a4.5 4.5 0 016.92 2.316l.32.318c.44.44.66.99.66 1.546l0 .322a4.5 4.5 0 01-2.317 6.92l-.498.082c-.542.09-1.008.56-1.226 1.11-.218.55-.218 1.19 0 1.74.218.55.684 1.02 1.226 1.11l.498.082a4.5 4.5 0 01-2.316 6.92l-.318.32c-.44.44-.99.66-1.546.66l-.322 0a4.5 4.5 0 01-6.92-2.317l-.082-.498c-.09-.542-.56-1.008-1.11-1.226-.55-.218-1.19-.218-1.74 0-.55.218-1.02.684-1.11 1.226l-.082.498a4.5 4.5 0 01-6.92-2.316l-.32-.318c-.44-.44-.66-.99-.66-1.546l0-.322a4.5 4.5 0 012.317-6.92l.498-.082c.542-.09 1.008-.56 1.226-1.11.218-.55.218-1.19 0-1.74-.218-.55-.684-1.02-1.226-1.11l-.498-.082a4.5 4.5 0 012.316-6.92l.318-.32c.44-.44.99-.66 1.546-.66l.322 0a4.5 4.5 0 016.92 2.317l.082.498z" />
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             Configuración Notaría
                         </a>
                     </li>
                 </ul>
             </nav>
-            
+
             <div class="mt-auto">
-                <a href="{{ url_for('logout') }}" class="flex items-center px-4 py-3 rounded-lg text-white font-bold bg-red-600 hover:bg-red-700 transition-colors duration-200">
-                    <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                <a href="{{ url_for('logout') }}"
+                    class="flex items-center px-4 py-3 rounded-lg text-white font-bold bg-red-600 hover:bg-red-700 transition-colors duration-200">
+                    <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
                     Cerrar Sesión
                 </a>
             </div>
         </aside>
 
         <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-    
+
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="mb-6 space-y-3">
-                    {% for category, message in messages %}
-                        <div class="p-4 rounded-lg text-lg font-semibold
+            {% if messages %}
+            <div class="mb-6 space-y-3">
+                {% for category, message in messages %}
+                <div class="p-4 rounded-lg text-lg font-semibold
                                     {% if category == 'success' %}bg-green-600 text-white
                                     {% elif category == 'warning' %}bg-yellow-500 text-gray-900
                                     {% elif category == 'error' %}bg-red-600 text-white
                                     {% elif category == 'info' %}bg-blue-600 text-white
                                     {% else %}bg-gray-700 text-white{% endif %}">
-                            {{ message }}
-                        </div>
-                    {% endfor %}
-                    </div>
-                {% endif %}
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endwith %}
-        
+
             <section id="dashboard-view" class="view-section bg-gray-900 p-6 rounded-2xl shadow-lg">
                 <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Dashboard General</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                     <div class="bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Turnos en Espera</p>
+                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Turnos en Espera
+                        </p>
                         <p class="text-5xl font-extrabold text-green-400" id="turns-waiting">0</p>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-xl shadow-md text-center">
-                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Turnos Atendidos Hoy</p>
+                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Turnos Atendidos
+                            Hoy</p>
                         <p class="text-5xl font-extrabold text-blue-400" id="turns-attended-today">0</p>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-xl shadow-md text-center">
@@ -130,36 +188,47 @@
                             </tr>
                         </thead>
                         <tbody id="realtime-modules-status-body" class="divide-y divide-gray-700">
-                           </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
-        
+
             <section id="manage-users-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
                 <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Usuarios</h2>
-                <button id="add-user-btn" class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Crear Nuevo Usuario</button>
-        
+                <button id="add-user-btn"
+                    class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Crear
+                    Nuevo Usuario</button>
+
                 <div id="user-form-container" class="hidden mb-8 p-6 bg-gray-800 rounded-lg">
                     <h3 class="text-xl font-bold text-white mb-4" id="user-form-title">Crear Usuario</h3>
                     <form id="user-form" class="space-y-4">
                         <input type="hidden" id="user-id-field">
-                        <input type="text" id="full-name-field" placeholder="Nombre Completo" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <input type="text" id="username-field" placeholder="Nombre de Usuario" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <input type="password" id="password-field" placeholder="Contraseña (dejar en blanco para no cambiar)" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <select id="role-field" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="full-name-field" placeholder="Nombre Completo" required
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="username-field" placeholder="Nombre de Usuario" required
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="password" id="password-field"
+                            placeholder="Contraseña (dejar en blanco para no cambiar)"
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="role-field"
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="funcionario">Funcionario</option>
                             <option value="administrador">Administrador</option>
                         </select>
-                        <select id="assigned-module-field" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="assigned-module-field"
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="">Sin Módulo Asignado</option>
                         </select>
                         <div class="flex justify-end gap-4 pt-4">
-                            <button type="submit" id="save-user-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Usuario</button>
-                            <button type="button" id="cancel-user-form-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                            <button type="submit" id="save-user-btn"
+                                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar
+                                Usuario</button>
+                            <button type="button" id="cancel-user-form-btn"
+                                class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
                         </div>
                     </form>
                 </div>
-        
+
                 <div class="overflow-x-auto bg-gray-800 rounded-lg">
                     <table class="w-full text-left">
                         <thead>
@@ -172,39 +241,49 @@
                             </tr>
                         </thead>
                         <tbody id="users-table-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
-        
+
             <section id="manage-modules-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
                 <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Módulos</h2>
-                <button id="add-module-btn" class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Crear Nuevo Módulo</button>
-        
+                <button id="add-module-btn"
+                    class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">Crear
+                    Nuevo Módulo</button>
+
                 <div id="module-form-container" class="hidden mb-8 p-6 bg-gray-800 rounded-lg">
-                     <h3 class="text-xl font-bold text-white mb-4" id="module-form-title">Crear Módulo</h3>
-                     <form id="module-form" class="space-y-4">
+                    <h3 class="text-xl font-bold text-white mb-4" id="module-form-title">Crear Módulo</h3>
+                    <form id="module-form" class="space-y-4">
                         <input type="hidden" id="module-id-field">
-                        <input type="text" id="module-name-field" placeholder="Nombre del Módulo (ej. Módulo 01)" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
-                        <textarea id="module-description-field" placeholder="Descripción (opcional)" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg h-24"></textarea>
+                        <input type="text" id="module-name-field" placeholder="Nombre del Módulo (ej. Módulo 01)"
+                            required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                        <textarea id="module-description-field" placeholder="Descripción (opcional)"
+                            class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg h-24"></textarea>
                         <label class="flex items-center text-white cursor-pointer">
                             <span class="mr-3">Estado:</span>
                             <div class="relative">
-                                <input type="checkbox" id="module-status-field" class="sr-only"> <div class="toggle-switch-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
-                                <div class="toggle-switch-dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+                                <input type="checkbox" id="module-status-field" class="sr-only">
+                                <div class="toggle-switch-bg block bg-gray-600 w-14 h-8 rounded-full"></div>
+                                <div
+                                    class="toggle-switch-dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition">
+                                </div>
                             </div>
                             <span id="module-status-text" class="ml-3 text-gray-300">Activo</span>
                         </label>
                         <div class="flex justify-end gap-4 pt-4">
-                            <button type="submit" id="save-module-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Módulo</button>
-                            <button type="button" id="cancel-module-form-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                            <button type="submit" id="save-module-btn"
+                                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar
+                                Módulo</button>
+                            <button type="button" id="cancel-module-form-btn"
+                                class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
                         </div>
-                     </form>
+                    </form>
                 </div>
-        
+
                 <div class="overflow-x-auto bg-gray-800 rounded-lg">
                     <table class="w-full text-left">
-                         <thead>
+                        <thead>
                             <tr class="bg-gray-700 text-sm font-semibold text-gray-400 uppercase">
                                 <th class="p-4">Nombre del Módulo</th>
                                 <th class="p-4">Descripción</th>
@@ -213,103 +292,149 @@
                             </tr>
                         </thead>
                         <tbody id="modules-table-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
-        
+
             <section id="configure-services-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Configurar Servicios por Módulo</h2>
-                <p class="text-gray-400 mb-6">Marque las casillas para indicar qué servicios puede atender cada módulo.</p>
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Configurar Servicios por
+                    Módulo</h2>
+                <p class="text-gray-400 mb-6">Marque las casillas para indicar qué servicios puede atender cada módulo.
+                </p>
                 <div class="overflow-x-auto bg-gray-800 rounded-lg">
                     <table class="w-full text-left">
-                        <thead id="services-config-header" class="bg-gray-700 text-sm font-semibold text-gray-400 uppercase">
-                            </thead>
+                        <thead id="services-config-header"
+                            class="bg-gray-700 text-sm font-semibold text-gray-400 uppercase">
+                        </thead>
                         <tbody id="services-config-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
-                <button id="save-services-config-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Configuración</button>
+                <button id="save-services-config-btn"
+                    class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar
+                    Configuración</button>
             </section>
-        
+
             <section id="reports-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Reportes Estadísticos</h2>
-            
-                <div class="mb-6 p-4 bg-gray-800 rounded-lg space-y-4">
-                    <div class="flex flex-wrap gap-2">
-                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-today">Hoy</button>
-                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-week">Esta Semana</button>
-                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-month">Este Mes</button>
-                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600" id="filter-all">Histórico</button>
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Reportes Estadísticos
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-gray-800 p-6 rounded-xl text-center">
+                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Total de Turnos</p>
+                        <p class="text-5xl font-extrabold text-white" id="kpi-total-turns">--</p>
                     </div>
-                
-                    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                        <div class="lg:col-span-2 grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="report-start-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha Inicio</label>
-                                <input type="date" id="report-start-date" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
-                            </div>
-                            <div>
-                                <label for="report-end-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha Fin</label>
-                                <input type="date" id="report-end-date" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
-                            </div>
-                        </div>
-                
-                        <div>
-                            <label for="employee-filter" class="block text-sm font-semibold text-gray-400 mb-1">Empleado</label>
-                            <select id="employee-filter" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
-                                <option value="">Todos los Empleados</option>
-                                </select>
-                        </div>
-                
-                        <div>
-                            <label for="module-filter" class="block text-sm font-semibold text-gray-400 mb-1">Módulo</label>
-                            <select id="module-filter" class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
-                                <option value="">Todos los Módulos</option>
-                                </select>
-                        </div>
-                
-                        <div class="flex items-end">
-                            <button id="generate-report-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg text-sm h-10">Generar</button>
-                        </div>
+                    <div class="bg-gray-800 p-6 rounded-xl text-center">
+                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Tiempo Prom. de
+                            Espera</p>
+                        <p class="text-5xl font-extrabold text-blue-400" id="kpi-avg-wait">--</p>
+                    </div>
+                    <div class="bg-gray-800 p-6 rounded-xl text-center">
+                        <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Tiempo Prom. de
+                            Atención</p>
+                        <p class="text-5xl font-extrabold text-green-400" id="kpi-avg-service">--</p>
                     </div>
                 </div>
-            
+
+                <div class="mb-6 p-4 bg-gray-800 rounded-lg space-y-4">
+                    <div class="flex flex-wrap gap-2">
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600"
+                            id="filter-today">Hoy</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600"
+                            id="filter-week">Esta Semana</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600"
+                            id="filter-month">Este Mes</button>
+                        <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600"
+                            id="filter-all">Histórico</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border-t border-gray-700 pt-4">
+                        <div>
+                            <label for="report-start-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha
+                                Inicio</label>
+                            <input type="date" id="report-start-date"
+                                class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label for="report-end-date" class="block text-sm font-semibold text-gray-400 mb-1">Fecha
+                                Fin</label>
+                            <input type="date" id="report-end-date"
+                                class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label for="employee-filter"
+                                class="block text-sm font-semibold text-gray-400 mb-1">Empleado</label>
+                            <select id="employee-filter"
+                                class="w-full p-2 text-gray-900 bg-gray-100 border border-gray-600 rounded-lg text-sm">
+                                <option value="">Todos los Empleados</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-700 pt-4">
+                        <label class="block text-sm font-semibold text-gray-400 mb-2">Agrupar Reporte Por:</label>
+                        <div id="report-group-by" class="flex flex-wrap gap-2">
+                            <input type="radio" name="group-by" value="funcionario" id="group-by-employee"
+                                class="sr-only" checked>
+                            <label for="group-by-employee" class="report-group-btn">Funcionario</label>
+
+                            <input type="radio" name="group-by" value="servicio" id="group-by-service" class="sr-only">
+                            <label for="group-by-service" class="report-group-btn">Servicio</label>
+
+                            <input type="radio" name="group-by" value="modulo" id="group-by-module" class="sr-only">
+                            <label for="group-by-module" class="report-group-btn">Módulo</label>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button id="generate-report-btn"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg">Generar
+                            Reporte</button>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-gray-800 p-6 rounded-lg">
-                        <h3 class="text-xl font-bold text-white mb-4">Turnos Atendidos por Funcionario</h3>
+                        <h3 class="text-xl font-bold text-white mb-4" id="chart-title">Resultados del Reporte</h3>
                         <div>
                             <canvas id="turns-by-employee-chart"></canvas>
                         </div>
                     </div>
                     <div class="bg-gray-800 p-6 rounded-lg">
                         <h3 class="text-xl font-bold text-white mb-4">Datos Detallados</h3>
-                        <div class="overflow-x-auto">
+                        <div class="overflow-x-auto max-h-96">
                             <table class="w-full text-left">
                                 <thead>
                                     <tr class="text-sm font-semibold text-gray-400 uppercase">
-                                        <th class="p-3">Funcionario</th>
+                                        <th class="p-3" id="table-header-group">Funcionario</th>
                                         <th class="p-3">Turnos Atendidos</th>
                                         <th class="p-3">T. Espera Prom.</th>
+                                        <th class="p-3">T. Atención Prom.</th>
                                     </tr>
                                 </thead>
                                 <tbody id="report-table-body" class="divide-y divide-gray-700">
-                                    </tbody>
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </section>
-        
+
             <section id="turn-history-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Historial Completo de Turnos</h2>
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Historial Completo de
+                    Turnos</h2>
                 <div class="mb-6 flex flex-col md:flex-row gap-4 items-center">
-                    <input type="date" id="history-start-date" class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" title="Fecha de inicio">
-                    <input type="date" id="history-end-date" class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" title="Fecha de fin">
-                    <select id="history-service-filter" class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                    <input type="date" id="history-start-date"
+                        class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" title="Fecha de inicio">
+                    <input type="date" id="history-end-date"
+                        class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg" title="Fecha de fin">
+                    <select id="history-service-filter"
+                        class="flex-1 w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
                         <option value="">Filtrar por Servicio</option>
                     </select>
-                    <button id="filter-history-btn" class="w-full md:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg">Filtrar</button>
+                    <button id="filter-history-btn"
+                        class="w-full md:w-auto bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg">Filtrar</button>
                 </div>
                 <div class="overflow-x-auto bg-gray-800 rounded-lg">
                     <table class="w-full text-left">
@@ -326,49 +451,65 @@
                             </tr>
                         </thead>
                         <tbody id="turn-history-table-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
-        
+
             <section id="notary-settings-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Configuración General</h2>
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Configuración General
+                </h2>
                 <div class="bg-gray-800 p-6 rounded-lg mb-6">
                     <h3 class="text-xl font-bold text-white mb-2">Resetear Numeración de Turnos</h3>
-                    <p class="text-gray-400 mb-4">Esta acción eliminará todos los turnos del día para empezar desde cero. ¡Esta acción no se puede deshacer!</p>
-                    <button id="reset-turns-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2A9 9 0 111 12a9 9 0 0118 0z"></path></svg>
+                    <p class="text-gray-400 mb-4">Esta acción eliminará todos los turnos del día para empezar desde
+                        cero. ¡Esta acción no se puede deshacer!</p>
+                    <button id="reset-turns-btn"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2A9 9 0 111 12a9 9 0 0118 0z"></path>
+                        </svg>
                         Resetear Turnos
                     </button>
                 </div>
             </section>
             <section id="manage-priorities-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
-                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Prioridades de Servicios</h2>
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Prioridades de
+                    Servicios</h2>
                 <div class="max-w-md mb-6">
-                    <label for="priority-module-select" class="block text-sm font-semibold text-gray-400 mb-2">Seleccione un Módulo para configurar sus prioridades:</label>
-                    <select id="priority-module-select" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label for="priority-module-select"
+                        class="block text-sm font-semibold text-gray-400 mb-2">Seleccione un Módulo para configurar sus
+                        prioridades:</label>
+                    <select id="priority-module-select"
+                        class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">-- Elija un módulo --</option>
                     </select>
                 </div>
 
                 <div id="priority-list-container" class="hidden">
-                    <p class="text-gray-400 mb-4">Arrastre y suelte los servicios para ordenarlos. El que esté más arriba tendrá la mayor prioridad.</p>
+                    <p class="text-gray-400 mb-4">Arrastre y suelte los servicios para ordenarlos. El que esté más
+                        arriba tendrá la mayor prioridad.</p>
                     <div id="priority-sortable-list" class="space-y-3">
-                        </div>
-                    <button id="save-priorities-btn" class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Prioridades</button>
+                    </div>
+                    <button id="save-priorities-btn"
+                        class="mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar
+                        Prioridades</button>
                 </div>
             </section>
-        
+
         </main>
     </div>
 
-    <div id="confirmation-modal" class="view-section fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div id="confirmation-modal"
+        class="view-section fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
             <h3 class="text-2xl font-bold text-white mb-4" id="modal-title">Título del Modal</h3>
             <p class="text-gray-300 mb-6" id="modal-message">Mensaje del modal.</p>
             <div class="flex justify-center gap-4">
-                <button id="modal-confirm-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar</button>
-                <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
+                <button id="modal-confirm-btn"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar</button>
+                <button id="modal-cancel-btn"
+                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
             </div>
         </div>
     </div>
@@ -379,4 +520,5 @@
     </script>
     <script type="module" src="../static/js/admin_dashboard.js"></script>
 </body>
+
 </html>
