@@ -209,6 +209,7 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
 
     // Obtenemos la referencia al panel que vamos a animar
     const turnDisplaySection = document.getElementById('current-turn-display');
+    const callSound = document.getElementById('call-sound'); // Referencia al sonido de campana
 
     const turnoCompleto = `${prefijoTurno}-${String(numeroTurno).padStart(3, '0')}`;
     const moduloCompleto = `Diríjase al Módulo ${nombreModulo.split(' ')[1]}`;
@@ -250,7 +251,21 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
     // Esto soluciona el problema de que se quede "pegado" en pantalla completa.
     setTimeout(shrinkPanel, 8000); // 8 segundos como máximo
 
-    window.speechSynthesis.speak(utterance);
+    //Inicio de la nueva lógica de orquestación
+    callSound.currentTime = 0; // asegurar de que el sonido esté al inicio
+    const playSpeechAfterChime = () => {
+        window.speechSynthesis.speak(utterance); //habla la voz del turno
+        callSound.removeEventListener('ended', playSpeechAfterChime); //remueve el listener para que no se acumule en futuros llamados
+    }
+
+    callSound.addEventListener('ended', playSpeechAfterChime);
+
+    callSound.play().catch(e => {
+        console.error("No se pudo reproducir el sonido de la campana: ", e);
+        window.speechSynthesis.speak(utterance); // Si falla el sonido, habla de todas formas
+    });
+
+    
 }
 
 
