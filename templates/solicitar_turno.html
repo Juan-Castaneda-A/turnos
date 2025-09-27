@@ -176,16 +176,16 @@
 
                     <div id="service-selection-container" class="hidden">
                         <h2 class="text-2xl font-semibold mb-6">Ahora, por favor, seleccione su tipo de trámite:</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             {% for servicio in servicios %}
                             {# Esta es la condición mágica. Se pregunta:
                             ¿Es este el último elemento del bucle Y el número total de elementos es impar? #}
                             {% set expand_class = 'md:col-span-2' if loop.last and loop.length % 2 != 0 else '' %}
 
                             <button type="submit" name="id_servicio" value="{{ servicio.id_servicio }}"
-                                class="service-button w-full flex items-center justify-center gap-6 p-8 bg-gray-700 text-white font-bold text-3xl rounded-2xl shadow-lg
-                       hover:bg-blue-500 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 {{ expand_class }}">
-                                <span class="text-5xl">
+                                class="service-button w-full flex items-center justify-center gap-6 p-6 bg-gray-700 text-white font-bold text-2xl rounded-2xl shadow-lg
+                       hover:bg-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 {{ expand_class }}">
+                                <span class="text-4xl">
                                     {% if 'Biometría' in servicio.nombre_servicio %} ☝️
                                     {% elif 'Registro' in servicio.nombre_servicio and 'Civil' not in
                                     servicio.nombre_servicio %} 📋
