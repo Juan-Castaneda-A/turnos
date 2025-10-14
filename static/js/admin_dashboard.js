@@ -21,6 +21,7 @@ let isSavingConfig = false;
 let allModules = [];
 let allServices = [];
 let currentModuleServiceConfig = {};
+let adminSilenceAlertBtn;
 
 
 function init() {
@@ -87,6 +88,7 @@ function init() {
     modalMessage = document.getElementById('modal-message');
     modalConfirmBtn = document.getElementById('modal-confirm-btn');
     modalCancelBtn = document.getElementById('modal-cancel-btn');
+    adminSilenceAlertBtn = document.getElementById('admin-silence-alert-btn');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -114,6 +116,31 @@ function assignEventListeners() {
             showView(e.currentTarget.dataset.view);
         });
     });
+
+    adminSilenceAlertBtn.addEventListener('click', () => {
+    // Usamos el mismo nombre de canal que el panel del funcionario
+    const turnosChannel = supabase.channel('turnos_channel');
+
+    turnosChannel.send({
+        type: 'broadcast',
+        event: 'silence_alert',
+        payload: { message: 'Por favor, guardar silencio' }
+    });
+
+    console.log("Alerta de silencio enviada desde el panel de admin.");
+
+    // Opcional: Mostrar una pequeña confirmación visual al admin
+    adminSilenceAlertBtn.textContent = '¡Enviado!';
+    setTimeout(() => {
+        // Reconstruimos el contenido original del botón después de 1.5 segundos
+        adminSilenceAlertBtn.innerHTML = `
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l-2.25 2.25M19.5 12l2.25-2.25M12 3c-3.866 0-7 1.79-7 4s3.134 4 7 4 7-1.79 7-4-3.134-4-7-4zM5 9v10.5A2.5 2.5 0 007.5 22h9a2.5 2.5 0 002.5-2.5V9" />
+            </svg>
+            Pedir Silencio
+        `;
+    }, 1500);
+});
 
     // Listener para el botón de generar reporte
     generateReportBtn.addEventListener('click', generateReport);
@@ -1402,213 +1429,3 @@ function setupRealtimeSubscriptions() {
 // ==========================================================
 document.addEventListener('DOMContentLoaded', init);
 
-
-// navLinks.forEach(link => {
-//     link.addEventListener('click', (e) => {
-//         e.preventDefault();
-//         showView(e.currentTarget.dataset.view);
-//     });
-// });
-
-// let isSavingConfig = false;
-
-// En static/js/admin_dashboard.js
-
-
-
-
-
-
-
-// Pega esto al final de tu admin_dashboard.js
-
-//const generateReportBtn = document.getElementById('generate-report-btn');
-//const reportStartDate = document.getElementById('report-start-date');
-//const reportEndDate = document.getElementById('report-end-date');
-//const reportTableBody = document.getElementById('report-table-body');
-//const chartCanvas = document.getElementById('turns-by-employee-chart');
-//let reportChart = null; // Variable para guardar la instancia del gráfico
-
-
-
-// ==========================================================
-// ======> NUEVAS FUNCIONES PARA EL EDITOR DE PRIORIDADES <======
-// ==========================================================
-
-// Función principal que se llama al entrar en la vista "Gestionar Prioridades"
-
-
-// Se activa cuando el admin selecciona un módulo del dropdown
-
-// window.onload = () => {
-//     showView('dashboard'); // Carga la vista de Dashboard por defecto
-//     // Retrasar la configuración de las suscripciones en tiempo real
-//     setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
-// };
-
-// window.onload = () => {
-//     showView('dashboard');
-//     setupRealtimeSubscriptions(); // Configurar suscripciones en tiempo real inmediatamente
-//     loadReportFilters(); // Cargar filtros del reporte inmediatamente
-// }
-
-/**
- BEGIN
-
-    RETURN QUERY
-
-    SELECT
-
-        u.id_usuario,
-
-        u.nombre_completo::TEXT,
-
-        COUNT(t.id_turno) AS turnos_atendidos,
-
-        CASE 
-
-            WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_llamado - t.hora_solicitud)
-
-            ELSE '0 seconds'::INTERVAL
-
-        END AS tiempo_espera_promedio,
-
-        CASE 
-
-            WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_finalizacion - t.hora_llamado)
-
-            ELSE '0 seconds'::INTERVAL
-
-        END AS tiempo_atencion_promedio
-
-    FROM
-
-        public.usuarios u
-
-    LEFT JOIN
-
-        public.logs_turnos lt ON u.id_usuario = lt.id_usuario
-
-    LEFT JOIN
-
-        public.turnos t ON lt.id_turno = t.id_turno
-
-    WHERE
-
-        t.estado = 'atendido' AND
-
-        lt.accion = 'finalizado' AND
-
-        t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
-
-        -- Lógica de filtro opcional: si el parámetro es NULL, ignora el filtro.
-
-        AND (_user_id IS NULL OR u.id_usuario = _user_id)
-
-        AND (_module_id IS NULL OR t.id_modulo_atencion = _module_id)
-
-    GROUP BY
-
-        u.id_usuario, u.nombre_completo
-
-    ORDER BY
-
-        turnos_atendidos DESC;
-
-END;
-*/
-
-
-/* código sql para la función get_report_data "antigua"
--- Pega este bloque completo en el Editor de SQL y presiona "RUN"
-
-CREATE OR REPLACE FUNCTION public.get_report_data(
-    start_date text,
-    end_date text,
-    group_by_param text,
-    _user_id integer DEFAULT NULL,
-    _module_id integer DEFAULT NULL
-)
-RETURNS TABLE(
-    group_name text,
-    turnos_atendidos bigint,
-    tiempo_espera_promedio interval,
-    tiempo_atencion_promedio interval
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    -- CASO 1: Agrupar por FUNCIONARIO
-    IF group_by_param = 'funcionario' THEN
-        RETURN QUERY
-        SELECT
-            u.nombre_completo::TEXT AS group_name,
-            COUNT(t.id_turno) AS turnos_atendidos,
-            CASE 
-                WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_llamado - t.hora_solicitud)
-                ELSE '0 seconds'::INTERVAL
-            END AS tiempo_espera_promedio,
-            CASE 
-                WHEN COUNT(t.id_turno) > 0 THEN AVG(t.hora_finalizacion - t.hora_llamado)
-                ELSE '0 seconds'::INTERVAL
-            END AS tiempo_atencion_promedio
-        FROM
-            public.usuarios u
-        LEFT JOIN
-            public.logs_turnos lt ON u.id_usuario = lt.id_usuario
-        LEFT JOIN
-            public.turnos t ON lt.id_turno = t.id_turno
-        WHERE
-            t.estado = 'atendido' AND
-            lt.accion = 'finalizado' AND
-            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
-            AND (_user_id IS NULL OR u.id_usuario = _user_id)
-            AND (_module_id IS NULL OR t.id_modulo_atencion = _module_id)
-        GROUP BY
-            u.id_usuario, u.nombre_completo
-        ORDER BY
-            turnos_atendidos DESC;
-
-    -- CASO 2: Agrupar por SERVICIO
-    ELSIF group_by_param = 'servicio' THEN
-        RETURN QUERY
-        SELECT
-            s.nombre_servicio::TEXT AS group_name,
-            COUNT(t.id_turno) AS turnos_atendidos,
-            AVG(t.hora_llamado - t.hora_solicitud) AS tiempo_espera_promedio,
-            AVG(t.hora_finalizacion - t.hora_llamado) AS tiempo_atencion_promedio
-        FROM
-            public.servicios s
-        JOIN
-            public.turnos t ON s.id_servicio = t.id_servicio
-        WHERE
-            t.estado = 'atendido' AND
-            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
-        GROUP BY
-            s.nombre_servicio
-        ORDER BY
-            turnos_atendidos DESC;
-
-    -- CASO 3: Agrupar por MÓDULO
-    ELSIF group_by_param = 'modulo' THEN
-        RETURN QUERY
-        SELECT
-            m.nombre_modulo::TEXT AS group_name,
-            COUNT(t.id_turno) AS turnos_atendidos,
-            AVG(t.hora_llamado - t.hora_solicitud) AS tiempo_espera_promedio,
-            AVG(t.hora_finalizacion - t.hora_llamado) AS tiempo_atencion_promedio
-        FROM
-            public.modulos m
-        JOIN
-            public.turnos t ON m.id_modulo = t.id_modulo_atencion
-        WHERE
-            t.estado = 'atendido' AND
-            t.hora_finalizacion BETWEEN start_date::TIMESTAMPTZ AND end_date::TIMESTAMPTZ
-        GROUP BY
-            m.nombre_modulo
-        ORDER BY
-            turnos_atendidos DESC;
-    END IF;
-END;
-$$;
-*/
