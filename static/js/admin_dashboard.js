@@ -26,6 +26,10 @@ let clientsTableBody;
 let clientPaginationControls, prevClientPage, clientPageInfo, nextClientPage; // <-- Añade esta línea
 let currentPage = 1; // <-- Añade esta línea
 const rowsPerPage = 25;
+let currentReportData = []; // <-- AÑADE ESTA LÍNEA para guardar los datos del último reporte
+let exportMenuBtn, exportOptions, exportXLSXBtn, exportCSVBtn, copyDataBtn;
+let exportPDFBtn;
+let reportInsightsContainer, reportInsightsList;
 
 function init() {
     // Inicializar Supabase
@@ -97,6 +101,14 @@ function init() {
     prevClientPage = document.getElementById('prev-client-page');
     clientPageInfo = document.getElementById('client-page-info');
     nextClientPage = document.getElementById('next-client-page');
+    exportMenuBtn = document.getElementById('export-menu-btn');
+    exportOptions = document.getElementById('export-options');
+    exportXLSXBtn = document.getElementById('export-xlsx-btn');
+    exportCSVBtn = document.getElementById('export-csv-btn');
+    copyDataBtn = document.getElementById('copy-data-btn');
+    exportPDFBtn = document.getElementById('export-pdf-btn');
+    reportInsightsContainer = document.getElementById('report-insights-container'); // <-- AÑADE ESTA LÍNEA
+    reportInsightsList = document.getElementById('report-insights-list');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -112,6 +124,17 @@ function init() {
     loadReportFilters();
 
 }
+
+const formatInterval = (intervalStr) => {
+    if (!intervalStr || typeof intervalStr !== 'string') return 'N/A';
+    const parts = intervalStr.split(':');
+    if (parts.length < 3) return 'N/A';
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = Math.round(parseFloat(parts[2]));
+    const totalMinutes = hours * 60 + minutes;
+    return `${totalMinutes}m ${seconds}s`;
+};
 
 // ==========================================================
 // SECCIÓN DE EVENT LISTENERS
@@ -197,6 +220,39 @@ function assignEventListeners() {
         // aquí solo necesitamos que avance.
         currentPage++;
         loadClients();
+    });
+
+    exportMenuBtn.addEventListener('click', () => {
+        exportOptions.classList.toggle('hidden');
+    });
+    // Cierra el menú si se hace clic en cualquier otro lugar
+    document.addEventListener('click', (event) => {
+        if (!exportMenuBtn.contains(event.target) && !exportOptions.contains(event.target)) {
+            exportOptions.classList.add('hidden');
+        }
+    });
+    exportXLSXBtn.addEventListener('click', (e) => {
+        e.preventDefault(); // Evita que el enlace '#' navegue
+        exportToXLSX();
+        exportOptions.classList.add('hidden'); // Ocultar menú después de la acción
+    });
+
+    exportCSVBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        exportToCSV();
+        exportOptions.classList.add('hidden');
+    });
+
+    copyDataBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        copyToClipboard();
+        exportOptions.classList.add('hidden');
+    });
+
+    exportPDFBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        exportToPDF();
+        exportOptions.classList.add('hidden');
     });
 
     // ... (Aquí irían todos los demás event listeners: addUserBtn, savePrioritiesBtn, etc.)
@@ -702,6 +758,316 @@ function formatDateToISO(date) {
     return date.toISOString().split('T')[0];
 }
 
+function exportToXLSX() {
+    if (currentReportData.length === 0) return;
+
+    // Tu lógica de Excel, ahora dentro de una función
+    const timeToExcel = (intervalStr) => {
+        if (!intervalStr || intervalStr === 'N/A') return 0;
+        const [h, m, s] = intervalStr.split(':').map(Number);
+        return (h * 3600 + m * 60 + s) / 86400;
+    };
+    const groupBy = document.querySelector('input[name="group-by"]:checked')?.value || 'funcionario';
+    const groupByLabel = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
+    const today = new Date().toISOString().split('T')[0];
+
+    // Hoja de detalles
+    const mainHeaders = [groupByLabel, "Turnos Atendidos", "Tiempo Espera Promedio", "Tiempo Atención Promedio"];
+    const mainData = currentReportData.map(row => [
+        row.group_name,
+        row.turnos_atendidos,
+        timeToExcel(row.tiempo_espera_promedio),
+        timeToExcel(row.tiempo_atencion_promedio)
+    ]);
+    const wsMain = XLSX.utils.aoa_to_sheet([mainHeaders, ...mainData]);
+    const range = XLSX.utils.decode_range(wsMain['!ref']);
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        ['C', 'D'].forEach(col => {
+            const cell = wsMain[col + (R + 1)];
+            if (cell) cell.z = 'mm"m "ss"s"';
+        });
+    }
+    // ... (El resto de tu lógica de formato de celdas, negritas y autofiltros) ...
+    // Estilo: encabezados en negrita
+    const headerCell = wsMain['A1'];
+    if (headerCell) headerCell.s = { font: { bold: true } };
+    wsMain['B1'].s = { font: { bold: true } };
+    wsMain['C1'].s = { font: { bold: true } };
+    wsMain['D1'].s = { font: { bold: true } };
+
+    // Agregar filtros automáticos
+    wsMain['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+
+    wsMain['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 25 }, { wch: 25 }];
+
+
+    // Hoja de resumen
+    // ... (Tu lógica para calcular KPIs y crear summaryData) ...
+    const totalTurns = currentReportData.reduce((sum, row) => sum + (row.turnos_atendidos || 0), 0);
+    let totalWaitSec = 0, totalServiceSec = 0;
+    currentReportData.forEach(row => {
+        const turns = row.turnos_atendidos || 0;
+        if (row.tiempo_espera_promedio) totalWaitSec += intervalToSeconds(row.tiempo_espera_promedio) * turns;
+        if (row.tiempo_atencion_promedio) totalServiceSec += intervalToSeconds(row.tiempo_atencion_promedio) * turns;
+    });
+    const avgWaitSec = totalTurns ? totalWaitSec / totalTurns : 0;
+    const avgServiceSec = totalTurns ? totalServiceSec / totalTurns : 0;
+
+    const summaryData = [
+        ["Métrica", "Valor"],
+        ["Total de Turnos", totalTurns],
+        ["Tiempo Espera Promedio", avgWaitSec / 86400],
+        ["Tiempo Atención Promedio", avgServiceSec / 86400]
+    ];
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    wsSummary['B3'].z = 'mm"m "ss"s"';
+    wsSummary['B4'].z = 'mm"m "ss"s"';
+    wsSummary['!cols'] = [{ wch: 30 }, { wch: 18 }];
+
+
+    // Crear libro y descargar
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen");
+    XLSX.utils.book_append_sheet(wb, wsMain, "Datos Detallados");
+    XLSX.writeFile(wb, `Reporte_Notaria_${groupByLabel}_${today}.xlsx`);
+}
+function exportToCSV() {
+    if (currentReportData.length === 0) return;
+
+    const groupByLabel = document.getElementById('table-header-group').textContent;
+    const today = new Date().toISOString().split('T')[0];
+
+    const headers = [groupByLabel, "Turnos Atendidos", "Tiempo Espera Promedio", "Tiempo Atención Promedio"];
+    const dataRows = currentReportData.map(row => [
+        row.group_name,
+        row.turnos_atendidos,
+        formatInterval(row.tiempo_espera_promedio), // Para CSV, usamos el formato de texto legible
+        formatInterval(row.tiempo_atencion_promedio)
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+    XLSX.writeFile(wb, `Reporte_Notaria_${groupByLabel}_${today}.csv`);
+}
+function copyToClipboard() {
+    if (currentReportData.length === 0) return;
+
+    const groupByLabel = document.getElementById('table-header-group').textContent;
+    const headers = [groupByLabel, "Turnos Atendidos", "Tiempo Espera Promedio", "Tiempo Atención Promedio"];
+    let clipboardText = headers.join('\t') + '\n';
+
+    currentReportData.forEach(row => {
+        const rowValues = [
+            row.group_name,
+            row.turnos_atendidos,
+            formatInterval(row.tiempo_espera_promedio),
+            formatInterval(row.tiempo_atencion_promedio)
+        ];
+        clipboardText += rowValues.join('\t') + '\n';
+    });
+
+    navigator.clipboard.writeText(clipboardText).then(() => {
+        const originalText = copyDataBtn.textContent;
+        copyDataBtn.textContent = '¡Copiado!';
+        setTimeout(() => {
+            copyDataBtn.textContent = originalText;
+        }, 1500);
+    }).catch(err => {
+        console.error('Error al copiar:', err);
+        alert('No se pudo copiar al portapapeles. Intente nuevamente.');
+    });
+}
+const intervalToSeconds = (intervalStr) => {
+    if (!intervalStr || typeof intervalStr !== 'string') return 0;
+    const parts = intervalStr.split(':');
+    if (parts.length < 3) return 0;
+    return (parseInt(parts[0], 10) * 3600) + (parseInt(parts[1], 10) * 60) + parseFloat(parts[2]);
+};
+
+// ==========================================================
+// MOTOR DE INSIGHTS AUTOMÁTICOS
+// ==========================================================
+
+/**
+ * Analiza los datos de un reporte y genera insights en lenguaje natural.
+ * @param {Array} reportData - Los datos del reporte (currentReportData).
+ * @returns {Array<string>} - Un array de strings, donde cada string es un insight.
+ */
+function generateInsights(reportData) {
+    if (!reportData || reportData.length < 1) {
+        return ["No hay suficientes datos para generar un análisis."];
+    }
+
+    const insights = [];
+
+    // --- CÁLCULOS GENERALES ---
+    const totalTurns = reportData.reduce((sum, row) => sum + row.turnos_atendidos, 0);
+    if (totalTurns === 0) return ["No se atendieron turnos en este período."];
+
+    // Calcular promedios generales ponderados para todo el reporte
+    let totalWaitSeconds = 0;
+    let totalServiceSeconds = 0;
+    reportData.forEach(row => {
+        const turns = row.turnos_atendidos || 0;
+        totalWaitSeconds += intervalToSeconds(row.tiempo_espera_promedio) * turns;
+        totalServiceSeconds += intervalToSeconds(row.tiempo_atencion_promedio) * turns;
+    });
+    const avgGeneralWaitTime = totalWaitSeconds / totalTurns;
+    const avgGeneralServiceTime = totalServiceSeconds / totalTurns;
+
+    // --- REGLAS DE ANÁLISIS ---
+
+    // REGLA 1: Identificar el cuello de botella (mayor tiempo de espera)
+    const sortedByWait = [...reportData].sort((a, b) => intervalToSeconds(b.tiempo_espera_promedio) - intervalToSeconds(a.tiempo_espera_promedio));
+    const slowestItem = sortedByWait[0];
+    if (slowestItem) {
+        const slowestWaitTime = intervalToSeconds(slowestItem.tiempo_espera_promedio);
+        if (slowestWaitTime > avgGeneralWaitTime * 1.5) { // Si es 50% más lento que el promedio
+            insights.push(`💡 **Punto Crítico:** "${slowestItem.group_name}" tiene el tiempo de espera más alto (${formatInterval(slowestItem.tiempo_espera_promedio)}), significativamente por encima del promedio. **Acción sugerida:** Analizar si necesita más recursos o personal asignado.`);
+        }
+    }
+
+    // REGLA 2: Identificar al más eficiente (menor tiempo de espera)
+    const fastestItem = sortedByWait[sortedByWait.length - 1];
+    if (fastestItem && reportData.length > 2) {
+        insights.push(`✅ **Punto Fuerte:** "${fastestItem.group_name}" demuestra ser el más ágil, con el menor tiempo de espera (${formatInterval(fastestItem.tiempo_espera_promedio)}). Se puede usar como un modelo de eficiencia.`);
+    }
+
+    // REGLA 3: Detectar desbalance (Mucha espera, pero atención rápida)
+    reportData.forEach(row => {
+        const waitTime = intervalToSeconds(row.tiempo_espera_promedio);
+        const serviceTime = intervalToSeconds(row.tiempo_atencion_promedio);
+        if (waitTime > avgGeneralWaitTime * 2 && serviceTime < avgGeneralServiceTime) {
+            insights.push(`⚠️ **Alerta de Flujo:** En "${row.group_name}", la espera es muy alta pero la atención es muy rápida. Esto podría indicar un "cuello de botella" antes de que el cliente llegue al funcionario, no en el funcionario mismo.`);
+        }
+    });
+
+    // REGLA 4: El más trabajador (mayor volumen de turnos)
+    const sortedByVolume = [...reportData].sort((a, b) => b.turnos_atendidos - a.turnos_atendidos);
+    const busiestItem = sortedByVolume[0];
+    if (busiestItem && busiestItem.turnos_atendidos > totalTurns / reportData.length * 1.5) {
+        insights.push(`📈 **Alto Volumen:** "${busiestItem.group_name}" gestiona la mayor cantidad de turnos (${busiestItem.turnos_atendidos}). Es el pilar del flujo de trabajo en este período.`);
+    }
+
+    if (insights.length === 0) {
+        insights.push("El rendimiento general es estable y no se detectaron anomalías significativas en este período.");
+    }
+
+    return insights;
+}
+
+async function exportToPDF() {
+    if (currentReportData.length === 0) {
+        alert("No hay datos para exportar. Por favor, genere un reporte primero.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+    // --- 1. METADATOS Y TÍTULOS ---
+    const groupByLabel = document.getElementById('table-header-group').textContent;
+    const startDate = document.getElementById('report-start-date').value;
+    const endDate = document.getElementById('report-end-date').value;
+    const today = new Date().toLocaleDateString('es-CO');
+    const pageHeight = doc.internal.pageSize.height;
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 14;
+
+    doc.setFontSize(18);
+    doc.setTextColor(40, 58, 90);
+    doc.text("Reporte Ejecutivo de Rendimiento", margin, 22);
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Período del reporte: ${startDate} al ${endDate}`, margin, 30);
+    doc.text(`Agrupado por: ${groupByLabel}`, margin, 36);
+
+    // --- 2. AÑADIR LOS INSIGHTS AUTOMÁTICOS ---
+    const insights = generateInsights(currentReportData);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(40, 58, 90);
+    doc.text("Análisis Automático", margin, 50);
+    doc.setLineWidth(0.5);
+    doc.line(margin, 52, pageWidth - margin, 52);
+
+    const plainTextInsights = insights.map(insight => {
+        let cleanText = insight.replace(/💡|✅|⚠️|📈/g, '');
+        cleanText = cleanText.replace(/\*\*/g, '');
+        return '• ' + cleanText.trim();
+    });
+
+    // **AQUÍ ESTÁ LA CORRECCIÓN CLAVE Y ROBUSTA:**
+    // 1. Definimos una posición inicial fija para el texto.
+    const insightsStartY = 60;
+    
+    // 2. CALCULAMOS la altura REAL que ocupará el bloque de texto ANTES de dibujarlo.
+    const textBlockDimensions = doc.getTextDimensions(plainTextInsights, { maxWidth: pageWidth - (margin * 2) });
+    const textBlockHeight = textBlockDimensions.h;
+
+    // 3. Dibujamos el texto en su posición.
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    doc.text(plainTextInsights, margin, insightsStartY, { maxWidth: pageWidth - (margin * 2) });
+
+    // 4. La tabla comenzará después del texto + un margen. Esto SIEMPRE será un número válido.
+    const tableStartY = insightsStartY + textBlockHeight + 10;
+
+    // --- 3. AÑADIR LA TABLA DE DATOS ---
+    const tableHeaders = [groupByLabel, "Turnos Atendidos", "T. Espera Prom.", "T. Atención Prom."];
+    const tableBody = currentReportData.map(row => [
+        row.group_name,
+        row.turnos_atendidos,
+        formatInterval(row.tiempo_espera_promedio),
+        formatInterval(row.tiempo_atencion_promedio)
+    ]);
+
+    doc.autoTable({
+        head: [tableHeaders],
+        body: tableBody,
+        startY: tableStartY, // Usamos nuestra posición calculada
+        theme: 'grid',
+        headStyles: { fillColor: [22, 162, 255] },
+        margin: { left: margin, right: margin }
+    });
+
+    // --- 4. AÑADIR EL GRÁFICO ---
+    let finalY = doc.lastAutoTable.finalY; 
+    const chartCanvas = document.getElementById('turns-by-employee-chart');
+    const chartImage = chartCanvas.toDataURL('image/png', 1.0);
+    const chartHeight = 80;
+    const chartWidth = 180;
+
+    if (finalY + chartHeight + 30 > pageHeight) {
+        doc.addPage();
+        finalY = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(40, 58, 90);
+    doc.text("Gráfico del Reporte", margin, finalY + 15);
+    doc.line(margin, finalY + 17, pageWidth - margin, finalY + 17);
+    doc.addImage(chartImage, 'PNG', margin, finalY + 20, chartWidth, chartHeight);
+
+    // --- 5. AÑADIR EL PIE DE PÁGINA ---
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+            `Página ${i} de ${pageCount} | Reporte generado el ${today} por Sistema de Turnos Notaría.`,
+            margin,
+            pageHeight - 10
+        );
+    }
+
+    // --- 6. DESCARGAR EL ARCHIVO ---
+    doc.save(`Reporte_Ejecutivo_${groupByLabel}_${endDate}.pdf`);
+}
+
 // --- Funciones de Carga de Datos (load...) ---
 async function loadDashboardSummary() {
     try {
@@ -877,7 +1243,7 @@ async function loadClients() {
             .select('*', { count: 'exact' }) // 'exact' nos da el número total de clientes
             .order('creado_en', { ascending: false }) // Ordenar por los más recientes primero
             .range(from, to); // ¡La magia! Pedir solo las filas de la página actual
-        
+
         if (error) throw error;
 
         clientsTableBody.innerHTML = '';
@@ -890,7 +1256,7 @@ async function loadClients() {
         clients.forEach(client => {
             const tr = document.createElement('tr');
             tr.className = 'table-row';
-            
+
             const registrationDate = new Date(client.creado_en).toLocaleDateString('es-CO', {
                 year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
@@ -1310,6 +1676,11 @@ async function generateReport() {
     const groupByElement = document.querySelector('input[name="group-by"]:checked');
     const groupBy = groupByElement ? groupByElement.value : 'funcionario';
 
+    currentReportData = [];
+    exportMenuBtn.disabled = true;
+    reportInsightsContainer.classList.add('hidden'); // <-- AÑADE ESTA LÍNEA
+    reportInsightsList.innerHTML = '';
+
     if (!start || !end) {
         return alert('Por favor, seleccione un rango de fechas.');
     }
@@ -1338,16 +1709,24 @@ async function generateReport() {
             return;
         }
 
-        const formatInterval = (intervalStr) => {
-            if (!intervalStr || typeof intervalStr !== 'string') return 'N/A';
-            const parts = intervalStr.split(':');
-            if (parts.length < 3) return 'N/A';
-            const hours = parseInt(parts[0], 10);
-            const minutes = parseInt(parts[1], 10);
-            const seconds = Math.round(parseFloat(parts[2]));
-            const totalMinutes = hours * 60 + minutes;
-            return `${totalMinutes}m ${seconds}s`;
-        };
+        // ====== INICIO DEL CÓDIGO A AÑADIR/MODIFICAR ======
+        // ¡Guardamos los datos en la variable global!
+        currentReportData = data;
+        // ¡Habilitamos el botón de exportar!
+        exportMenuBtn.disabled = false;
+        // ====== FIN DEL CÓDIGO A AÑADIR/MODIFICAR ======
+
+        // Justo después de guardar los datos y habilitar el botón de exportar:
+
+        const insights = generateInsights(currentReportData); // ¡Llamamos al motor!
+        if (insights.length > 0) {
+            insights.forEach(insightText => {
+                const li = document.createElement('li');
+                li.innerHTML = insightText; // Usamos innerHTML para que reconozca <strong> y <b>
+                reportInsightsList.appendChild(li);
+            });
+            reportInsightsContainer.classList.remove('hidden');
+        }
 
         const totalTurns = data.reduce((sum, row) => sum + (row.turnos_atendidos || 0), 0);
         document.getElementById('kpi-total-turns').textContent = totalTurns;
@@ -1427,6 +1806,9 @@ async function generateReport() {
         console.error("Error al generar el reporte:", error);
         reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400">Error: ${error.message}</td></tr>`;
         if (reportChart) reportChart.destroy();
+
+        exportMenuBtn.disabled = true;
+        reportInsightsContainer.classList.add('hidden');
     }
 }
 

@@ -46,3 +46,9 @@ input[type="radio"]:checked + .report-group-btn {
     color: white;
     font-weight: 600;
 }
+
+#report-insights-list strong,
+#report-insights-list b {
+    color: #fff;
+    font-weight: bold;
+}

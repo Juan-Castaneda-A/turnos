@@ -10,7 +10,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     <link href="../static/css/admin_dashboard.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -357,6 +359,17 @@
                     </div>
                 </div>
 
+                <div id="report-insights-container" class="hidden mb-8 p-6 bg-gray-800 rounded-lg border border-blue-500/30">
+                <h3 class="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.311a7.5 7.5 0 00-7.5 0" />
+                    </svg>
+                    Análisis Automático del Reporte
+                </h3>
+                <ul id="report-insights-list" class="space-y-3 text-gray-300 list-disc list-inside">
+                    </ul>
+            </div>
+
                 <div class="mb-6 p-4 bg-gray-800 rounded-lg space-y-4">
                     <div class="flex flex-wrap gap-2">
                         <button class="flex-1 px-3 py-2 text-sm font-medium bg-gray-700 rounded hover:bg-blue-600"
@@ -415,10 +428,39 @@
                         </div>
                     </div>
 
-                    <div class="pt-4">
+                    <div class="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <button id="generate-report-btn"
-                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg">Generar
-                            Reporte</button>
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-lg flex items-center justify-center gap-2">
+                            Generar Reporte
+                        </button>
+
+                        <div class="relative">
+                            <button id="export-menu-btn"
+                                class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                disabled>
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                                Exportar
+                                <svg class="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                                </svg>
+                            </button>
+                            <div id="export-options"
+                                class="hidden absolute right-0 mt-2 w-full bg-gray-700 rounded-lg shadow-xl z-10">
+                                <a href="#" id="export-xlsx-btn"
+                                    class="block px-4 py-3 text-white hover:bg-blue-600 rounded-t-lg">Excel (.xlsx)</a>
+                                <a href="#" id="export-csv-btn" class="block px-4 py-3 text-white hover:bg-blue-600">CSV
+                                    (.csv)</a>
+                                <a href="#" id="export-pdf-btn" class="block px-4 py-3 text-white hover:bg-blue-600">PDF Ejecutivo (.pdf)</a>
+                                <a href="#" id="copy-data-btn"
+                                    class="block px-4 py-3 text-white hover:bg-blue-600 rounded-b-lg">Copiar Datos</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -542,11 +584,13 @@
                     </table>
                 </div>
                 <div id="client-pagination-controls" class="hidden mt-6 flex items-center justify-between">
-                    <button id="prev-client-page" class="px-4 py-2 bg-gray-700 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button id="prev-client-page"
+                        class="px-4 py-2 bg-gray-700 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
                         Anterior
                     </button>
                     <span id="client-page-info" class="font-semibold text-gray-400"></span>
-                    <button id="next-client-page" class="px-4 py-2 bg-gray-700 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button id="next-client-page"
+                        class="px-4 py-2 bg-gray-700 text-white font-bold rounded-lg shadow-md hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
                         Siguiente
                     </button>
                 </div>
