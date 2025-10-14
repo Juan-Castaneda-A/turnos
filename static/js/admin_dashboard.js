@@ -22,7 +22,10 @@ let allModules = [];
 let allServices = [];
 let currentModuleServiceConfig = {};
 let adminSilenceAlertBtn;
-
+let clientsTableBody;
+let clientPaginationControls, prevClientPage, clientPageInfo, nextClientPage; // <-- Añade esta línea
+let currentPage = 1; // <-- Añade esta línea
+const rowsPerPage = 25;
 
 function init() {
     // Inicializar Supabase
@@ -89,6 +92,11 @@ function init() {
     modalConfirmBtn = document.getElementById('modal-confirm-btn');
     modalCancelBtn = document.getElementById('modal-cancel-btn');
     adminSilenceAlertBtn = document.getElementById('admin-silence-alert-btn');
+    clientsTableBody = document.getElementById('clients-table-body');
+    clientPaginationControls = document.getElementById('client-pagination-controls');
+    prevClientPage = document.getElementById('prev-client-page');
+    clientPageInfo = document.getElementById('client-page-info');
+    nextClientPage = document.getElementById('next-client-page');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -118,29 +126,29 @@ function assignEventListeners() {
     });
 
     adminSilenceAlertBtn.addEventListener('click', () => {
-    // Usamos el mismo nombre de canal que el panel del funcionario
-    const turnosChannel = supabase.channel('turnos_channel');
+        // Usamos el mismo nombre de canal que el panel del funcionario
+        const turnosChannel = supabase.channel('turnos_channel');
 
-    turnosChannel.send({
-        type: 'broadcast',
-        event: 'silence_alert',
-        payload: { message: 'Por favor, guardar silencio' }
-    });
+        turnosChannel.send({
+            type: 'broadcast',
+            event: 'silence_alert',
+            payload: { message: 'Por favor, guardar silencio' }
+        });
 
-    console.log("Alerta de silencio enviada desde el panel de admin.");
+        console.log("Alerta de silencio enviada desde el panel de admin.");
 
-    // Opcional: Mostrar una pequeña confirmación visual al admin
-    adminSilenceAlertBtn.textContent = '¡Enviado!';
-    setTimeout(() => {
-        // Reconstruimos el contenido original del botón después de 1.5 segundos
-        adminSilenceAlertBtn.innerHTML = `
+        // Opcional: Mostrar una pequeña confirmación visual al admin
+        adminSilenceAlertBtn.textContent = '¡Enviado!';
+        setTimeout(() => {
+            // Reconstruimos el contenido original del botón después de 1.5 segundos
+            adminSilenceAlertBtn.innerHTML = `
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l-2.25 2.25M19.5 12l2.25-2.25M12 3c-3.866 0-7 1.79-7 4s3.134 4 7 4 7-1.79 7-4-3.134-4-7-4zM5 9v10.5A2.5 2.5 0 007.5 22h9a2.5 2.5 0 002.5-2.5V9" />
             </svg>
             Pedir Silencio
         `;
-    }, 1500);
-});
+        }, 1500);
+    });
 
     // Listener para el botón de generar reporte
     generateReportBtn.addEventListener('click', generateReport);
@@ -175,6 +183,20 @@ function assignEventListeners() {
         reportStartDate.value = '2020-01-01';
         reportEndDate.value = formatDateToISO(new Date());
         generateReportBtn.click();
+    });
+
+    prevClientPage.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            loadClients();
+        }
+    });
+
+    nextClientPage.addEventListener('click', () => {
+        // La lógica para deshabilitar el botón se hará en otra función,
+        // aquí solo necesitamos que avance.
+        currentPage++;
+        loadClients();
     });
 
     // ... (Aquí irían todos los demás event listeners: addUserBtn, savePrioritiesBtn, etc.)
@@ -632,6 +654,9 @@ function showView(viewId) {
         case 'manage-priorities':
             loadPriorityEditor();
             break;
+        case 'manage-clients':
+            loadClients();
+            break;
         case 'reports':
             // Solo cargar filtros si la vista existe
             if (targetView) {
@@ -838,6 +863,72 @@ async function loadUsers() {
     }
 }
 
+async function loadClients() {
+    clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando clientes...</td></tr>`;
+
+    // 1. Calcular el rango de filas a solicitar
+    const from = (currentPage - 1) * rowsPerPage;
+    const to = from + rowsPerPage - 1;
+
+    try {
+        // 2. Pedir a Supabase los datos Y el conteo total de filas
+        const { data: clients, error, count } = await supabase
+            .from('clientes')
+            .select('*', { count: 'exact' }) // 'exact' nos da el número total de clientes
+            .order('creado_en', { ascending: false }) // Ordenar por los más recientes primero
+            .range(from, to); // ¡La magia! Pedir solo las filas de la página actual
+        
+        if (error) throw error;
+
+        clientsTableBody.innerHTML = '';
+        if (clients.length === 0) {
+            clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay clientes registrados.</td></tr>`;
+            clientPaginationControls.classList.add('hidden'); // Ocultar paginación si no hay clientes
+            return;
+        }
+
+        clients.forEach(client => {
+            const tr = document.createElement('tr');
+            tr.className = 'table-row';
+            
+            const registrationDate = new Date(client.creado_en).toLocaleDateString('es-CO', {
+                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+
+            tr.innerHTML = `
+                <td class="px-4 py-2">${client.nombre_completo}</td>
+                <td class="px-4 py-2">${client.numero_identificacion}</td>
+                <td class="px-4 py-2">${registrationDate}</td>
+            `;
+            clientsTableBody.appendChild(tr);
+        });
+
+        // 3. Llamar a la función que dibuja los controles de paginación
+        renderPaginationControls(count);
+
+    } catch (error) {
+        console.error("Error al cargar clientes:", error.message);
+        clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar la lista de clientes.</td></tr>`;
+    }
+}
+
+function renderPaginationControls(totalCount) {
+    if (!totalCount || totalCount <= rowsPerPage) {
+        clientPaginationControls.classList.add('hidden');
+        return;
+    }
+
+    clientPaginationControls.classList.remove('hidden');
+
+    const totalPages = Math.ceil(totalCount / rowsPerPage);
+
+    clientPageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+
+    // Habilitar o deshabilitar los botones según la página actual
+    prevClientPage.disabled = currentPage === 1;
+    nextClientPage.disabled = currentPage >= totalPages;
+}
+
 async function loadModulesForUserAssignment() {
     try {
         const { data: modules, error } = await supabase.from('modulos').select('id_modulo, nombre_modulo').order('nombre_modulo', { ascending: true });
@@ -875,8 +966,8 @@ async function loadReportFilters() {
         if (moduleError) throw moduleError;
 
         //const { data: users, error: userError } = await supabase.from('usuarios').select('id_usuario, nombre_completo');
-        
-        
+
+
         employeeFilterSelect.innerHTML = '<option value="">Todos los Empleados</option>';
         users.forEach(user => {
             const option = document.createElement('option');
@@ -886,7 +977,7 @@ async function loadReportFilters() {
         });
 
         //const { data: modules, error: moduleError } = await supabase.from('modulos').select('id_modulo, nombre_modulo');
-        
+
 
         moduleFilterSelect.innerHTML = '<option value="">Todos los Módulos</option>';
         modules.forEach(mod => {
@@ -1260,7 +1351,7 @@ async function generateReport() {
 
         const totalTurns = data.reduce((sum, row) => sum + (row.turnos_atendidos || 0), 0);
         document.getElementById('kpi-total-turns').textContent = totalTurns;
-        
+
         // Calcular promedios generales correctamente (ponderado)
         let totalWaitSeconds = 0;
         let totalServiceSeconds = 0;
@@ -1268,19 +1359,19 @@ async function generateReport() {
             const turns = row.turnos_atendidos || 0;
             if (row.tiempo_espera_promedio) {
                 const parts = row.tiempo_espera_promedio.split(':');
-                const seconds = (parseInt(parts[0])*3600) + (parseInt(parts[1])*60) + parseFloat(parts[2]);
+                const seconds = (parseInt(parts[0]) * 3600) + (parseInt(parts[1]) * 60) + parseFloat(parts[2]);
                 totalWaitSeconds += seconds * turns;
             }
             if (row.tiempo_atencion_promedio) {
                 const parts = row.tiempo_atencion_promedio.split(':');
-                const seconds = (parseInt(parts[0])*3600) + (parseInt(parts[1])*60) + parseFloat(parts[2]);
+                const seconds = (parseInt(parts[0]) * 3600) + (parseInt(parts[1]) * 60) + parseFloat(parts[2]);
                 totalServiceSeconds += seconds * turns;
             }
         });
 
         const avgWaitSeconds = totalTurns > 0 ? totalWaitSeconds / totalTurns : 0;
         const avgServiceSeconds = totalTurns > 0 ? totalServiceSeconds / totalTurns : 0;
-        
+
         const formatSeconds = (totalSeconds) => {
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = Math.round(totalSeconds % 60);
@@ -1292,7 +1383,7 @@ async function generateReport() {
 
         const tableHeader = document.getElementById('table-header-group');
         tableHeader.textContent = groupBy.charAt(0).toUpperCase() + groupBy.slice(1);
-        
+
         data.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
