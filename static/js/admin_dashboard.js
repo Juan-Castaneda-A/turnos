@@ -24,6 +24,8 @@ let currentModuleServiceConfig = {};
 let adminSilenceAlertBtn;
 let clientsTableBody;
 let clientPaginationControls, prevClientPage, clientPageInfo, nextClientPage; // <-- Añade esta línea
+let clientSearchInput; // <-- AÑADE ESTA LÍNEA
+let currentClientSearch = '';
 let currentPage = 1; // <-- Añade esta línea
 const rowsPerPage = 25;
 let currentReportData = []; // <-- AÑADE ESTA LÍNEA para guardar los datos del último reporte
@@ -101,6 +103,7 @@ function init() {
     prevClientPage = document.getElementById('prev-client-page');
     clientPageInfo = document.getElementById('client-page-info');
     nextClientPage = document.getElementById('next-client-page');
+    clientSearchInput = document.getElementById('client-search-input');
     exportMenuBtn = document.getElementById('export-menu-btn');
     exportOptions = document.getElementById('export-options');
     exportXLSXBtn = document.getElementById('export-xlsx-btn');
@@ -219,6 +222,15 @@ function assignEventListeners() {
         // La lógica para deshabilitar el botón se hará en otra función,
         // aquí solo necesitamos que avance.
         currentPage++;
+        loadClients();
+    });
+
+    clientSearchInput.addEventListener('input', () => {
+        // Guardamos el término de búsqueda actual
+        currentClientSearch = clientSearchInput.value.trim();
+        // ¡MUY IMPORTANTE! Reseteamos a la página 1 para cada nueva búsqueda
+        currentPage = 1; 
+        // Llamamos a la función para recargar los clientes con el nuevo filtro
         loadClients();
     });
 
@@ -1232,31 +1244,40 @@ async function loadUsers() {
 async function loadClients() {
     clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando clientes...</td></tr>`;
 
-    // 1. Calcular el rango de filas a solicitar
     const from = (currentPage - 1) * rowsPerPage;
     const to = from + rowsPerPage - 1;
 
     try {
-        // 2. Pedir a Supabase los datos Y el conteo total de filas
-        const { data: clients, error, count } = await supabase
+        // 1. Empezamos a construir la consulta base
+        let query = supabase
             .from('clientes')
-            .select('*', { count: 'exact' }) // 'exact' nos da el número total de clientes
-            .order('creado_en', { ascending: false }) // Ordenar por los más recientes primero
-            .range(from, to); // ¡La magia! Pedir solo las filas de la página actual
+            .select('*', { count: 'exact' });
 
+        // 2. Si hay un término de búsqueda, AÑADIMOS el filtro a la consulta
+        if (currentClientSearch) {
+            // Usamos 'ilike' con '%' para buscar todos los números que EMPIECEN con el texto
+            query = query.ilike('numero_identificacion', `${currentClientSearch}%`);
+        }
+
+        // 3. Continuamos construyendo la consulta con el orden y el rango
+        const { data: clients, error, count } = await query
+            .order('creado_en', { ascending: false })
+            .range(from, to);
+        
         if (error) throw error;
 
+        // El resto de la función es casi igual
         clientsTableBody.innerHTML = '';
         if (clients.length === 0) {
-            clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay clientes registrados.</td></tr>`;
-            clientPaginationControls.classList.add('hidden'); // Ocultar paginación si no hay clientes
+            clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No se encontraron clientes con esos criterios.</td></tr>`;
+            clientPaginationControls.classList.add('hidden');
             return;
         }
 
         clients.forEach(client => {
             const tr = document.createElement('tr');
             tr.className = 'table-row';
-
+            
             const registrationDate = new Date(client.creado_en).toLocaleDateString('es-CO', {
                 year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
@@ -1269,7 +1290,6 @@ async function loadClients() {
             clientsTableBody.appendChild(tr);
         });
 
-        // 3. Llamar a la función que dibuja los controles de paginación
         renderPaginationControls(count);
 
     } catch (error) {
