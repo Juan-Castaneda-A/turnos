@@ -77,6 +77,16 @@
                         </a>
                     </li>
                     <li>
+                            <a href="#"
+                                class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white"
+                                data-view="manage-services">
+                                <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75c0-.231-.035-.454-.1-.664M6.75 7.5h1.5v.75c0 .414.336.75.75.75h3a.75.75 0 00.75-.75v-.75h1.5a2.25 2.25 0 012.25 2.25v8.692c0 .285-.23.515-.515.515H5.015a.515.515 0 01-.515-.515V9.75A2.25 2.25 0 016.75 7.5z" />
+                                </svg>
+                                Gestionar Servicios
+                            </a>
+                        </li>
+                    <li>
                         <a href="#"
                             class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors duration-200"
                             data-view="configure-services">
@@ -601,8 +611,43 @@
                     </button>
                 </div>
             </section>
+            <section id="manage-services-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-3xl font-bold text-blue-400 mb-6 border-b border-gray-700 pb-4">Gestionar Servicios</h2>
+                <button id="add-service-btn" class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md">
+                    Crear Nuevo Servicio
+                </button>
+
+                <div id="service-form-container" class="hidden mb-8 p-6 bg-gray-800 rounded-lg">
+                    <h3 id="service-form-title" class="text-xl font-bold text-white mb-4">Crear Servicio</h3>
+                    <form id="service-form" class="space-y-4">
+                        <input type="hidden" id="service-id-field">
+                        <input type="text" id="service-name-field" placeholder="Nombre del Servicio (ej. Autenticación)" required class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                        <input type="text" id="service-prefix-field" placeholder="Prefijo del Ticket (ej. A)" required maxlength="5" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                        <div class="flex justify-end gap-4 pt-4">
+                            <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Servicio</button>
+                            <button type="button" id="cancel-service-form-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="overflow-x-auto bg-gray-800 rounded-lg">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-700 text-sm font-semibold text-gray-400 uppercase">
+                                <th class="p-4">Nombre del Servicio</th>
+                                <th class="p-4">Prefijo del Ticket</th>
+                                <th class="p-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="services-table-body" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
         </main>
     </div>
+
+    
 
     <div id="confirmation-modal"
         class="view-section fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">

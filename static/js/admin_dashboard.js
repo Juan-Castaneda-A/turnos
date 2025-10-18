@@ -26,6 +26,7 @@ let clientsTableBody;
 let clientPaginationControls, prevClientPage, clientPageInfo, nextClientPage; // <-- Añade esta línea
 let clientSearchInput; // <-- AÑADE ESTA LÍNEA
 let currentClientSearch = '';
+let servicesTableBody, addServiceBtn, serviceFormContainer, serviceFormTitle, serviceForm, serviceIdField, serviceNameField, servicePrefixField, cancelServiceFormBtn;
 let currentPage = 1; // <-- Añade esta línea
 const rowsPerPage = 25;
 let currentReportData = []; // <-- AÑADE ESTA LÍNEA para guardar los datos del último reporte
@@ -112,6 +113,15 @@ function init() {
     exportPDFBtn = document.getElementById('export-pdf-btn');
     reportInsightsContainer = document.getElementById('report-insights-container'); // <-- AÑADE ESTA LÍNEA
     reportInsightsList = document.getElementById('report-insights-list');
+    servicesTableBody = document.getElementById('services-table-body');
+    addServiceBtn = document.getElementById('add-service-btn');
+    serviceFormContainer = document.getElementById('service-form-container');
+    serviceFormTitle = document.getElementById('service-form-title');
+    serviceForm = document.getElementById('service-form');
+    serviceIdField = document.getElementById('service-id-field');
+    serviceNameField = document.getElementById('service-name-field');
+    servicePrefixField = document.getElementById('service-prefix-field');
+    cancelServiceFormBtn = document.getElementById('cancel-service-form-btn');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -229,7 +239,7 @@ function assignEventListeners() {
         // Guardamos el término de búsqueda actual
         currentClientSearch = clientSearchInput.value.trim();
         // ¡MUY IMPORTANTE! Reseteamos a la página 1 para cada nueva búsqueda
-        currentPage = 1; 
+        currentPage = 1;
         // Llamamos a la función para recargar los clientes con el nuevo filtro
         loadClients();
     });
@@ -266,6 +276,19 @@ function assignEventListeners() {
         exportToPDF();
         exportOptions.classList.add('hidden');
     });
+
+    addServiceBtn.addEventListener('click', () => {
+        serviceForm.reset();
+        serviceIdField.value = '';
+        serviceFormTitle.textContent = 'Crear Nuevo Servicio';
+        serviceFormContainer.classList.remove('hidden');
+    });
+
+    cancelServiceFormBtn.addEventListener('click', () => {
+        serviceFormContainer.classList.add('hidden');
+    });
+
+    serviceForm.addEventListener('submit', handleSaveService);
 
     // ... (Aquí irían todos los demás event listeners: addUserBtn, savePrioritiesBtn, etc.)
     // Por simplicidad, los dejo dentro de sus funciones de carga por ahora,
@@ -725,6 +748,9 @@ function showView(viewId) {
         case 'manage-clients':
             loadClients();
             break;
+        case 'manage-services':
+            loadServices();
+            break;
         case 'reports':
             // Solo cargar filtros si la vista existe
             if (targetView) {
@@ -998,7 +1024,7 @@ async function exportToPDF() {
 
     // --- 2. AÑADIR LOS INSIGHTS AUTOMÁTICOS ---
     const insights = generateInsights(currentReportData);
-    
+
     doc.setFontSize(14);
     doc.setTextColor(40, 58, 90);
     doc.text("Análisis Automático", margin, 50);
@@ -1014,7 +1040,7 @@ async function exportToPDF() {
     // **AQUÍ ESTÁ LA CORRECCIÓN CLAVE Y ROBUSTA:**
     // 1. Definimos una posición inicial fija para el texto.
     const insightsStartY = 60;
-    
+
     // 2. CALCULAMOS la altura REAL que ocupará el bloque de texto ANTES de dibujarlo.
     const textBlockDimensions = doc.getTextDimensions(plainTextInsights, { maxWidth: pageWidth - (margin * 2) });
     const textBlockHeight = textBlockDimensions.h;
@@ -1046,7 +1072,7 @@ async function exportToPDF() {
     });
 
     // --- 4. AÑADIR EL GRÁFICO ---
-    let finalY = doc.lastAutoTable.finalY; 
+    let finalY = doc.lastAutoTable.finalY;
     const chartCanvas = document.getElementById('turns-by-employee-chart');
     const chartImage = chartCanvas.toDataURL('image/png', 1.0);
     const chartHeight = 80;
@@ -1263,7 +1289,7 @@ async function loadClients() {
         const { data: clients, error, count } = await query
             .order('creado_en', { ascending: false })
             .range(from, to);
-        
+
         if (error) throw error;
 
         // El resto de la función es casi igual
@@ -1277,7 +1303,7 @@ async function loadClients() {
         clients.forEach(client => {
             const tr = document.createElement('tr');
             tr.className = 'table-row';
-            
+
             const registrationDate = new Date(client.creado_en).toLocaleDateString('es-CO', {
                 year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
@@ -1831,6 +1857,108 @@ async function generateReport() {
         reportInsightsContainer.classList.add('hidden');
     }
 }
+
+async function loadServices() {
+    servicesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando servicios...</td></tr>`;
+    try {
+        const { data: services, error } = await supabase
+            .from('servicios')
+            .select('*')
+            .order('nombre_servicio', { ascending: true });
+        
+        if (error) throw error;
+
+        servicesTableBody.innerHTML = '';
+        if (services.length === 0) {
+            servicesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay servicios registrados.</td></tr>`;
+            return;
+        }
+
+        services.forEach(service => {
+            const tr = document.createElement('tr');
+            tr.className = 'table-row';
+            tr.innerHTML = `
+                <td class="px-4 py-2">${service.nombre_servicio}</td>
+                <td class="px-4 py-2">${service.prefijo_ticket}</td>
+                <td class="px-4 py-2">
+                    <button class="form-button btn-primary text-sm px-3 py-1 mr-2" onclick="handleEditService(${service.id_servicio})">Editar</button>
+                    <button class="form-button btn-danger text-sm px-3 py-1" onclick="handleDeleteService(${service.id_servicio}, '${service.nombre_servicio}')">Eliminar</button>
+                </td>
+            `;
+            servicesTableBody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error("Error al cargar servicios:", error.message);
+        servicesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar servicios.</td></tr>`;
+    }
+}
+
+async function handleSaveService(event) {
+    event.preventDefault();
+    const id = serviceIdField.value;
+    const serviceData = {
+        nombre_servicio: serviceNameField.value,
+        prefijo_ticket: servicePrefixField.value.toUpperCase()
+    };
+
+    const actionText = id ? 'Actualizar' : 'Crear';
+    const confirmed = await showConfirmationModal(`${actionText} Servicio`, `¿Está seguro de que desea guardar este servicio?`);
+    if (!confirmed) return;
+
+    try {
+        if (id) {
+            serviceData.id_servicio = id;
+        }
+        
+        const { error } = await supabase.from('servicios').upsert(serviceData);
+        if (error) throw error;
+
+        await showConfirmationModal('Éxito', `Servicio guardado exitosamente.`);
+        serviceFormContainer.classList.add('hidden');
+        loadServices(); // Recargar la tabla
+    } catch (error) {
+        console.error(`Error al guardar servicio:`, error.message);
+        await showConfirmationModal('Error', `Error al guardar servicio: ${error.message}`);
+    }
+}
+
+async function handleEditService(id) {
+    try {
+        const { data: service, error } = await supabase.from('servicios').select('*').eq('id_servicio', id).single();
+        if (error) throw error;
+
+        serviceForm.reset();
+        serviceIdField.value = service.id_servicio;
+        serviceNameField.value = service.nombre_servicio;
+        servicePrefixField.value = service.prefijo_ticket;
+        
+        serviceFormTitle.textContent = `Editar Servicio: ${service.nombre_servicio}`;
+        serviceFormContainer.classList.remove('hidden');
+    } catch (error) {
+        console.error("Error al cargar servicio para editar:", error.message);
+        await showConfirmationModal('Error', `No se pudo cargar el servicio: ${error.message}`);
+    }
+}
+
+async function handleDeleteService(id, name) {
+    const confirmed = await showConfirmationModal('Confirmar Eliminación', `¿Está ABSOLUTAMENTE seguro de que desea eliminar el servicio "${name}"? Esta acción no se puede deshacer.`);
+    if (!confirmed) return;
+
+    try {
+        const { error } = await supabase.from('servicios').delete().eq('id_servicio', id);
+        if (error) throw error;
+
+        await showConfirmationModal('Éxito', 'Servicio eliminado exitosamente.');
+        loadServices();
+    } catch (error) {
+        console.error("Error al eliminar servicio:", error.message);
+        await showConfirmationModal('Error', `No se pudo eliminar el servicio: ${error.message}. Es posible que esté en uso.`);
+    }
+}
+
+// IMPORTANTE: Expón las funciones al ámbito global para que los `onclick` funcionen
+window.handleEditService = handleEditService;
+window.handleDeleteService = handleDeleteService;
 
 // --- suscripciones realtime ---
 function setupRealtimeSubscriptions() {
