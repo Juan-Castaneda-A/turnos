@@ -27,6 +27,7 @@ let clientPaginationControls, prevClientPage, clientPageInfo, nextClientPage; //
 let clientSearchInput; // <-- AÑADE ESTA LÍNEA
 let currentClientSearch = '';
 let servicesTableBody, addServiceBtn, serviceFormContainer, serviceFormTitle, serviceForm, serviceIdField, serviceNameField, servicePrefixField, cancelServiceFormBtn;
+let messagesTableBody, addMessageBtn, messageFormContainer, messageFormTitle, messageForm, messageIdField, messageTextField, messageActiveField, messageActiveText, cancelMessageFormBtn;
 let currentPage = 1; // <-- Añade esta línea
 const rowsPerPage = 25;
 let currentReportData = []; // <-- AÑADE ESTA LÍNEA para guardar los datos del último reporte
@@ -122,6 +123,16 @@ function init() {
     serviceNameField = document.getElementById('service-name-field');
     servicePrefixField = document.getElementById('service-prefix-field');
     cancelServiceFormBtn = document.getElementById('cancel-service-form-btn');
+    messagesTableBody = document.getElementById('messages-table-body');
+    addMessageBtn = document.getElementById('add-message-btn');
+    messageFormContainer = document.getElementById('message-form-container');
+    messageFormTitle = document.getElementById('message-form-title');
+    messageForm = document.getElementById('message-form');
+    messageIdField = document.getElementById('message-id-field');
+    messageTextField = document.getElementById('message-text-field');
+    messageActiveField = document.getElementById('message-active-field');
+    messageActiveText = document.getElementById('message-active-text');
+    cancelMessageFormBtn = document.getElementById('cancel-message-form-btn');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -289,6 +300,26 @@ function assignEventListeners() {
     });
 
     serviceForm.addEventListener('submit', handleSaveService);
+
+    addMessageBtn.addEventListener('click', () => {
+        messageForm.reset();
+        messageIdField.value = '';
+        messageActiveField.checked = true; // Por defecto activo
+        messageActiveText.textContent = 'Activo';
+        messageFormTitle.textContent = 'Crear Nuevo Mensaje';
+        messageFormContainer.classList.remove('hidden');
+    });
+
+    cancelMessageFormBtn.addEventListener('click', () => {
+        messageFormContainer.classList.add('hidden');
+    });
+
+    // Listener para el texto del toggle switch
+    messageActiveField.addEventListener('change', () => {
+        messageActiveText.textContent = messageActiveField.checked ? 'Activo' : 'Inactivo';
+    });
+
+    messageForm.addEventListener('submit', handleSaveMessage);
 
     // ... (Aquí irían todos los demás event listeners: addUserBtn, savePrioritiesBtn, etc.)
     // Por simplicidad, los dejo dentro de sus funciones de carga por ahora,
@@ -764,6 +795,9 @@ function showView(viewId) {
         case 'notary-settings':
             // Lógica para cargar configuración de notaría (si aplica)
             break;
+        case 'manage-messages':
+            loadMessages();
+            break;
     }
 }
 
@@ -870,6 +904,7 @@ function exportToXLSX() {
     XLSX.utils.book_append_sheet(wb, wsMain, "Datos Detallados");
     XLSX.writeFile(wb, `Reporte_Notaria_${groupByLabel}_${today}.xlsx`);
 }
+
 function exportToCSV() {
     if (currentReportData.length === 0) return;
 
@@ -1323,6 +1358,112 @@ async function loadClients() {
         clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar la lista de clientes.</td></tr>`;
     }
 }
+
+async function loadMessages() {
+    messagesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando mensajes...</td></tr>`;
+    try {
+        const { data: messages, error } = await supabase
+            .from('mensajes_visualizador')
+            .select('*')
+            .order('created_at', { ascending: false }); // Mostrar los más recientes primero
+
+        if (error) throw error;
+
+        messagesTableBody.innerHTML = '';
+        if (messages.length === 0) {
+            messagesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay mensajes registrados.</td></tr>`;
+            return;
+        }
+
+        messages.forEach(msg => {
+            const tr = document.createElement('tr');
+            tr.className = 'table-row';
+            const statusText = msg.is_active ? 'Activo' : 'Inactivo';
+            const statusClass = msg.is_active ? 'text-green-400' : 'text-red-400';
+            tr.innerHTML = `
+                <td class="px-4 py-2">${msg.texto_mensaje}</td>
+                <td class="px-4 py-2 ${statusClass}">${statusText}</td>
+                <td class="px-4 py-2">
+                    <button class="form-button btn-primary text-sm px-3 py-1 mr-2" onclick="handleEditMessage(${msg.id})">Editar</button>
+                    <button class="form-button btn-danger text-sm px-3 py-1" onclick="handleDeleteMessage(${msg.id})">Eliminar</button>
+                </td>
+            `;
+            messagesTableBody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error("Error al cargar mensajes:", error.message);
+        messagesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar mensajes.</td></tr>`;
+    }
+}
+
+async function handleSaveMessage(event) {
+    event.preventDefault();
+    const id = messageIdField.value;
+    const messageData = {
+        texto_mensaje: messageTextField.value,
+        is_active: messageActiveField.checked
+    };
+
+    const actionText = id ? 'Actualizar' : 'Crear';
+    const confirmed = await showConfirmationModal(`${actionText} Mensaje`, `¿Está seguro de que desea guardar este mensaje?`);
+    if (!confirmed) return;
+
+    try {
+        if (id) {
+            messageData.id = id;
+        }
+
+        // Usamos upsert para crear o actualizar
+        const { error } = await supabase.from('mensajes_visualizador').upsert(messageData);
+        if (error) throw error;
+
+        await showConfirmationModal('Éxito', `Mensaje guardado exitosamente.`);
+        messageFormContainer.classList.add('hidden');
+        loadMessages(); // Recargar la tabla
+    } catch (error) {
+        console.error(`Error al guardar mensaje:`, error.message);
+        await showConfirmationModal('Error', `Error al guardar mensaje: ${error.message}`);
+    }
+}
+
+async function handleEditMessage(id) {
+    try {
+        const { data: msg, error } = await supabase.from('mensajes_visualizador').select('*').eq('id', id).single();
+        if (error) throw error;
+
+        messageForm.reset();
+        messageIdField.value = msg.id;
+        messageTextField.value = msg.texto_mensaje;
+        messageActiveField.checked = msg.is_active;
+        messageActiveText.textContent = msg.is_active ? 'Activo' : 'Inactivo';
+
+        messageFormTitle.textContent = `Editar Mensaje`;
+        messageFormContainer.classList.remove('hidden');
+    } catch (error) {
+        console.error("Error al cargar mensaje para editar:", error.message);
+        await showConfirmationModal('Error', `No se pudo cargar el mensaje: ${error.message}`);
+    }
+}
+
+async function handleDeleteMessage(id) {
+    const confirmed = await showConfirmationModal('Confirmar Eliminación', `¿Está seguro de que desea eliminar este mensaje?`);
+    if (!confirmed) return;
+
+    try {
+        const { error } = await supabase.from('mensajes_visualizador').delete().eq('id', id);
+        if (error) throw error;
+
+        await showConfirmationModal('Éxito', 'Mensaje eliminado exitosamente.');
+        loadMessages();
+    } catch (error) {
+        console.error("Error al eliminar mensaje:", error.message);
+        await showConfirmationModal('Error', `No se pudo eliminar el mensaje: ${error.message}`);
+    }
+}
+
+// Exponer las funciones al ámbito global para los onclick
+window.handleEditMessage = handleEditMessage;
+window.handleDeleteMessage = handleDeleteMessage;
 
 function renderPaginationControls(totalCount) {
     if (!totalCount || totalCount <= rowsPerPage) {
@@ -1865,7 +2006,7 @@ async function loadServices() {
             .from('servicios')
             .select('*')
             .order('nombre_servicio', { ascending: true });
-        
+
         if (error) throw error;
 
         servicesTableBody.innerHTML = '';
@@ -1909,7 +2050,7 @@ async function handleSaveService(event) {
         if (id) {
             serviceData.id_servicio = id;
         }
-        
+
         const { error } = await supabase.from('servicios').upsert(serviceData);
         if (error) throw error;
 
@@ -1931,7 +2072,7 @@ async function handleEditService(id) {
         serviceIdField.value = service.id_servicio;
         serviceNameField.value = service.nombre_servicio;
         servicePrefixField.value = service.prefijo_ticket;
-        
+
         serviceFormTitle.textContent = `Editar Servicio: ${service.nombre_servicio}`;
         serviceFormContainer.classList.remove('hidden');
     } catch (error) {

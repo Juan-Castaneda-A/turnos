@@ -6,16 +6,8 @@ console.log("Supabase Client inicializado para Visualizador.");
 console.log("Objeto Supabase:", supabase); // DEBUG: Inspeccionar el objeto supabase
 console.log("¿Existe supabase.from?", typeof supabase.from); // DEBUG: Verificar si .from existe
 
-// // Referencias a los elementos del DOM
-// const currentTurnNumberElement = document.getElementById('current-turn-number');
-// const currentTurnModuleElement = document.getElementById('current-turn-module');
-// const currentTurnDisplayElement = document.getElementById('current-turn-display');
-// const callHistoryElement = document.getElementById('call-history');
-// const modulesStatusBodyElement = document.getElementById('modules-status-body');
-// //const callSound = document.getElementById('call-sound');
-// const fullscreenAlert = document.getElementById('fullscreen-alert');
-// const fullscreenTurnNumber = document.getElementById('fullscreen-turn-number');
-// const fullscreenTurnModule = document.getElementById('fullscreen-turn-module');
+const messageTickerContainer = document.getElementById('message-ticker-container');
+const messageTickerText = document.getElementById('message-ticker-text');
 
 // Declaramos las variables aquí, pero las asignaremos cuando el DOM esté listo.
 let currentTurnNumberElement, currentTurnModuleElement, currentTurnDisplayElement,
@@ -25,90 +17,14 @@ let lastCalledTurnId = null; // Para evitar reproducir el sonido múltiples vece
 let spanishVoice = null;// Variable global para guardar la voz en español una vez que la encontremos
 //let audioEnabled = false;
 
+let activeMessages = [];      // Array para guardar los mensajes activos
+let currentMessageIndex = 0;  // Índice del mensaje que se está mostrando
+let tickerIntervalId = null;  // Para poder detener/reiniciar el intervalo
+const TICKER_INTERVAL = 10000; // Tiempo en milisegundos para cambiar de mensaje (10 segundos)
+
 // ==========================================================
 // FUNCIONES DE LÓGICA (Tus funciones de TTS y otras se quedan igual)
 // ==========================================================
-
-/*document.addEventListener('click', () => {
-    audioEnabled = true;
-    // Intentar reproducir el sonido para "desbloquear" el audio
-    callSound.play().then(() => callSound.pause()).catch(e => console.log(e));
-}, { once: true });*/
-
-// --- Funciones de Utilidad para Audio y TTS ---
-
-// Utility function to convert base64 to ArrayBuffer
-// function base64ToArrayBuffer(base64) {
-//     const binaryString = atob(base64);
-//     const len = binaryString.length;
-//     const bytes = new Uint8Array(len);
-//     for (let i = 0; i < len; i++) {
-//         bytes[i] = binaryString.charCodeAt(i);
-//     }
-//     return bytes.buffer;
-// }
-
-// Utility function to convert PCM (Int16Array) to WAV Blob
-// function pcmToWav(pcm, sampleRate) {
-//     const pcmLength = pcm.length;
-//     const buffer = new ArrayBuffer(44 + pcmLength * 2); // 44 bytes for WAV header, 2 bytes per sample (PCM16)
-//     const view = new DataView(buffer);
-
-//     // WAV header
-//     // RIFF chunk descriptor
-//     writeString(view, 0, 'RIFF');
-//     view.setUint32(4, 36 + pcmLength * 2, true); // ChunkSize
-//     writeString(view, 8, 'WAVE');
-//     // FMT sub-chunk
-//     writeString(view, 12, 'fmt ');
-//     view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-//     view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
-//     view.setUint16(22, 1, true); // NumChannels (1 for mono)
-//     view.setUint32(24, sampleRate, true); // SampleRate
-//     view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * NumChannels * BitsPerSample/8)
-//     view.setUint16(32, 2, true); // BlockAlign (NumChannels * BitsPerSample/8)
-//     view.setUint16(34, 16, true); // BitsPerSample
-//     // DATA sub-chunk
-//     writeString(view, 36, 'data');
-//     view.setUint32(40, pcmLength * 2, true); // Subchunk2Size (NumSamples * NumChannels * BitsPerSample/8)
-
-//     // Write PCM data
-//     let offset = 44;
-//     for (let i = 0; i < pcmLength; i++, offset += 2) {
-//         view.setInt16(offset, pcm[i], true);
-//     }
-
-//     return new Blob([buffer], { type: 'audio/wav' });
-// }
-
-// function writeString(view, offset, string) {
-//     for (let i = 0; i < string.length; i++) {
-//         view.setUint8(offset + i, string.charCodeAt(i));
-//     }
-// }
-
-// Utility function for exponential backoff with fetch
-// async function fetchWithExponentialBackoff(url, options, retries = 3, delay = 1000) {
-//     try {
-//         const response = await fetch(url, options);
-//         if (!response.ok) {
-//             if (response.status === 429 && retries > 0) { // Too Many Requests
-//                 console.warn(`Rate limit hit, retrying in ${delay / 1000}s...`);
-//                 await new Promise(res => setTimeout(res, delay));
-//                 return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
-//             }
-//             throw new Error(`HTTP error! status: ${response.status}`);
-//         }
-//         return response;
-//     } catch (error) {
-//         if (retries > 0) {
-//             console.warn(`Fetch failed, retrying in ${delay / 1000}s...`, error);
-//             await new Promise(res => setTimeout(res, delay));
-//             return fetchWithExponentialBackoff(url, options, retries - 1, delay * 2);
-//         }
-//         throw error;
-//     }
-// }
 
 // Function to convert numbers to Spanish words (simplified for turn numbers)
 function numberToWordsSpanish(num) {
@@ -163,45 +79,6 @@ function loadSpanishVoice() {
 // El evento 'voiceschanged' se dispara cuando la lista de voces está lista
 window.speechSynthesis.onvoiceschanged = loadSpanishVoice;
 
-// async function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
-//     // Primero, nos aseguramos de que las voces se hayan cargado
-//     if (!spanishVoice) {
-//         loadSpanishVoice();
-//     }
-
-//     try {
-//         // La función que convierte números a palabras sigue siendo útil
-//         const numeroTurnoEnPalabras = numberToWordsSpanish(parseInt(numeroTurno, 10));
-//         const moduleNumberStr = nombreModulo.split(' ')[1] || '';
-//         const moduleNumber = parseInt(moduleNumberStr, 10);
-//         const moduleNumberEnPalabras = numberToWordsSpanish(moduleNumber);
-
-//         const textToSpeak = `Turno ${prefijoTurno} ${numeroTurnoEnPalabras}, diríjase al módulo ${moduleNumberEnPalabras}.`;
-//         console.log("Texto a anunciar (nativo):", textToSpeak);
-
-//         // Cancelar cualquier anuncio anterior para evitar que se solapen
-//         window.speechSynthesis.cancel();
-
-//         // Crear el objeto de síntesis de voz
-//         const utterance = new SpeechSynthesisUtterance(textToSpeak);
-
-//         // Asignar la voz en español que encontramos
-//         if (spanishVoice) {
-//             utterance.voice = spanishVoice;
-//         }
-
-//         // (Opcional) Ajustar velocidad y tono
-//         utterance.rate = 0.9; // Un poco más lento que lo normal
-//         utterance.pitch = 1.0; 
-
-//         // ¡Hablar!
-//         window.speechSynthesis.speak(utterance);
-
-//     } catch (error) {
-//         console.error("Error al anunciar el turno con la Web Speech API:", error);
-//     }
-// }
-
 function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
     if (!spanishVoice) {
         loadSpanishVoice();
@@ -235,15 +112,14 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
     console.log("Texto a anunciar (nativo):", textToSpeak);
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    // ... (tu configuración de voz: spanishVoice, rate, etc.) ...
     if (spanishVoice) {
         utterance.voice = spanishVoice;
     }
 
-        // (Opcional) Ajustar velocidad y tono
+    // (Opcional) Ajustar velocidad y tono
     utterance.rate = 0.9; // Un poco más lento que lo normal
-    utterance.pitch = 1.0; 
-    
+    utterance.pitch = 1.0;
+
     // 3. Cuando la voz termine, quitamos la clase para que vuelva a su tamaño normal
     utterance.onend = shrinkPanel;
 
@@ -265,73 +141,12 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
         window.speechSynthesis.speak(utterance); // Si falla el sonido, habla de todas formas
     });
 
-    
+
 }
-
-
-// Función para actualizar el display del turno actual
-// async function updateCurrentTurnDisplay(turn) {
-//     if (turn) {
-//         currentTurnNumberElement.textContent = `${turn.prefijo_turno}-${String(turn.numero_turno).padStart(3, '0')}`;
-//         currentTurnModuleElement.textContent = `Diríjase al módulo ${turn.modulos.nombre_modulo.split(' ')[1]}`;
-
-//         // Reproducir sonido si es un nuevo turno llamado
-//         if (turn.id_turno !== lastCalledTurnId) {
-//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-//             lastCalledTurnId = turn.id_turno;
-
-//             // Añadir animación de pulso al display principal
-//             currentTurnDisplayElement.classList.add('pulse-animation');
-//             setTimeout(() => {
-//                 currentTurnDisplayElement.classList.remove('pulse-animation');
-//             }, 1500); // Duración de la animación
-//         }
-//     } else {
-//         currentTurnNumberElement.textContent = '---';
-//         currentTurnModuleElement.textContent = 'Esperando nuevo turno...';
-//         lastCalledTurnId = null;
-//     }
-// }
-
-// --- Suscripciones en tiempo real a Supabase ---
-
-// Pega esta nueva función en visualizador.js
-
-// async function forceAnnounceTurnById(turnId) {
-//     if (!turnId) return;
-//     try {
-//         const { data: turn, error } = await supabase
-//             .from('turnos')
-//             .select('*, modulos(nombre_modulo)')
-//             .eq('id_turno', turnId)
-//             .single(); // .single() para obtener un solo objeto
-
-//         if (error) throw error;
-
-//         if (turn) {
-//             // Llama a la lógica de anuncio directamente, saltándose la comprobación de ID
-//             updateCurrentTurnDisplay(turn); // Reutilizamos la función que actualiza la pantalla
-//             await announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-//         }
-//     } catch (error) {
-//         console.error("Error al forzar el anuncio del turno:", error);
-//     }
-// }
 
 async function forceAnnounceTurnById(turnId) {
     if (!turnId) return;
-    // La sintaxis de Supabase V2 es un poco diferente, la ajustamos
-    // supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single()
-    //     .then(({ data: turn, error }) => {
-    //         if (error) {
-    //             console.error("Error al forzar anuncio:", error);
-    //             return;
-    //         }
-    //         if (turn) {
-    //             // Llamamos a la nueva función que maneja la animación y la voz
-    //             announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-    //         }
-    //     });
+
     try {
         const { data: turn, error } = await supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single();
         if (error) throw error;
@@ -386,32 +201,17 @@ async function updateModulesStatus(modules) {
         `;
         return;
     }
-    /*
-    // Obtener todos los usuarios para mapear ID a nombre
-    let allUsers = {};
-    try {
-        const { data: users, error: usersError } = await supabase
-            .from('usuarios')
-            .select('id_usuario, nombre_completo');
-        if (usersError) throw usersError;
-        users.forEach(user => {
-            allUsers[user.id_usuario] = user.nombre_completo;
-        });
-    } catch (error) {
-        console.error("Error al cargar todos los usuarios para el estado de módulos:", error.message);
-        // Continuar sin nombres de usuario si hay un error
-    }*/
 
     modules.forEach(mod => {
         const tr = document.createElement('tr');
         let statusClass = '';
         let statusText = '';
         let currentTurnInfo = '';
-        
+
         // Obtener el nombre del funcionario asignado (si existe)
-const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0 
-    ? mod.usuarios[0].nombre_completo 
-    : 'Sin Asignar';
+        const funcionarioNombre = mod.usuarios && mod.usuarios.length > 0
+            ? mod.usuarios[0].nombre_completo
+            : 'Sin Asignar';
         // Filtrar turnos para mostrar solo el que está 'en atencion' por ese módulo
         const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
         switch (mod.estado) {
@@ -483,13 +283,13 @@ function updateCallHistoryWithNewTurn(turn) {
     // Actualiza el display principal
     currentTurnNumberElement.textContent = turnText;
     currentTurnModuleElement.textContent = `Diríjase al ${moduleText.toLowerCase()}`;
-    
+
     // Añade el nuevo turno al principio del historial en el DOM
     const firstHistoryItem = callHistoryElement.querySelector('.history-item');
     const newHistoryDiv = document.createElement('div');
     newHistoryDiv.className = 'history-item';
     newHistoryDiv.innerHTML = `<span>${turnText}</span><span class="text-gray-400">${moduleText}</span>`;
-    
+
     callHistoryElement.insertBefore(newHistoryDiv, firstHistoryItem);
 
     // Mantiene el historial con un máximo de 5 elementos
@@ -511,29 +311,9 @@ function setupRealtimeSubscriptions() {
         (payload) => {
             console.log('Cambio general detectado, recargando datos silenciosamente:', payload.table);
             // Llama a una función que actualiza todo MENOS el turno principal y el sonido.
-            updateSecondaryData(); 
+            updateSecondaryData();
         }
     );
-
-    // Escucha cambios en la tabla 'modulos'
-    // channel.on(
-    //     'postgres_changes',
-    //     { event: '*', schema: 'public', table: 'modulos' },
-    //     (payload) => {
-    //         console.log('Cambio en modulos recibido:', payload.eventType);
-    //         loadInitialData();
-    //     }
-    // );
-
-    // // Escucha cambios en la tabla 'usuarios'
-    // channel.on(
-    //     'postgres_changes',
-    //     { event: '*', schema: 'public', table: 'usuarios' },
-    //     (payload) => {
-    //         console.log('Cambio en usuarios recibido:', payload.eventType);
-    //         loadInitialData();
-    //     }
-    // );
 
     // Escucha el mensaje específico de 'nuevo_llamado'
     channel.on('broadcast', { event: 'nuevo_llamado' },
@@ -543,7 +323,7 @@ function setupRealtimeSubscriptions() {
             lastCalledTurnId = turn.id_turno; // <-- **AÑADIDO**: Actualizamos el estado
             // Actualizamos el historial y el display principal
             updateCallHistoryWithNewTurn(turn);
-            
+
             // Llamamos directamente a la función de anuncio con los datos recibidos.
             announceTurn(turn.prefijo_turno, turn.numero_turno, turn.nombre_modulo);
         }
@@ -558,18 +338,10 @@ function setupRealtimeSubscriptions() {
     );
 
     // Escucha el mensaje de que un turno ha terminado.
-    channel.on('broadcast', { event: 'turno_finalizado' }, 
+    channel.on('broadcast', { event: 'turno_finalizado' },
         async (message) => {
             console.log('Evento de TURNO FINALIZADO recibido.', message.payload);
-            
-            // Comprobamos si el turno que se finalizó es el que está en pantalla
-            // para evitar limpiar la pantalla si un turno antiguo se finaliza.
-            // if (message.payload.id_turno === lastCalledTurnId) {
-            //     clearMainTurnDisplay();
-            // }
-            
-            // // Refrescamos los datos secundarios (historial, estado de módulos)
-            // updateSecondaryData();
+
             try {
                 const { data: nextTurnToShow, error } = await supabase
                     .from('turnos')
@@ -607,7 +379,24 @@ function setupRealtimeSubscriptions() {
         // Oculta el banner después de 10 segundos
         setTimeout(() => {
             silenceBanner.classList.add('hidden');
-        }, 4000); 
+        }, 4000);
+    });
+
+    const messagesChannel = supabase.channel('visualizador_messages_channel');
+
+    messagesChannel.on('postgres_changes',
+        { event: '*', schema: 'public', table: 'mensajes_visualizador' },
+        (payload) => {
+            console.log('Cambio detectado en mensajes_visualizador:', payload.eventType);
+            // Simplemente volvemos a cargar y mostrar los mensajes
+            loadAndDisplayMessages();
+        }
+    ).subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Visualizador conectado al canal de mensajes.');
+        } else {
+            console.error('Error al conectar al canal de mensajes:', status);
+        }
     });
 
     // 3. Finalmente, nos suscribimos al canal UNA SOLA VEZ para activar todos los listeners
@@ -623,7 +412,7 @@ function setupRealtimeSubscriptions() {
 // ==========================================================
 // INICIO DE LA APLICACIÓN
 // ==========================================================
-function init() {
+async function init() {
     // **CORRECCIÓN**: Asignamos las variables del DOM aquí, cuando estamos seguros de que existen.
     currentTurnNumberElement = document.getElementById('current-turn-number');
     currentTurnModuleElement = document.getElementById('current-turn-module');
@@ -631,13 +420,14 @@ function init() {
     callHistoryElement = document.getElementById('call-history');
     modulesStatusBodyElement = document.getElementById('modules-status-body');
     silenceBanner = document.getElementById('silence-banner');
-    
+    console.log("Inicializando Visualizador...");
     // El resto de la inicialización
-    loadInitialData();
+    await loadInitialData();
     setupRealtimeSubscriptions();
+    await loadAndDisplayMessages(); // <-- AÑADE ESTA LÍNEA
+    console.log("Visualizador inicializado.");
 }
 
-// Función para cargar los datos iniciales y mantener actualizados los displays
 async function loadInitialData() {
     // Cargar turno principal solo una vez al inicio
     try {
@@ -657,16 +447,74 @@ async function loadInitialData() {
     } catch (e) {
         console.error("Error cargando turno inicial", e);
     }
-    
+
     // Carga el resto de datos
     await updateSecondaryData();
 }
 
-// Cargar datos iniciales al cargar la página
-// window.onload = () => {
-//     loadInitialData();
-//     // Retrasar la configuración de las suscripciones en tiempo real
-//     setTimeout(setupRealtimeSubscriptions, 500); // Retraso de 500ms
-// };
+async function loadAndDisplayMessages() {
+    console.log("Cargando mensajes para el ticker...");
+    try {
+        const { data: messages, error } = await supabase
+            .from('mensajes_visualizador')
+            .select('texto_mensaje')
+            .eq('is_active', true) // Solo traemos los mensajes activos
+            .order('created_at', { ascending: false }); // Opcional: ordenar por más recientes
+
+        if (error) throw error;
+
+        activeMessages = messages.map(msg => msg.texto_mensaje); // Guardamos solo el texto
+        console.log(`Mensajes activos cargados: ${activeMessages.length}`);
+
+        // Detener cualquier intervalo anterior para evitar duplicados
+        if (tickerIntervalId) {
+            clearInterval(tickerIntervalId);
+        }
+
+        if (activeMessages.length > 0) {
+            messageTickerContainer.classList.remove('hidden'); // Mostrar el contenedor
+            currentMessageIndex = 0; // Empezar desde el primer mensaje
+
+            // Función interna para actualizar el texto del ticker
+            const updateTicker = () => {
+                if (activeMessages.length === 0) {
+                    messageTickerContainer.classList.add('hidden'); // Ocultar si ya no hay mensajes
+                    if (tickerIntervalId) clearInterval(tickerIntervalId); // Detener intervalo
+                    return;
+                }
+
+                // Concatenamos todos los mensajes activos con separadores
+                // para que fluyan continuamente en la animación CSS
+                const fullTickerText = activeMessages.join("   •   "); // Usa puntos o separadores
+
+                // Solo actualizamos si el texto es diferente (evita reinicios innecesarios de la animación)
+                if (messageTickerText.textContent !== fullTickerText) {
+                    messageTickerText.textContent = fullTickerText + "   •   "; // Añade separador al final para loop visual
+                }
+
+                // Ya NO necesitamos la animación de opacidad ni el índice
+                // messageTickerText.style.opacity = 0; 
+                // setTimeout(() => { messageTickerText.style.opacity = 1; }, 500);
+                // currentMessageIndex = (currentMessageIndex + 1) % activeMessages.length;
+            };
+
+            updateTicker(); // Mostrar el primer mensaje inmediatamente
+            //tickerIntervalId = setInterval(updateTicker, TICKER_INTERVAL); // Iniciar la rotación
+
+            messageTickerContainer.classList.remove('hidden');
+
+        } else {
+            // Si no hay mensajes activos, ocultar el ticker
+            messageTickerContainer.classList.add('hidden');
+            messageTickerText.textContent = '';
+            if (tickerIntervalId) clearInterval(tickerIntervalId);
+        }
+
+    } catch (error) {
+        console.error("Error al cargar mensajes del ticker:", error.message);
+        messageTickerText.textContent = "Error al cargar mensajes.";
+        messageTickerContainer.classList.remove('hidden'); // Mostrar el error
+    }
+}
 
 document.addEventListener('DOMContentLoaded', init);

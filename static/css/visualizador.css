@@ -102,3 +102,51 @@ body {
     font-weight: 600; /* semibold */
     /* El color text-gray-400 ya lo tienes en el HTML, así que se mantiene */
 }
+
+/* Container for the ticker */
+#message-ticker-container {
+  overflow: hidden; /* Crucial: Hides the text outside the box */
+  position: relative; /* Needed for absolute positioning if desired later */
+}
+
+/* The text element that will scroll */
+#message-ticker-text {
+  /* Start the animation */
+  animation: ticker-scroll 30s linear infinite; 
+  display: inline-block; /* Allows text to move as one block */
+  padding-left: 100%; /* Start the text off-screen to the right */
+  white-space: nowrap; /* Prevent text wrapping */
+  opacity: 1; /* Ensure opacity is reset if changed by JS */
+  transition: none; /* Override the JS fade transition */
+}
+
+/* Define the scrolling animation */
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0); /* Start position (off-screen right) */
+  }
+  100% {
+    transform: translateX(-100%); /* End position (completely off-screen left) */
+  }
+}
+
+/* Optional: Pause animation on hover */
+#message-ticker-container:hover #message-ticker-text {
+  animation-play-state: paused;
+}
+
+#call-history, #modules-status-body /* Assuming modules status uses this ID or similar */ {
+  max-height: calc(55vh - 100px); /* Example: 55% of viewport height minus some pixels for padding/margins */
+  overflow-y: auto; /* Add scrollbars IF content exceeds the max height */
+}
+
+/* Ensure the parent container allows shrinking */
+main > section {
+  min-height: 0; /* Allows sections to shrink if needed */
+}
+
+/* Adjust padding within the side sections if needed */
+main > section:not(#current-turn-display) {
+   padding-top: 0.75rem; /* Reduce top padding */
+   padding-bottom: 0.75rem; /* Reduce bottom padding */
+}

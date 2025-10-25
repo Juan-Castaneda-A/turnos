@@ -14,32 +14,40 @@
 
 <body class="bg-gray-800 text-gray-200 font-sans antialiased">
 
-    <div class="container mx-auto p-4 lg:p-6 flex flex-col min-h-screen">
-        
-        <header class="text-center py-6 bg-gray-700 rounded-2xl shadow-lg">
-            <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="w-auto h-12 sm:h-16 mx-auto mb-4">
+    <div class="container mx-auto p-3 lg:p-4 flex flex-col min-h-screen">
 
-            <!-- <h1 class="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
-                Notaría Tercera
-            </h1> -->
-            <h2 class="text-xl sm:text-3xl font-semibold text-gray-400 mt-2">Turnos en Atención</h2>
+        <header class="flex items-center justify-between py-3 px-6 bg-gray-700 rounded-2xl shadow-lg mb-6">
+            <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría"
+                class="w-auto h-16 sm:h-20">
+
+            <h2 class="text-2xl sm:text-4xl font-semibold text-gray-300">Turnos en Atención</h2>
         </header>
 
-        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow mt-6">
-    
-    <section class="lg:col-span-2 bg-gray-900 rounded-2xl shadow-lg flex flex-col justify-center items-center text-center p-6 min-h-[300px] transition-all duration-500 ease-in-out" id="current-turn-display">
-        <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
-        <div id="current-turn-number" class="turn-font-size font-extrabold text-green-400 leading-none tracking-tight">---</div>
-        <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">Esperando turno...</p>
-    </section>
-
-    <section class="lg:col-span-1 bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col">
-        <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
-        <div id="call-history" class="space-y-3 overflow-y-auto flex-grow">
+        <div id="message-ticker-container" class="w-full bg-gray-900 bg-opacity-80 py-3 px-6 overflow-hidden shadow-lg border-y border-gray-700 mb-4 rounded-lg"> 
+            <div id="message-ticker-text" class="text-3xl font-semibold text-yellow-300 whitespace- uppercase">
+                Cargando mensajes...
             </div>
-    </section>
+        </div>
 
-    </main>
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow mt-0">
+
+            <section
+                class="lg:col-span-2 bg-gray-900 rounded-2xl shadow-lg flex flex-col justify-center items-center text-center p-6 min-h-[300px] transition-all duration-500 ease-in-out"
+                id="current-turn-display">
+                <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
+                <div id="current-turn-number"
+                    class="turn-font-size font-extrabold text-green-400 leading-none tracking-tight">---</div>
+                <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">
+                    Esperando turno...</p>
+            </section>
+
+            <section class="lg:col-span-1 bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col">
+                <h3 class="text-2xl font-bold text-gray-300 mb-4">Últimos Llamados</h3>
+                <div id="call-history" class="space-y-3 overflow-y-auto flex-grow">
+                </div>
+            </section>
+
+        </main>
     </div>
 
     <audio id="call-sound" src="{{ url_for('static', filename='audio/doble_sonido_rapido.mp3') }}"></audio>
@@ -50,13 +58,16 @@
     </script>
     <script type="module" src="{{ url_for('static', filename='js/visualizador.js') }}"></script>
 
-<div id="fullscreen-alert" class="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center z-50 hidden transition-opacity duration-500 opacity-0">
-    <div id="fullscreen-turn-number" class="font-extrabold text-green-400 leading-none tracking-tight" style="font-size: 45vw;">---</div>
-    <div id="fullscreen-turn-module" class="font-semibold text-gray-300" style="font-size: 10vw;">---</div>
-</div>
-<div id="silence-banner" class="fixed top-0 inset-x-0 bg-red-600 text-white text-4xl font-bold p-4 text-center z-50 hidden shadow-lg">
-    🤫 POR FAVOR, GUARDAR SILENCIO 🤫
-</div>
+    <div id="fullscreen-alert"
+        class="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center z-50 hidden transition-opacity duration-500 opacity-0">
+        <div id="fullscreen-turn-number" class="font-extrabold text-green-400 leading-none tracking-tight"
+            style="font-size: 45vw;">---</div>
+        <div id="fullscreen-turn-module" class="font-semibold text-gray-300" style="font-size: 10vw;">---</div>
+    </div>
+    <div id="silence-banner"
+        class="fixed top-0 inset-x-0 bg-red-600 text-white text-4xl font-bold p-4 text-center z-50 hidden shadow-lg">
+        🤫 POR FAVOR, GUARDAR SILENCIO 🤫
+    </div>
 </body>
 
 </html>
