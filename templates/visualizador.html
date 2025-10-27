@@ -12,9 +12,9 @@
     <link href="{{ url_for('static', filename='css/visualizador.css') }}" rel="stylesheet">
 </head>
 
-<body class="bg-gray-800 text-gray-200 font-sans antialiased">
+<body class="bg-gray-800 text-gray-200 font-sans antialiased flex flex-col h-screen overflow-hidden">
 
-    <div class="container mx-auto p-3 lg:p-4 flex flex-col min-h-screen">
+    <div class="flex flex-col flex-grow w-full p-2">
 
         <header class="flex items-center justify-between py-3 px-6 bg-gray-700 rounded-2xl shadow-lg mb-6">
             <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría"
@@ -36,7 +36,7 @@
                 id="current-turn-display">
                 <p class="text-lg sm:text-xl font-medium text-gray-400 mb-2 uppercase tracking-wider">Turno Actual</p>
                 <div id="current-turn-number"
-                    class="turn-font-size font-extrabold text-green-400 leading-none tracking-tight">---</div>
+                    class="turn-font-size font-extrabold text-green-400 leading-none tracking-tight whitespace-nowrap">---</div>
                 <p id="current-turn-module" class="text-2xl sm:text-3xl lg:text-4xl font-semibold text-gray-300 mt-2">
                     Esperando turno...</p>
             </section>
