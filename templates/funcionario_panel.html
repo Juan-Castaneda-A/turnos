@@ -15,26 +15,32 @@
 <body class="bg-gray-800 text-gray-200 font-sans antialiased">
     <div class="container mx-auto p-4">
 
-        <header class="flex flex-col md:flex-row justify-between items-center py-4 px-6 bg-blue-800 rounded-2xl shadow-lg mb-6">
-    
+        <header
+            class="flex flex-col md:flex-row justify-between items-center py-4 px-6 bg-blue-800 rounded-2xl shadow-lg mb-6">
+
             <div class="flex items-center gap-4 mb-4 md:mb-0">
-                <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="h-10"> <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+                <img src="{{ url_for('static', filename='img/logo_not.png') }}" alt="Logo Notaría" class="h-10">
+                <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                     Panel de Atención
                 </h1>
             </div>
-        
-            <div class="text-lg md:text-xl font-semibold text-blue-200 text-center md:text-left mb-4 md:mb-0">
-                Bienvenido, <span class="font-bold text-white">{{ user_name }}</span> | Módulo: <span class="font-bold text-white" id="assigned-module-name">Cargando...</span>
-            </div>
-            <button id="silence-alert-btn" class="mr-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg shadow-md transition">Pedir Silencio</button>
 
-            <a href="{{ url_for('logout') }}" class="w-full md:w-auto text-center px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition duration-300">
+            <div class="text-lg md:text-xl font-semibold text-blue-200 text-center md:text-left mb-4 md:mb-0">
+                Bienvenido, <span class="font-bold text-white">{{ user_name }}</span> | Módulo: <span
+                    class="font-bold text-white" id="assigned-module-name">Cargando...</span>
+            </div>
+            <button id="silence-alert-btn"
+                class="mr-4 px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold rounded-lg shadow-md transition">Pedir
+                Silencio</button>
+
+            <a href="{{ url_for('logout') }}"
+                class="w-full md:w-auto text-center px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition duration-300">
                 Cerrar Sesión
             </a>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            
+
             <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col lg:col-span-1">
                 <h2 class="text-2xl font-bold text-green-400 mb-4">Turnos por Atender</h2>
                 <div class="overflow-y-auto flex-grow h-80">
@@ -46,34 +52,52 @@
                             </tr>
                         </thead>
                         <tbody id="pending-turns-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
 
-            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-2">
+            <section
+                class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-2">
                 <h2 class="text-2xl font-bold text-green-400 mb-4" id="my-module-title">Mi Módulo: Cargando...</h2>
                 <div class="flex-grow flex flex-col justify-center items-center w-full">
                     <p class="text-lg font-medium text-gray-400 mb-2">Turno en Curso:</p>
-                    <div id="current-attending-turn" class="text-7xl font-extrabold text-yellow-400 mb-2 tracking-wide">---</div>
-                    <p id="current-attending-service" class="text-2xl font-semibold text-gray-300 mb-8">Esperando nuevo turno...</p>
+                    <div id="current-attending-turn" class="text-7xl font-extrabold text-yellow-400 mb-2 tracking-wide">
+                        ---</div>
+                    <p id="current-attending-service" class="text-2xl font-semibold text-gray-300 mb-8">Esperando nuevo
+                        turno...</p>
                     <div class="mt-4 text-center">
                         <p class="text-lg text-gray-400">Atendiendo a:</p>
                         <p id="current-attending-client" class="text-2xl font-bold text-white">-</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-4 w-full max-w-lg mt-8">
-                        </div>
+                    </div>
                     <div class="flex flex-col sm:flex-row gap-4 w-full max-w-lg">
-                        <button id="btn-call-next" class="flex-1 flex items-center justify-center px-5 py-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                        <button id="btn-call-next"
+                            class="flex-1 flex items-center justify-center px-5 py-4 bg-blue-600 text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                            </svg>
                             Llamar Siguiente
                         </button>
-                        <button id="btn-recall" class="flex-1 flex items-center justify-center px-5 py-4 bg-yellow-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
+                        <button id="btn-recall"
+                            class="flex-1 flex items-center justify-center px-5 py-4 bg-yellow-500 text-gray-900 font-bold rounded-lg shadow-md hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                            </svg>
                             Rellamar
                         </button>
-                        <button id="btn-finish" class="flex-1 flex items-center justify-center px-5 py-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <button id="btn-finish"
+                            class="flex-1 flex items-center justify-center px-5 py-4 bg-green-500 text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-6 h-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
                             Finalizar Turno
                         </button>
                     </div>
@@ -91,20 +115,46 @@
                             </tr>
                         </thead>
                         <tbody id="daily-history-body" class="divide-y divide-gray-700">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
             </section>
         </main>
     </div>
 
-    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div id="transfer-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-lg w-full">
+            <h3 class="text-2xl font-bold text-white mb-4" id="transfer-modal-title">Transferir Turno</h3>
+
+            <div class="mb-4">
+                <label for="transfer-module-select" class="block text-sm font-medium text-gray-300 mb-2">
+                    Seleccione el módulo de destino:
+                </label>
+                <select id="transfer-module-select"
+                    class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </select>
+            </div>
+
+            <div class="flex justify-end gap-4">
+                <button id="transfer-modal-confirm-btn"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar
+                    Transferencia</button>
+                <button id="transfer-modal-cancel-btn"
+                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmation-modal"
+        class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-sm w-full text-center">
             <h3 class="text-2xl font-bold text-white mb-4" id="modal-title"></h3>
             <p class="text-gray-300 mb-6" id="modal-message"></p>
             <div class="flex justify-center gap-4">
-                <button id="modal-confirm-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar</button>
-                <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
+                <button id="modal-confirm-btn"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar</button>
+                <button id="modal-cancel-btn"
+                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
             </div>
         </div>
     </div>

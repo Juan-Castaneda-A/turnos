@@ -144,20 +144,20 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
 
 }
 
-async function forceAnnounceTurnById(turnId) {
-    if (!turnId) return;
+// async function forceAnnounceTurnById(turnId) {
+//     if (!turnId) return;
 
-    try {
-        const { data: turn, error } = await supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single();
-        if (error) throw error;
-        if (turn) {
-            announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
-            lastCalledTurnId = turn.id_turno; // <-- **AÑADIDO**: Actualizamos el estado
-        }
-    } catch (error) {
-        console.error("Error al forzar anuncio:", error);
-    }
-}
+//     try {
+//         const { data: turn, error } = await supabase.from('turnos').select('*, modulos(nombre_modulo)').eq('id_turno', turnId).single();
+//         if (error) throw error;
+//         if (turn) {
+//             announceTurn(turn.prefijo_turno, turn.numero_turno, turn.modulos.nombre_modulo);
+//             lastCalledTurnId = turn.id_turno; // <-- **AÑADIDO**: Actualizamos el estado
+//         }
+//     } catch (error) {
+//         console.error("Error al forzar anuncio:", error);
+//     }
+// }
 
 function clearMainTurnDisplay() {
     currentTurnNumberElement.textContent = '---';
@@ -304,45 +304,73 @@ function setupRealtimeSubscriptions() {
     const channel = supabase.channel('turnos_channel');
     const silenceBanner = document.getElementById('silence-banner');
 
-    // ¡ELIMINAMOS EL LISTENER 'postgres_changes' GENERAL!
-    // Era ineficiente y ya no es necesario.
-    /*
-    channel.on('postgres_changes', { event: '*', schema: 'public' },
+    // --- ¡CORRECCIÓN "DEBOUNCE" v2 (Con Mutex) PARA EL VISUALIZADOR! ---
+    let reloadTimeout;
+    let isReloading = false; // <-- ¡LA BANDERA (MUTEX)!
+
+    const debouncedReloadAll = () => {
+        clearTimeout(reloadTimeout);
+        reloadTimeout = setTimeout(async () => {
+            // ¡EL CONTROL DE SEGURIDAD!
+            if (isReloading) {
+                console.log("VISUALIZADOR DEBOUNCED: Ignorado, recarga en curso.");
+                return;
+            }
+
+            isReloading = true; // ¡Levantar la bandera!
+            console.log("VISUALIZADOR DEBOUNCED: Recargando datos.");
+
+            try {
+                await loadInitialData();
+            } catch (e) {
+                console.error("Error en recarga 'debounced' del visualizador:", e);
+            } finally {
+                isReloading = false; // ¡Bajar la bandera!
+                console.log("VISUALIZADOR DEBOUNCED: Recarga completada.");
+            }
+        }, 500); // 500ms de espera
+    };
+    // --- FIN DE LA CORRECCIÓN ---
+
+    // Este es el ÚNICO listener de turnos que necesitamos
+    channel.on(
+        'postgres_changes',
+        {
+            event: '*',
+            schema: 'public',
+            table: 'turnos'
+            // NOTA: Si RLS de SELECT está activo, no necesitamos el filtro de org.
+        },
         (payload) => {
-            console.log('Cambio general detectado...');
-            updateSecondaryData(); // <-- Esta función ya no existe
-        }
-    );
-    */
-
-    // TODOS TUS LISTENERS 'broadcast' SE QUEDAN IGUAL. ¡Están perfectos!
-    channel.on('broadcast', { event: 'nuevo_llamado' },
-        (message) => {
-            console.log('¡Evento de NUEVO LLAMADO recibido!', message.payload);
-            const turn = message.payload;
-            lastCalledTurnId = turn.id_turno; 
-            updateCallHistoryWithNewTurn(turn); // <-- Esta función actualiza el historial
-            announceTurn(turn.prefijo_turno, turn.numero_turno, turn.nombre_modulo);
+            console.log(`Cambio en 'turnos' detectado: ${payload.eventType}`);
+            // ¡Cada vez que algo cambia, llamamos al amortiguador!
+            debouncedReloadAll();
         }
     );
 
-    channel.on('broadcast', { event: 'rellamar' },
-        (message) => {
-            console.log('¡Evento de RELLAMADO recibido!', message.payload);
-            forceAnnounceTurnById(message.payload.id_turno);
-        }
-    );
+    channel.on('broadcast', { event: 'nuevo_llamado' }, ({ payload }) => {
+        console.log('Evento "nuevo_llamado" (SONIDO) recibido:', payload);
 
-    // ... (tu listener de 'turno_finalizado' se queda igual) ...
-    channel.on('broadcast', { event: 'turno_finalizado' },
-        async (message) => {
-            console.log('Evento de TURNO FINALIZADO recibido.', message.payload);
-            // Simplemente volvemos a cargar los datos iniciales
-            loadInitialData(); 
+        // Comprobamos que el turno no sea el mismo que acaba de sonar
+        if (payload.id_turno && payload.id_turno !== lastCalledTurnId) {
+            announceTurn(payload.prefijo_turno, payload.numero_turno, payload.nombre_modulo);
+            updateCallHistoryWithNewTurn(payload); // Actualiza el historial inmediatamente
+            lastCalledTurnId = payload.id_turno;
+        } else {
+            console.log("Ignorando 'nuevo_llamado' duplicado (ya sonó).");
         }
-    );
-    
-    // ... (tu listener de 'silence_alert' se queda igual) ...
+    });
+
+    // 2. Listener para el ANUNCIO de un rellamado
+    channel.on('broadcast', { event: 'rellamar' }, ({ payload }) => {
+        console.log('Evento "rellamar" (SONIDO) recibido:', payload);
+
+        // El rellamado DEBE sonar siempre, incluso si es el mismo turno
+        announceTurn(payload.prefijo_turno, payload.numero_turno, payload.nombre_modulo);
+        lastCalledTurnId = payload.id_turno; // Sincroniza el ID
+    });
+
+    // Listener para "Silencio" (este es un broadcast, está bien)
     channel.on('broadcast', { event: 'silence_alert' }, (payload) => {
         console.log('Alerta de silencio recibida!', payload);
         silenceBanner.classList.remove('hidden');
@@ -353,7 +381,7 @@ function setupRealtimeSubscriptions() {
         }, 4000);
     });
 
-    // TU LISTENER DE MENSAJES SE QUEDA IGUAL. ¡Está perfecto!
+    // Canal separado para los mensajes del Ticker (está bien)
     const messagesChannel = supabase.channel('visualizador_messages_channel');
     messagesChannel.on('postgres_changes',
         { event: '*', schema: 'public', table: 'mensajes_visualizador' },
@@ -362,16 +390,12 @@ function setupRealtimeSubscriptions() {
             loadAndDisplayMessages(); // Recarga los mensajes
         }
     ).subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-            console.log('Visualizador conectado al canal de mensajes.');
-        }
+        if (status === 'SUBSCRIBED') console.log('Visualizador conectado al canal de mensajes.');
     });
 
-    // Tu suscripción final se queda igual
+    // Suscribirse al canal principal
     channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-            console.log('Visualizador conectado y escuchando en el canal notaria-turnos-canal.');
-        }
+        if (status === 'SUBSCRIBED') console.log('Visualizador conectado y escuchando en el canal notaria-turnos-canal.');
     });
 
     console.log("Suscripciones Realtime del Visualizador configuradas.");
@@ -404,7 +428,7 @@ async function loadInitialData() {
         if (!response.ok || !result.success) {
             throw new Error(result.error);
         }
-        
+
         const turn = result.current_turn; // Puede ser 'null'
         const history = result.history;   // Puede ser []
 
