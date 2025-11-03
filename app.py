@@ -540,39 +540,38 @@ def check_cliente(identificacion):
 @app.route('/api/reports')
 @admin_required # Asegúrate de que siga protegida
 def get_reports():
-    # 1. Recopilamos todos los parámetros de la URL
+    # 1. Recopilamos todos los parámetros
     start_date = request.args.get('start')
     end_date = request.args.get('end')
-    group_by = request.args.get('group_by') # El que agrupa
-    user_id = request.args.get('user_id')     # Filtro opcional
-    module_id = request.args.get('module_id') # Filtro opcional
+    group_by = request.args.get('group_by')
+    user_id = request.args.get('user_id')
+    module_id = request.args.get('module_id')
 
     if not all([start_date, end_date, group_by]):
         return jsonify({"error": "Faltan parámetros requeridos (start, end, group_by)"}), 400
     
     try:
-        # 2. Creamos un diccionario de parámetros con los NOMBRES EXACTOS que la función SQL espera
+        # 2. Creamos el diccionario de parámetros
         params = {
             'start_date': start_date,
             'end_date': end_date,
             'group_by_param': group_by,
-            # ¡CAMBIO CLAVE! Añadimos el ID de la organización del admin logueado
-            '_id_organizacion': g.org['id_organizacion'] # <-- DATO NUEVO
+            '_id_organizacion': g.org['id_organizacion'] # <-- El filtro de organización
         }
 
-        # 3. Añadimos los parámetros OPCIONALES solo si existen, usando los nombres con guion bajo
-        if user_id:
-            params['_user_id'] = int(user_id)
-        if module_id:
-            params['_module_id'] = int(module_id)
+        # --- ¡ESTA ES LA CORRECCIÓN! ---
+        # Añadimos los parámetros OPCIONALES, enviando None (NULL) si están vacíos.
+        # La base de datos necesita recibir TODOS los argumentos definidos.
+        params['_user_id'] = int(user_id) if user_id else None
+        params['_module_id'] = int(module_id) if module_id else None
+        # --- FIN DE LA CORRECCIÓN ---
         
-        # 4. Llamamos a la función RPC con el diccionario de parámetros correcto
+        # 4. Llamamos a la función RPC
         response = supabase.rpc('get_report_data', params).execute()
 
         if response.data:
             return jsonify(response.data)
         else:
-            # Si hay un error en la respuesta de Supabase, lo mostramos
             if response.error:
                 raise Exception(response.error.message)
             return jsonify([])
@@ -1345,6 +1344,127 @@ def api_delete_user(user_id):
         logging.error(f"Error en api_delete_user: {e}")
         return jsonify({"success": False, "error": f"Error al eliminar usuario: {e}"}), 500
 
+@app.route('/api/get-services-list')
+@admin_required
+def api_get_services_list():
+    """
+    Obtiene una lista simple (ID y nombre) de todos los servicios
+    de la organización para usar en menús desplegables.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('servicios') \
+            .select('id_servicio, nombre_servicio') \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .order('nombre_servicio', desc=False) \
+            .execute()
+            
+        return jsonify({"success": True, "services": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_services_list: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/get-turn-history')
+@admin_required
+def api_get_turn_history():
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    
+    start_date = request.args.get('start', None)
+    end_date = request.args.get('end', None)
+    service_id = request.args.get('service_id', None)
+    
+    try:
+        query = supabase.table('turnos') \
+            .select('*, servicios(nombre_servicio), modulos(nombre_modulo), logs_turnos(accion, hora_accion)') \
+            .eq('id_organizacion', org_id)
+
+        if service_id:
+            query = query.eq('id_servicio', service_id)
+        
+        # --- ¡ESTA ES LA CORRECCIÓN! ---
+        if start_date:
+            query = query.gte('hora_solicitud', start_date)
+        
+        if end_date:
+            from datetime import datetime, timedelta
+            end_date_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.lt('hora_solicitud', end_date_dt.strftime('%Y-%m-%d'))
+        
+        # Si NO se proveen fechas, aplicamos un filtro por defecto (últimos 7 días)
+        if not start_date and not end_date:
+            from datetime import datetime, timedelta
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+            query = query.gte('hora_solicitud', seven_days_ago.isoformat())
+        # --- FIN DE LA CORRECCIÓN ---
+
+        # Añadimos un límite de seguridad y orden
+        query = query.order('hora_solicitud', desc=True).limit(250) 
+        response = query.execute()
+
+        return jsonify({"success": True, "history": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_turn_history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/get-dashboard-data')
+@admin_required
+def api_get_dashboard_data():
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
+    try:
+        # 1. KPI: Turnos en Espera
+        waiting_resp = supabase.table('turnos').select('id_turno', count='exact').eq('id_organizacion', org_id).eq('estado', 'en espera').execute()
+        
+        # 2. KPI: Turnos Atendidos Hoy
+        attended_resp = supabase.table('turnos').select('id_turno', count='exact').eq('id_organizacion', org_id).eq('estado', 'atendido').gte('hora_finalizacion', today).execute()
+
+        # 3. KPI: Módulos Activos
+        active_modules_resp = supabase.table('modulos').select('id_modulo', count='exact').eq('id_organizacion', org_id).eq('estado', 'activo').execute()
+
+        # --- ¡ESTA ES LA CORRECCIÓN! ---
+        # 4. Tabla: Estado de Módulos (Consulta simple)
+        modules_status_resp = supabase.table('modulos') \
+            .select('*, turnos(prefijo_turno, numero_turno, estado)') \
+            .eq('id_organizacion', org_id) \
+            .order('nombre_modulo', desc=False) \
+            .execute()
+
+        # 5. Obtenemos los usuarios POR SEPARADO
+        users_resp = supabase.table('usuarios') \
+            .select('id_modulo_asignado, nombre_completo') \
+            .eq('id_organizacion', org_id) \
+            .execute()
+        # --- FIN DE LA CORRECCIÓN ---
+
+        kpis = {
+            "waiting_count": waiting_resp.count or 0,
+            "attended_today_count": attended_resp.count or 0,
+            "active_modules_count": active_modules_resp.count or 0
+        }
+        
+        return jsonify({
+            "success": True, 
+            "kpis": kpis,
+            "modules_status": modules_status_resp.data,
+            "users": users_resp.data  # <-- Añadimos los usuarios a la respuesta
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_dashboard_data: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)

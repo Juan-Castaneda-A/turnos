@@ -783,8 +783,7 @@ function showView(viewId) {
 
     switch (viewId) {
         case 'dashboard':
-            loadDashboardSummary();
-            loadRealtimeModulesStatus();
+            loadDashboardData();
             break;
         case 'manage-users':
             loadUsers();
@@ -1165,71 +1164,158 @@ async function exportToPDF() {
 }
 
 // --- Funciones de Carga de Datos (load...) ---
-async function loadDashboardSummary() {
+// async function loadDashboardSummary() {
+//     try {
+//         const { count: waitingCount, error: waitingError } = await supabase
+//             .from('turnos')
+//             .select('*', { count: 'exact' })
+//             .eq('estado', 'en espera');
+//         if (waitingError) throw waitingError;
+//         turnsWaitingElement.textContent = waitingCount;
+
+//         const today = new Date().toISOString().split('T')[0];
+//         const { count: attendedCount, error: attendedError } = await supabase
+//             .from('turnos')
+//             .select('*', { count: 'exact' })
+//             .eq('estado', 'atendido')
+//             .gte('hora_finalizacion', today);
+//         if (attendedError) throw attendedError;
+//         turnsAttendedTodayElement.textContent = attendedCount;
+
+//         const { count: activeModulesCount, error: activeModulesError } = await supabase
+//             .from('modulos')
+//             .select('*', { count: 'exact' })
+//             .eq('estado', 'activo');
+//         if (activeModulesError) throw activeModulesError;
+//         activeModulesElement.textContent = activeModulesCount;
+
+//     } catch (error) {
+//         console.error("Error al cargar resumen del dashboard:", error.message);
+//         turnsWaitingElement.textContent = 'Error';
+//         turnsAttendedTodayElement.textContent = 'Error';
+//         activeModulesElement.textContent = 'Error';
+//     }
+// }
+
+// async function loadRealtimeModulesStatus() {
+//     realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando estado de módulos...</td></tr>`;
+//     try {
+//         // Obtener todos los usuarios y mapear su id_modulo_asignado a su nombre
+//         let moduleToUserNameMap = {};
+//         try {
+//             const { data: users, error: usersError } = await supabase
+//                 .from('usuarios')
+//                 .select('id_usuario, nombre_completo, id_modulo_asignado');
+//             if (usersError) throw usersError;
+
+//             users.forEach(user => {
+//                 if (user.id_modulo_asignado) {
+//                     moduleToUserNameMap[user.id_modulo_asignado] = user.nombre_completo;
+//                 }
+//             });
+//         } catch (error) {
+//             console.error("Error al cargar usuarios para el estado de módulos en tiempo real:", error.message);
+//         }
+
+//         const { data: modulesData, error: modulesError } = await supabase
+//             .from('modulos')
+//             .select(`
+//                 *,
+//                 turnos(id_turno, numero_turno, prefijo_turno, estado)
+//             `)
+//             .order('nombre_modulo', { ascending: true });
+
+//         if (modulesError) throw modulesError;
+
+//         realtimeModulesStatusBody.innerHTML = '';
+//         if (modulesData.length === 0) {
+//             realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">No hay módulos registrados.</td></tr>`;
+//             return;
+//         }
+
+//         modulesData.forEach(mod => {
+//             const tr = document.createElement('tr');
+//             tr.className = 'table-row';
+//             let statusClass = '';
+//             let statusText = '';
+//             let currentTurnInfo = '---';
+
+//             // Obtener el nombre del funcionario asignado a este módulo
+//             const funcionarioNombre = moduleToUserNameMap[mod.id_modulo] || 'Sin Asignar';
+
+//             const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
+
+//             switch (mod.estado) {
+//                 case 'activo':
+//                     statusClass = 'text-green-400';
+//                     statusText = 'Activo';
+//                     break;
+//                 case 'inactivo':
+//                     statusClass = 'text-red-400';
+//                     statusText = 'Inactivo';
+//                     break;
+//                 default:
+//                     statusClass = 'text-gray-400';
+//                     statusText = mod.estado;
+//             }
+
+//             if (currentTurn) {
+//                 statusText = 'Atendiendo';
+//                 statusClass = 'text-yellow-400';
+//                 currentTurnInfo = `${currentTurn.prefijo_turno}-${String(currentTurn.numero_turno).padStart(3, '0')}`;
+//             }
+
+//             tr.innerHTML = `
+//                 <td class="px-4 py-2">${mod.nombre_modulo}</td>
+//                 <td class="px-4 py-2">${funcionarioNombre}</td>
+//                 <td class="px-4 py-2 ${statusClass}">${statusText}</td>
+//                 <td class="px-4 py-2">${currentTurnInfo}</td>
+//             `;
+//             realtimeModulesStatusBody.appendChild(tr);
+//         });
+
+//     } catch (error) {
+//         console.error("Error al cargar estado de módulos en tiempo real:", error.message);
+//         realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-red-400 py-4">Error al cargar estado de módulos.</td></tr>`;
+//     }
+// }
+
+async function loadDashboardData() {
+    realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando...</td></tr>`;
+    turnsWaitingElement.textContent = '...';
+    turnsAttendedTodayElement.textContent = '...';
+    activeModulesElement.textContent = '...';
+
     try {
-        const { count: waitingCount, error: waitingError } = await supabase
-            .from('turnos')
-            .select('*', { count: 'exact' })
-            .eq('estado', 'en espera');
-        if (waitingError) throw waitingError;
-        turnsWaitingElement.textContent = waitingCount;
+        const response = await fetch('/api/get-dashboard-data');
+        const result = await response.json();
 
-        const today = new Date().toISOString().split('T')[0];
-        const { count: attendedCount, error: attendedError } = await supabase
-            .from('turnos')
-            .select('*', { count: 'exact' })
-            .eq('estado', 'atendido')
-            .gte('hora_finalizacion', today);
-        if (attendedError) throw attendedError;
-        turnsAttendedTodayElement.textContent = attendedCount;
-
-        const { count: activeModulesCount, error: activeModulesError } = await supabase
-            .from('modulos')
-            .select('*', { count: 'exact' })
-            .eq('estado', 'activo');
-        if (activeModulesError) throw activeModulesError;
-        activeModulesElement.textContent = activeModulesCount;
-
-    } catch (error) {
-        console.error("Error al cargar resumen del dashboard:", error.message);
-        turnsWaitingElement.textContent = 'Error';
-        turnsAttendedTodayElement.textContent = 'Error';
-        activeModulesElement.textContent = 'Error';
-    }
-}
-
-async function loadRealtimeModulesStatus() {
-    realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando estado de módulos...</td></tr>`;
-    try {
-        // Obtener todos los usuarios y mapear su id_modulo_asignado a su nombre
-        let moduleToUserNameMap = {};
-        try {
-            const { data: users, error: usersError } = await supabase
-                .from('usuarios')
-                .select('id_usuario, nombre_completo, id_modulo_asignado');
-            if (usersError) throw usersError;
-
-            users.forEach(user => {
-                if (user.id_modulo_asignado) {
-                    moduleToUserNameMap[user.id_modulo_asignado] = user.nombre_completo;
-                }
-            });
-        } catch (error) {
-            console.error("Error al cargar usuarios para el estado de módulos en tiempo real:", error.message);
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
         }
 
-        const { data: modulesData, error: modulesError } = await supabase
-            .from('modulos')
-            .select(`
-                *,
-                turnos(id_turno, numero_turno, prefijo_turno, estado)
-            `)
-            .order('nombre_modulo', { ascending: true });
+        // 2. Poblamos los KPIs
+        const kpis = result.kpis;
+        turnsWaitingElement.textContent = kpis.waiting_count;
+        turnsAttendedTodayElement.textContent = kpis.attended_today_count;
+        activeModulesElement.textContent = kpis.active_modules_count;
 
-        if (modulesError) throw modulesError;
+        // --- ¡ESTA ES LA CORRECCIÓN! ---
+        // 3. Creamos un mapa de Módulo -> Funcionario
+        const userMap = new Map();
+        if (result.users) {
+            result.users.forEach(user => {
+                if (user.id_modulo_asignado) {
+                    userMap.set(user.id_modulo_asignado, user.nombre_completo);
+                }
+            });
+        }
+        // --- FIN DE LA CORRECCIÓN ---
 
+        // 4. Poblamos la Tabla de Estado de Módulos
+        const modulesData = result.modules_status;
         realtimeModulesStatusBody.innerHTML = '';
-        if (modulesData.length === 0) {
+        if (!modulesData || modulesData.length === 0) {
             realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">No hay módulos registrados.</td></tr>`;
             return;
         }
@@ -1241,11 +1327,12 @@ async function loadRealtimeModulesStatus() {
             let statusText = '';
             let currentTurnInfo = '---';
 
-            // Obtener el nombre del funcionario asignado a este módulo
-            const funcionarioNombre = moduleToUserNameMap[mod.id_modulo] || 'Sin Asignar';
+            // ¡CORRECCIÓN! Buscamos el funcionario en nuestro mapa
+            const funcionarioNombre = userMap.get(mod.id_modulo) || 'Sin Asignar';
 
             const currentTurn = mod.turnos ? mod.turnos.find(t => t.estado === 'en atencion') : null;
-
+            
+            // ... (el resto de tu switch/case para 'statusText' y 'currentTurnInfo' es correcto) ...
             switch (mod.estado) {
                 case 'activo':
                     statusClass = 'text-green-400';
@@ -1276,8 +1363,11 @@ async function loadRealtimeModulesStatus() {
         });
 
     } catch (error) {
-        console.error("Error al cargar estado de módulos en tiempo real:", error.message);
+        console.error("Error al cargar datos del dashboard:", error.message);
         realtimeModulesStatusBody.innerHTML = `<tr><td colspan="4" class="text-center text-red-400 py-4">Error al cargar estado de módulos.</td></tr>`;
+        turnsWaitingElement.textContent = 'Error';
+        turnsAttendedTodayElement.textContent = 'Error';
+        activeModulesElement.textContent = 'Error';
     }
 }
 
@@ -1719,9 +1809,17 @@ async function loadServicesConfig() {
 
 async function loadHistoryServicesFilter() {
     try {
-        const { data: services, error } = await supabase.from('servicios').select('id_servicio, nombre_servicio').order('nombre_servicio', { ascending: true });
-        if (error) throw error;
+        // Llamamos a la nueva API
+        const response = await fetch('/api/get-services-list');
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const services = result.services; // Obtenemos la lista del JSON
+
+        // El resto de tu lógica es IDÉNTICA
         historyServiceFilter.innerHTML = '<option value="">Filtrar por Servicio</option>';
         services.forEach(service => {
             const option = document.createElement('option');
@@ -1736,32 +1834,30 @@ async function loadHistoryServicesFilter() {
 
 async function loadTurnHistory() {
     turnHistoryTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-500 py-4">Cargando historial...</td></tr>`;
+    
+    // 1. Recolectamos los filtros del DOM
+    const startDate = historyStartDate.value;
+    const endDate = historyEndDate.value;
+    const serviceId = historyServiceFilter.value;
+    
+    // 2. Construimos la URL con los parámetros de búsqueda
+    const url = new URL('/api/get-turn-history', window.location.origin);
+    if (startDate) url.searchParams.append('start', startDate);
+    if (endDate) url.searchParams.append('end', endDate);
+    if (serviceId) url.searchParams.append('service_id', serviceId);
+
     try {
-        let query = supabase
-            .from('turnos')
-            .select('*, servicios(nombre_servicio), modulos(nombre_modulo), logs_turnos(accion, hora_accion)');
-
-        const startDate = historyStartDate.value;
-        const endDate = historyEndDate.value;
-        const serviceId = historyServiceFilter.value;
-
-        if (startDate) {
-            query = query.gte('hora_solicitud', startDate);
-        }
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setDate(end.getDate() + 1);
-            query = query.lt('hora_solicitud', end.toISOString().split('T')[0]);
-        }
-        if (serviceId) {
-            query = query.eq('id_servicio', serviceId);
+        // 3. Llamamos a nuestra nueva API
+        const response = await fetch(url.toString());
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
         }
 
-        query = query.order('hora_solicitud', { ascending: false });
+        const history = result.history; // Obtenemos el historial del JSON
 
-        const { data: history, error } = await query;
-        if (error) throw error;
-
+        // 4. ¡El resto de tu lógica para "pintar" la tabla es IDÉNTICA!
         turnHistoryTableBody.innerHTML = '';
         if (history.length === 0) {
             turnHistoryTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-gray-500 py-4">No se encontraron turnos con los filtros aplicados.</td></tr>`;
@@ -1800,7 +1896,7 @@ async function loadTurnHistory() {
 
     } catch (error) {
         console.error("Error al cargar historial de turnos:", error.message);
-        turnHistoryTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-400 py-4">Error al cargar historial.</td></tr>`;
+        turnHistoryTableBody.innerHTML = `<tr><td colspan="8" class="text-center text-red-400 py-4">Error al cargar historial: ${error.message}</td></tr>`;
     }
 }
 
@@ -2217,17 +2313,16 @@ window.handleDeleteService = handleDeleteService;
 
 // --- suscripciones realtime ---
 function setupRealtimeSubscriptions() {
-    // Suscribirse a cambios en la tabla 'turnos'
+    // --- Canal de TURNOS ---
     const turnosChannel = supabase.channel('admin_turnos_channel');
     turnosChannel
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'turnos' },
+            { event: '*', schema: 'public', table: 'turnos', filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` }, // <-- ¡Añadí el filtro de org aquí!
             async payload => {
                 console.log('Cambio en turnos recibido en admin dashboard!', payload);
-                loadDashboardSummary();
-                loadRealtimeModulesStatus();
-                // Solo recargar el historial si la vista está activa
+                loadDashboardData(); // <-- CORRECCIÓN
+
                 if (!document.getElementById('turn-history-view').classList.contains('hidden')) {
                     loadTurnHistory();
                 }
@@ -2235,17 +2330,16 @@ function setupRealtimeSubscriptions() {
         )
         .subscribe();
 
-    // Suscribirse a cambios en la tabla 'modulos'
+    // --- Canal de MÓDULOS ---
     const modulosChannel = supabase.channel('admin_modulos_channel');
     modulosChannel
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'modulos' },
+            { event: '*', schema: 'public', table: 'modulos', filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` }, // <-- ¡Añadí el filtro de org aquí!
             async payload => {
                 console.log('Cambio en modulos recibido en admin dashboard!', payload);
-                loadDashboardSummary();
-                loadRealtimeModulesStatus();
-                // Solo recargar si la vista está activa
+                loadDashboardData(); // <-- CORRECCIÓN
+                
                 if (!document.getElementById('manage-modules-view').classList.contains('hidden')) {
                     loadModules();
                 }
@@ -2258,20 +2352,23 @@ function setupRealtimeSubscriptions() {
             }
         )
         .subscribe();
-
-    // Suscribirse a cambios en la tabla 'usuarios'
+    
+    // --- Canal de USUARIOS ---
     const usuariosChannel = supabase.channel('admin_usuarios_channel');
     usuariosChannel
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'usuarios' },
+            { event: '*', schema: 'public', table: 'usuarios', filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` }, // <-- ¡Añadí el filtro de org aquí!
             async payload => {
                 console.log('Cambio en usuarios recibido en admin dashboard!', payload);
-                // Solo recargar si la vista está activa
+                
                 if (!document.getElementById('manage-users-view').classList.contains('hidden')) {
                     loadUsers();
                 }
-                loadRealtimeModulesStatus(); // Esto siempre debe actualizarse
+                
+                // ¡LA CORRECCIÓN MÁS IMPORTANTE!
+                // loadRealtimeModulesStatus(); // <-- ESTA LÍNEA CAUSABA EL ERROR
+                loadDashboardData(); // <-- Esta es la nueva función correcta
             }
         )
         .subscribe();
@@ -2281,7 +2378,7 @@ function setupRealtimeSubscriptions() {
     modulosServiciosChannel
         .on(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'modulos_servicios' },
+            { event: '*', schema: 'public', table: 'modulos_servicios', filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` },
             async payload => {
                 // Si la bandera está levantada, ignora el evento y no hagas nada.
                 if (isSavingConfig) {
