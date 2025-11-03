@@ -1553,9 +1553,6 @@ def api_get_module_name():
 @app.route('/api/funcionario/get-current-turn')
 @login_required
 def api_get_current_turn():
-    """
-    Obtiene el turno "en atencion" actual para el módulo del funcionario.
-    """
     if not g.org or not g.user or not g.user.get('assigned_module_id'):
         return jsonify({"success": False, "error": "No autorizado o sin módulo"}), 401
     
@@ -1573,8 +1570,11 @@ def api_get_current_turn():
             .maybe_single() \
             .execute()
         
-        # Devuelve el turno (que puede ser None)
-        return jsonify({"success": True, "turn": response.data}), 200
+        # --- ¡CORRECCIÓN DEFENSIVA! ---
+        # Verificamos si 'response' existe antes de acceder a '.data'
+        turn_data = response.data if response else None
+        return jsonify({"success": True, "turn": turn_data}), 200
+        # --- FIN DE LA CORRECCIÓN ---
             
     except Exception as e:
         logging.error(f"Error en api_get_current_turn: {e}")
@@ -1584,9 +1584,6 @@ def api_get_current_turn():
 @app.route('/api/funcionario/get-daily-history')
 @login_required
 def api_get_daily_history():
-    """
-    Obtiene el historial de turnos "atendidos" HOY para el módulo del funcionario.
-    """
     if not g.org or not g.user or not g.user.get('assigned_module_id'):
         return jsonify({"success": False, "error": "No autorizado o sin módulo"}), 401
 
@@ -1604,7 +1601,10 @@ def api_get_daily_history():
             .order('hora_finalizacion', desc=True) \
             .execute()
         
-        return jsonify({"success": True, "history": response.data}), 200
+        # --- ¡CORRECCIÓN DEFENSIVA! ---
+        history_data = response.data if response else []
+        return jsonify({"success": True, "history": history_data}), 200
+        # --- FIN DE LA CORRECCIÓN ---
             
     except Exception as e:
         logging.error(f"Error en api_get_daily_history: {e}")
@@ -1765,6 +1765,81 @@ def api_finish_turn():
 
     except Exception as e:
         logging.error(f"Error en api_finish_turn: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/visualizador/get-initial-data')
+def api_get_visualizador_data():
+    """
+    Endpoint PÚBLICO (filtrado por subdominio) que obtiene
+    el turno actual y el historial para el visualizador.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 404
+    
+    org_id = g.org['id_organizacion']
+    
+    try:
+        # 1. Get current turn
+        current_turn_resp = supabase.table('turnos') \
+            .select('id_turno, prefijo_turno, numero_turno, modulos(nombre_modulo)') \
+            .eq('id_organizacion', org_id) \
+            .eq('estado', 'en atencion') \
+            .order('hora_llamado', desc=True) \
+            .limit(1) \
+            .maybe_single() \
+            .execute()
+
+        # 2. Get history
+        history_resp = supabase.table('turnos') \
+            .select('prefijo_turno, numero_turno, modulos(nombre_modulo)') \
+            .eq('id_organizacion', org_id) \
+            .eq('estado', 'atendido') \
+            .order('hora_finalizacion', desc=True) \
+            .limit(5) \
+            .execute()
+
+        # --- ¡ESTA ES LA CORRECCIÓN DEFENSIVA! ---
+        # Verificamos si la respuesta NO es None ANTES de acceder a .data
+        
+        current_turn_data = current_turn_resp.data if current_turn_resp else None
+        history_data = history_resp.data if history_resp else [] # Default a lista vacía
+        # --- FIN DE LA CORRECCIÓN ---
+
+        return jsonify({
+            "success": True,
+            "current_turn": current_turn_data, # (Esto será 'None' si .data era 'None', lo cual es JSON válido)
+            "history": history_data
+        }), 200
+
+    except Exception as e:
+        # El error que veías ("'NoneType'...") estaba ocurriendo aquí
+        logging.error(f"Error en api_get_visualizador_data: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/visualizador/get-ticker-messages')
+def api_get_ticker_messages():
+    """
+    Endpoint PÚBLICO (filtrado por subdominio) que obtiene
+    los mensajes activos para el ticker.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 404
+    
+    org_id = g.org['id_organizacion']
+    
+    try:
+        messages_resp = supabase.table('mensajes_visualizador') \
+            .select('texto_mensaje') \
+            .eq('id_organizacion', org_id) \
+            .eq('is_active', True) \
+            .order('created_at', desc=False) \
+            .execute()
+        
+        return jsonify({"success": True, "messages": messages_resp.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_ticker_messages: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---

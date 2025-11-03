@@ -420,9 +420,9 @@ btnFinish.addEventListener('click', async () => {
 
     btnFinish.disabled = true;
     try {
-        const finishedTurnId = currentAttendingTurnId; // Guardamos el ID
+        const finishedTurnId = currentAttendingTurnId; 
 
-        // 1. Llamamos a nuestra API
+        // 1. Llamamos a nuestra API (esto no cambia)
         const response = await fetch('/api/funcionario/finish-turn', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -437,21 +437,27 @@ btnFinish.addEventListener('click', async () => {
         console.log(`Turno ${finishedTurnId} finalizado.`);
         currentAttendingTurnId = null;
 
-        // 2. Actualizamos la UI local INMEDIATAMENTE
-        await loadCurrentTurn();
-        await loadDailyHistory();
+        // --- ¡LÍNEAS ELIMINADAS! ---
+        // Ya no llamamos a loadCurrentTurn() ni loadDailyHistory() aquí.
+        // Dejaremos que el evento de Realtime (que se recibe 1ms después)
+        // se encargue de actualizar la UI.
+        // await loadCurrentTurn();  <-- ELIMINADA
+        // await loadDailyHistory(); <-- ELIMINADA
         
-        // 3. Enviamos el broadcast (¡esto no cambia!)
+        // 3. Enviamos el broadcast (esto no cambia y ahora es lo único que actualiza la UI)
         turnosChannel.send({
             type: 'broadcast',
             event: 'turno_finalizado',
             payload: { id_turno: finishedTurnId }
         });
+        
     } catch (error) {
         console.error("Error al finalizar turno:", error.message);
         await showConfirmationModal('Error', `Error al finalizar turno: ${error.message}`);
     } finally {
-        updateButtonStates(); // Esto re-evaluará los botones
+        // 'updateButtonStates()' sigue aquí, pero las llamadas de Realtime
+        // lo volverán a llamar, asegurando el estado correcto.
+        updateButtonStates();
     }
 });
 
