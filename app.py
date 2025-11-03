@@ -1064,6 +1064,188 @@ def api_save_message():
         logging.error(f"Error en api_save_message: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/get-prioritized-services/<int:module_id>')
+@admin_required
+def api_get_prioritized_services(module_id):
+    """
+    Obtiene los servicios asignados a UN módulo, ordenados por prioridad,
+    y verifica que el módulo pertenezca a la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+
+    try:
+        # 1. Verificamos que el módulo pertenezca al admin (medida de seguridad)
+        module_check = supabase.table('modulos') \
+            .select('id_modulo') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', org_id) \
+            .single() \
+            .execute()
+
+        if not module_check.data:
+            return jsonify({"success": False, "error": "Módulo no encontrado o no pertenece a esta organización."}), 404
+
+        # 2. Si el módulo es válido, obtenemos sus servicios ordenados por prioridad
+        response = supabase.table('modulos_servicios') \
+            .select('prioridad, servicios(id_servicio, nombre_servicio)') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', org_id) \
+            .order('prioridad', desc=False) \
+            .execute()
+
+        return jsonify({"success": True, "services": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_prioritized_services: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/save-priorities', methods=['POST'])
+@admin_required
+def api_save_priorities():
+    """
+    Recibe una lista de IDs de servicio en su nuevo orden y actualiza
+    sus prioridades en la base de datos para un módulo específico.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    data = request.get_json()
+    
+    module_id = data.get('module_id')
+    service_ids_order = data.get('service_ids') # Esperamos una lista [7, 2, 5]
+
+    if not module_id or not isinstance(service_ids_order, list):
+        return jsonify({"success": False, "error": "Datos incompletos (module_id o service_ids faltantes)."}), 400
+
+    try:
+        # 1. Verificamos que el módulo pertenezca al admin (medida de seguridad)
+        module_check = supabase.table('modulos') \
+            .select('id_modulo') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', org_id) \
+            .single() \
+            .execute()
+
+        if not module_check.data:
+            return jsonify({"success": False, "error": "Módulo no encontrado o no pertenece a esta organización."}), 404
+            
+        # 2. Creamos la lista de objetos para 'upsert'
+        # 'upsert' es perfecto aquí: actualiza la prioridad si la fila existe, 
+        # (aunque en este caso siempre deberían existir).
+        updates = []
+        for index, service_id in enumerate(service_ids_order):
+            updates.append({
+                'id_modulo': module_id,
+                'id_servicio': service_id,
+                'id_organizacion': org_id, # Clave de seguridad
+                'prioridad': index + 1  # La prioridad es el índice (empezando en 1)
+            })
+
+        # 3. Ejecutamos la actualización
+        if updates:
+            response = supabase.table('modulos_servicios') \
+                .upsert(updates, on_conflict='id_modulo, id_servicio, id_organizacion') \
+                .execute()
+                
+            if not response.data:
+                 raise Exception("Error al ejecutar upsert de prioridades.")
+
+        return jsonify({"success": True, "message": "Orden de prioridad guardado exitosamente."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_save_priorities: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/get-clients')
+@admin_required
+def api_get_clients():
+    """
+    Endpoint seguro para obtener la lista PAGINADA y con BÚSQUEDA
+    de clientes, filtrados por la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    
+    # 1. Obtenemos los parámetros de la URL (?page=1&search=pedro&limit=25)
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 25))
+        search_term = request.args.get('search', '')
+    except ValueError:
+        return jsonify({"success": False, "error": "Parámetros de paginación inválidos"}), 400
+        
+    # 2. Calculamos el rango de paginación
+    page_from = (page - 1) * limit
+    page_to = page_from + limit - 1
+    
+    try:
+        # 3. Construimos la consulta base (filtrada por organización)
+        query = supabase.table('clientes') \
+            .select('*', count='exact') \
+            .eq('id_organizacion', org_id)
+
+        # 4. Si hay un término de búsqueda, añadimos el filtro
+        if search_term:
+            # Usamos 'ilike' para buscar cualquier parte del nombre O identificación
+            # y 'textSearch' para búsquedas más complejas (depende de tu config de Supabase)
+            # 'ilike' es más simple y efectivo para números de identificación.
+            query = query.ilike('numero_identificacion', f'{search_term}%') # Busca IDs que EMPIECEN con...
+
+        # 5. Añadimos el orden y el rango (paginación)
+        query = query.order('creado_en', desc=True) \
+                     .range(page_from, page_to)
+        
+        # 6. Ejecutamos la consulta
+        response = query.execute()
+
+        # 'response.count' nos da el CONTEO TOTAL de filas (ignorando el 'range')
+        return jsonify({
+            "success": True, 
+            "clients": response.data,
+            "total_count": response.count 
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_clients: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/reset-turns', methods=['DELETE'])
+@admin_required
+def api_reset_turns():
+    """
+    Endpoint seguro para RESETEAR (borrar) todos los turnos
+    de la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    logging.info(f"Admin {g.user['name']} iniciando reseteo de turnos para org {org_id}.")
+    
+    try:
+        # ¡BORRADO SEGURO! Borra solo los turnos de ESTA org.
+        # Tu JS original borraba todo (neq 'id_turno', 0), así que replicamos esa lógica
+        # pero AÑADIENDO el filtro de organización.
+        response = supabase.table('turnos') \
+            .delete() \
+            .eq('id_organizacion', org_id) \
+            .execute()
+        
+        # response.data contiene los registros borrados
+        num_deleted = len(response.data)
+        logging.info(f"{num_deleted} turnos eliminados para org {org_id}.")
+        return jsonify({"success": True, "message": f"Todos los turnos ({num_deleted}) de la organización han sido reseteados."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_reset_turns: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':

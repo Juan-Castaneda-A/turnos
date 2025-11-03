@@ -496,17 +496,27 @@ function assignEventListeners() {
     resetTurnsBtn.addEventListener('click', async () => {
         const confirmed = await showConfirmationModal(
             'Confirmar Reseteo de Turnos',
-            '¿Está ABSOLUTAMENTE seguro de que desea resetear la numeración de TODOS los turnos para el día? Esta acción no se puede deshacer y afectará a todos los servicios.'
+            '¿Está ABSOLUTAMENTE seguro de que desea resetear la numeración? Esta acción eliminará TODOS los turnos (en espera, atendidos, etc.) de SU organización.'
         );
         if (!confirmed) return;
 
         try {
-            const { error } = await supabase.from('turnos').delete().neq('id_turno', 0);
-            if (error) throw error;
+            // 1. Llamamos a nuestra nueva API segura
+            const response = await fetch('/api/reset-turns', {
+                method: 'DELETE'
+            });
 
-            await showConfirmationModal('Éxito', 'Numeración de turnos reseteada exitosamente para el día.');
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error);
+            }
+
+            // 2. Lógica de éxito (la misma que tenías)
+            await showConfirmationModal('Éxito', result.message); // Usamos el mensaje del backend
             loadDashboardSummary();
             loadRealtimeModulesStatus();
+
         } catch (error) {
             console.error("Error al resetear turnos:", error.message);
             await showConfirmationModal('Error', `Error al resetear turnos: ${error.message}`);
@@ -658,30 +668,30 @@ function assignEventListeners() {
         prioritySortableList.innerHTML = `<p class="text-gray-400">Cargando servicios para este módulo...</p>`;
 
         try {
-            // Buscamos los servicios asignados a este módulo, ordenados por su prioridad actual
-            const { data: services, error } = await supabase
-                .from('modulos_servicios')
-                .select(`
-                prioridad,
-                servicios (id_servicio, nombre_servicio)
-            `)
-                .eq('id_modulo', moduleId)
-                .order('prioridad', { ascending: true });
+            // Llamamos a la nueva API
+            const response = await fetch(`/api/get-prioritized-services/${moduleId}`);
+            const result = await response.json();
 
-            if (error) throw error;
+            if (!response.ok || !result.success) {
+                throw new Error(result.error);
+            }
 
+            // Obtenemos los servicios del JSON
+            // La data ya viene como { prioridad, servicios: {id_servicio, nombre_servicio} }
+            const services = result.services;
+
+            // El resto de tu lógica para "pintar" la lista es IDÉNTICA
             prioritySortableList.innerHTML = '';
             if (services.length === 0) {
                 prioritySortableList.innerHTML = `<p class="text-gray-400">Este módulo no tiene servicios asignados. Vaya a "Configurar Servicios" para asignarlos.</p>`;
                 return;
             }
 
-            // Creamos los elementos HTML para cada servicio
             services.forEach(item => {
                 const service = item.servicios;
                 const listItem = document.createElement('div');
                 listItem.className = 'priority-item';
-                listItem.dataset.serviceId = service.id_servicio; // Guardamos el ID del servicio
+                listItem.dataset.serviceId = service.id_servicio; // Guardamos el ID
 
                 listItem.innerHTML = `
                 <svg class="handle w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
@@ -690,7 +700,7 @@ function assignEventListeners() {
                 prioritySortableList.appendChild(listItem);
             });
 
-            // ¡Magia! Activamos la funcionalidad de arrastrar y soltar en la lista
+            // Tu librería Sortable (¡esto no cambia!)
             new Sortable(prioritySortableList, {
                 animation: 150,
                 ghostClass: 'sortable-ghost',
@@ -698,8 +708,8 @@ function assignEventListeners() {
             });
 
         } catch (error) {
-            console.error("Error cargando la lista de prioridades:", error);
-            prioritySortableList.innerHTML = `<p class="text-red-400">Error al cargar los servicios de este módulo.</p>`;
+            console.error("Error cargando la lista de prioridades:", error.message);
+            prioritySortableList.innerHTML = `<p class="text-red-400">Error al cargar los servicios: ${error.message}</p>`;
         }
     });
 
@@ -711,30 +721,38 @@ function assignEventListeners() {
         const confirmed = await showConfirmationModal('Guardar Prioridades', `¿Está seguro de que desea guardar el nuevo orden de prioridad para este módulo?`);
         if (!confirmed) return;
 
-        // Obtenemos todos los elementos de la lista en su nuevo orden
+        // 1. La lógica para LEER el nuevo orden del DOM es IDÉNTICA
         const listItems = prioritySortableList.querySelectorAll('.priority-item');
 
-        // Creamos un array de objetos para actualizar la base de datos
-        const updates = Array.from(listItems).map((item, index) => ({
-            id_modulo: parseInt(moduleId),
-            id_servicio: parseInt(item.dataset.serviceId),
-            prioridad: index + 1 // El índice (0, 1, 2...) se convierte en la prioridad (1, 2, 3...)
-        }));
+        // Creamos una simple lista de IDs en el nuevo orden
+        const serviceIdsInOrder = Array.from(listItems).map(item => parseInt(item.dataset.serviceId));
+
+        // 2. Creamos el payload para enviar al backend
+        const payload = {
+            module_id: parseInt(moduleId),
+            service_ids: serviceIdsInOrder // Enviamos la lista [7, 2, 5]
+        };
 
         try {
-            // Usamos upsert para actualizar las filas existentes.
-            // onConflict le dice a Supabase que la combinación de módulo y servicio es única.
-            const { error } = await supabase.from('modulos_servicios').upsert(updates, {
-                onConflict: 'id_modulo, id_servicio'
+            // 3. Llamamos a la nueva API
+            const response = await fetch('/api/save-priorities', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
 
-            if (error) throw error;
+            const result = await response.json();
 
-            await showConfirmationModal('Éxito', 'El orden de prioridad se ha guardado correctamente.');
+            if (!response.ok || !result.success) {
+                throw new Error(result.error);
+            }
+
+            // 4. Lógica de éxito
+            await showConfirmationModal('Éxito', result.message);
 
         } catch (error) {
             console.error('Error al guardar las prioridades:', error);
-            await showConfirmationModal('Error', `No se pudo guardar el orden de prioridades: ${error.message}`);
+            await showConfirmationModal('Error', `No se pudo guardar el orden: ${error.message}`);
         }
     });
 }
@@ -1310,29 +1328,27 @@ async function loadUsers() {
 async function loadClients() {
     clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando clientes...</td></tr>`;
 
-    const from = (currentPage - 1) * rowsPerPage;
-    const to = from + rowsPerPage - 1;
+    // 1. Construimos la URL de la API con los parámetros
+    const url = new URL('/api/get-clients', window.location.origin);
+    url.searchParams.append('page', currentPage);
+    url.searchParams.append('limit', rowsPerPage);
+    if (currentClientSearch) {
+        url.searchParams.append('search', currentClientSearch);
+    }
 
     try {
-        // 1. Empezamos a construir la consulta base
-        let query = supabase
-            .from('clientes')
-            .select('*', { count: 'exact' });
+        // 2. Llamamos a nuestra nueva API
+        const response = await fetch(url.toString());
+        const result = await response.json();
 
-        // 2. Si hay un término de búsqueda, AÑADIMOS el filtro a la consulta
-        if (currentClientSearch) {
-            // Usamos 'ilike' con '%' para buscar todos los números que EMPIECEN con el texto
-            query = query.ilike('numero_identificacion', `${currentClientSearch}%`);
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
         }
 
-        // 3. Continuamos construyendo la consulta con el orden y el rango
-        const { data: clients, error, count } = await query
-            .order('creado_en', { ascending: false })
-            .range(from, to);
+        const clients = result.clients;
+        const totalCount = result.total_count; // ¡Obtenemos el conteo total desde el backend!
 
-        if (error) throw error;
-
-        // El resto de la función es casi igual
+        // 3. ¡El resto de tu lógica para pintar la tabla es IDÉNTICA!
         clientsTableBody.innerHTML = '';
         if (clients.length === 0) {
             clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No se encontraron clientes con esos criterios.</td></tr>`;
@@ -1356,11 +1372,13 @@ async function loadClients() {
             clientsTableBody.appendChild(tr);
         });
 
-        renderPaginationControls(count);
+        // 4. ¡Tu lógica de paginación también es idéntica!
+        renderPaginationControls(totalCount);
 
     } catch (error) {
         console.error("Error al cargar clientes:", error.message);
-        clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar la lista de clientes.</td></tr>`;
+        clientsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-400 py-4">Error al cargar la lista de clientes: ${error.message}</td></tr>`;
+        clientPaginationControls.classList.add('hidden');
     }
 }
 
@@ -1406,7 +1424,7 @@ async function loadMessages() {
 
 async function handleSaveMessage(event) {
     event.preventDefault();
-    
+
     const id = messageIdField.value;
     const messageData = {
         texto_mensaje: messageTextField.value,
@@ -1480,7 +1498,7 @@ async function handleDeleteMessage(id) {
         const response = await fetch(`/api/delete-message/${id}`, {
             method: 'DELETE'
         });
-        
+
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -1786,12 +1804,15 @@ async function loadPriorityEditor() {
     priorityListContainer.classList.add('hidden');
 
     try {
-        const { data: modules, error } = await supabase
-            .from('modulos')
-            .select('id_modulo, nombre_modulo')
-            .order('nombre_modulo');
+        // Usamos la API que ya existe para cargar módulos
+        const response = await fetch('/api/get-modules');
+        const result = await response.json();
 
-        if (error) throw error;
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const modules = result.modules; // Obtenemos módulos de la API
 
         priorityModuleSelect.innerHTML = '<option value="">-- Elija un módulo --</option>';
         modules.forEach(module => {
