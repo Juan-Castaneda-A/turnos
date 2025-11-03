@@ -1465,6 +1465,308 @@ def api_get_dashboard_data():
         logging.error(f"Error en api_get_dashboard_data: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
     
+
+@app.route('/api/funcionario/get-pending-turns')
+@login_required # <-- ¡Usamos tu decorador de login!
+def api_get_pending_turns():
+    """
+    Obtiene los turnos pendientes para el módulo del funcionario logueado,
+    ordenados por prioridad.
+    """
+    if not g.org or not g.user:
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    module_id = g.user.get('assigned_module_id')
+    org_id = g.org['id_organizacion']
+
+    if not module_id:
+        return jsonify({"success": False, "error": "Funcionario no tiene módulo asignado", "turns": []}), 404
+
+    try:
+        # 1. Obtenemos las asignaciones y PRIORIDADES de los servicios para nuestro módulo
+        ms_resp = supabase.table('modulos_servicios') \
+            .select('id_servicio, prioridad') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', org_id) \
+            .execute()
+
+        if not ms_resp.data:
+            return jsonify({"success": True, "turns": []}), 200 # No hay servicios configurados
+
+        priority_map = {ms['id_servicio']: ms['prioridad'] for ms in ms_resp.data}
+        service_ids = list(priority_map.keys())
+
+        # 2. Obtenemos los turnos pendientes para esos servicios
+        turns_resp = supabase.table('turnos') \
+            .select('id_turno, prefijo_turno, numero_turno, hora_solicitud, id_servicio, servicios(nombre_servicio)') \
+            .eq('estado', 'en espera') \
+            .eq('id_organizacion', org_id) \
+            .in_('id_servicio', service_ids) \
+            .order('hora_solicitud', desc=False) \
+            .execute()
+        
+        # 3. Ordenamos por prioridad en Python
+        def sort_key(turn):
+            priority = priority_map.get(turn['id_servicio'], 99) # 99 como default
+            solicitude_time = datetime.fromisoformat(turn['hora_solicitud'])
+            return (priority, solicitude_time)
+
+        sorted_turns = sorted(turns_resp.data, key=sort_key)
+        
+        return jsonify({"success": True, "turns": sorted_turns}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_pending_turns: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/funcionario/get-module-name')
+@login_required
+def api_get_module_name():
+    """
+    Obtiene el nombre del módulo asignado al funcionario logueado.
+    """
+    if not g.org or not g.user:
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    module_id = g.user.get('assigned_module_id')
+    if not module_id:
+        return jsonify({"success": True, "module_name": "No Asignado"}), 200
+
+    try:
+        response = supabase.table('modulos') \
+            .select('nombre_modulo') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .single() \
+            .execute()
+        
+        if response.data:
+            return jsonify({"success": True, "module_name": response.data['nombre_modulo']}), 200
+        else:
+            return jsonify({"success": False, "error": "Módulo no encontrado"}), 404
+            
+    except Exception as e:
+        logging.error(f"Error en api_get_module_name: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/funcionario/get-current-turn')
+@login_required
+def api_get_current_turn():
+    """
+    Obtiene el turno "en atencion" actual para el módulo del funcionario.
+    """
+    if not g.org or not g.user or not g.user.get('assigned_module_id'):
+        return jsonify({"success": False, "error": "No autorizado o sin módulo"}), 401
+    
+    org_id = g.org['id_organizacion']
+    module_id = g.user.get('assigned_module_id')
+
+    try:
+        response = supabase.table('turnos') \
+            .select('id_turno, prefijo_turno, numero_turno, servicios(nombre_servicio), clientes(nombre_completo)') \
+            .eq('estado', 'en atencion') \
+            .eq('id_modulo_atencion', module_id) \
+            .eq('id_organizacion', org_id) \
+            .order('hora_llamado', desc=True) \
+            .limit(1) \
+            .maybe_single() \
+            .execute()
+        
+        # Devuelve el turno (que puede ser None)
+        return jsonify({"success": True, "turn": response.data}), 200
+            
+    except Exception as e:
+        logging.error(f"Error en api_get_current_turn: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/funcionario/get-daily-history')
+@login_required
+def api_get_daily_history():
+    """
+    Obtiene el historial de turnos "atendidos" HOY para el módulo del funcionario.
+    """
+    if not g.org or not g.user or not g.user.get('assigned_module_id'):
+        return jsonify({"success": False, "error": "No autorizado o sin módulo"}), 401
+
+    org_id = g.org['id_organizacion']
+    module_id = g.user.get('assigned_module_id')
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+    try:
+        response = supabase.table('turnos') \
+            .select('id_turno, prefijo_turno, numero_turno, hora_finalizacion') \
+            .eq('estado', 'atendido') \
+            .eq('id_modulo_atencion', module_id) \
+            .eq('id_organizacion', org_id) \
+            .gte('hora_finalizacion', today) \
+            .order('hora_finalizacion', desc=True) \
+            .execute()
+        
+        return jsonify({"success": True, "history": response.data}), 200
+            
+    except Exception as e:
+        logging.error(f"Error en api_get_daily_history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/funcionario/call-next', methods=['POST'])
+@login_required
+def api_call_next():
+    """
+    Llama al siguiente turno disponible basado en la prioridad del módulo.
+    Esta es una operación transaccional segura.
+    """
+    if not g.org or not g.user or not g.user.get('assigned_module_id'):
+        return jsonify({"success": False, "error": "No autorizado o sin módulo"}), 401
+
+    org_id = g.org['id_organizacion']
+    module_id = g.user.get('assigned_module_id')
+    user_id = g.user.get('id')
+
+    try:
+        # 1. Verificar que este módulo no tenga ya un turno "en atencion"
+        current_check = supabase.table('turnos') \
+            .select('id_turno') \
+            .eq('id_modulo_atencion', module_id) \
+            .eq('estado', 'en atencion') \
+            .eq('id_organizacion', org_id) \
+            .execute()
+        
+        if current_check.data:
+            return jsonify({"success": False, "error": "Ya tiene un turno en atención. Finalícelo primero."}), 409 # 409 Conflict
+
+        # 2. Replicamos la lógica de `api_get_pending_turns` para encontrar el turno correcto
+        ms_resp = supabase.table('modulos_servicios').select('id_servicio, prioridad').eq('id_modulo', module_id).eq('id_organizacion', org_id).execute()
+        if not ms_resp.data:
+            return jsonify({"success": False, "error": "Este módulo no tiene servicios configurados."}), 404
+
+        priority_map = {ms['id_servicio']: ms['prioridad'] for ms in ms_resp.data}
+        service_ids = list(priority_map.keys())
+
+        turns_resp = supabase.table('turnos').select('id_turno, prefijo_turno, numero_turno, hora_solicitud, id_servicio, servicios(nombre_servicio)').eq('estado', 'en espera').eq('id_organizacion', org_id).in_('id_servicio', service_ids).order('hora_solicitud', desc=False).execute()
+        
+        if not turns_resp.data:
+            return jsonify({"success": False, "error": "No hay turnos pendientes para llamar."}), 404
+            
+        def sort_key(turn):
+            priority = priority_map.get(turn['id_servicio'], 99)
+            solicitude_time = datetime.fromisoformat(turn['hora_solicitud'])
+            return (priority, solicitude_time)
+        
+        next_turn = sorted(turns_resp.data, key=sort_key)[0]
+
+        # 3. ¡ACCIÓN! Actualizamos el turno de forma atómica
+        # Usamos .eq('estado', 'en espera') como un "lock" para evitar race conditions
+        update_response = supabase.table('turnos') \
+            .update({
+                'estado': 'en atencion',
+                'hora_llamado': datetime.now(timezone.utc).isoformat(),
+                'id_modulo_atencion': module_id
+            }) \
+            .eq('id_turno', next_turn['id_turno']) \
+            .eq('estado', 'en espera') \
+            .execute()
+
+        if not update_response.data:
+            # Si 'data' está vacío, significa que otro funcionario lo llamó 1 segundo antes
+            raise Exception("El turno acaba de ser llamado por otro módulo. Intente de nuevo.")
+
+        # 4. Insertamos el log
+        supabase.table('logs_turnos').insert({
+            'id_turno': next_turn['id_turno'],
+            'id_usuario': user_id,
+            'accion': 'llamado',
+            'id_organizacion': org_id
+        }).execute()
+
+        # 5. Devolvemos el turno que se llamó
+        return jsonify({"success": True, "called_turn": next_turn}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_call_next: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/funcionario/recall-turn', methods=['POST'])
+@login_required
+def api_recall_turn():
+    """
+    Rellama un turno (actualiza 'hora_llamado' e inserta un log).
+    """
+    if not g.org or not g.user: return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    data = request.get_json()
+    turn_id = data.get('turn_id')
+    
+    try:
+        # Actualizamos el turno
+        update_response = supabase.table('turnos') \
+            .update({'hora_llamado': datetime.now(timezone.utc).isoformat()}) \
+            .eq('id_turno', turn_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .eq('id_modulo_atencion', g.user.get('assigned_module_id')) \
+            .execute()
+
+        if not update_response.data:
+            raise Exception("No se pudo rellamar el turno (no se encontró o no pertenece a este módulo).")
+
+        # Insertamos el log
+        supabase.table('logs_turnos').insert({
+            'id_turno': turn_id,
+            'id_usuario': g.user.get('id'),
+            'accion': 'rellamado',
+            'id_organizacion': g.org['id_organizacion']
+        }).execute()
+        
+        return jsonify({"success": True, "message": "Turno rellamado."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_recall_turn: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/funcionario/finish-turn', methods=['POST'])
+@login_required
+def api_finish_turn():
+    """
+    Finaliza un turno (cambia estado a 'atendido' e inserta log).
+    """
+    if not g.org or not g.user: return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    data = request.get_json()
+    turn_id = data.get('turn_id')
+    
+    try:
+        # Actualizamos el turno
+        update_response = supabase.table('turnos') \
+            .update({
+                'estado': 'atendido',
+                'hora_finalizacion': datetime.now(timezone.utc).isoformat()
+            }) \
+            .eq('id_turno', turn_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .eq('id_modulo_atencion', g.user.get('assigned_module_id')) \
+            .execute()
+
+        if not update_response.data:
+            raise Exception("No se pudo finalizar el turno (no se encontró o no pertenece a este módulo).")
+
+        # Insertamos el log
+        supabase.table('logs_turnos').insert({
+            'id_turno': turn_id,
+            'id_usuario': g.user.get('id'),
+            'accion': 'finalizado',
+            'id_organizacion': g.org['id_organizacion']
+        }).execute()
+        
+        return jsonify({"success": True, "message": "Turno finalizado."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_finish_turn: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)
