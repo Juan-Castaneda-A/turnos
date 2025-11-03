@@ -1367,13 +1367,16 @@ async function loadClients() {
 async function loadMessages() {
     messagesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando mensajes...</td></tr>`;
     try {
-        const { data: messages, error } = await supabase
-            .from('mensajes_visualizador')
-            .select('*')
-            .order('created_at', { ascending: false }); // Mostrar los más recientes primero
+        const response = await fetch('/api/get-messages');
+        const result = await response.json();
 
-        if (error) throw error;
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
 
+        const messages = result.messages;
+
+        // El resto de tu lógica para pintar la tabla es IDÉNTICA
         messagesTableBody.innerHTML = '';
         if (messages.length === 0) {
             messagesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay mensajes registrados.</td></tr>`;
@@ -1403,26 +1406,36 @@ async function loadMessages() {
 
 async function handleSaveMessage(event) {
     event.preventDefault();
+    
     const id = messageIdField.value;
     const messageData = {
         texto_mensaje: messageTextField.value,
         is_active: messageActiveField.checked
     };
 
+    if (id) {
+        messageData.id = id;
+    }
+
     const actionText = id ? 'Actualizar' : 'Crear';
     const confirmed = await showConfirmationModal(`${actionText} Mensaje`, `¿Está seguro de que desea guardar este mensaje?`);
     if (!confirmed) return;
 
     try {
-        if (id) {
-            messageData.id = id;
+        // Llamamos a la API unificada
+        const response = await fetch('/api/save-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(messageData),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
         }
 
-        // Usamos upsert para crear o actualizar
-        const { error } = await supabase.from('mensajes_visualizador').upsert(messageData);
-        if (error) throw error;
-
-        await showConfirmationModal('Éxito', `Mensaje guardado exitosamente.`);
+        await showConfirmationModal('Éxito', result.message);
         messageFormContainer.classList.add('hidden');
         loadMessages(); // Recargar la tabla
     } catch (error) {
@@ -1433,9 +1446,17 @@ async function handleSaveMessage(event) {
 
 async function handleEditMessage(id) {
     try {
-        const { data: msg, error } = await supabase.from('mensajes_visualizador').select('*').eq('id', id).single();
-        if (error) throw error;
+        // Llamamos a la API para obtener el mensaje
+        const response = await fetch(`/api/get-message/${id}`);
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const msg = result.message; // Obtenemos el mensaje del JSON
+
+        // El resto de tu lógica para rellenar el formulario es IDÉNTICA
         messageForm.reset();
         messageIdField.value = msg.id;
         messageTextField.value = msg.texto_mensaje;
@@ -1455,10 +1476,18 @@ async function handleDeleteMessage(id) {
     if (!confirmed) return;
 
     try {
-        const { error } = await supabase.from('mensajes_visualizador').delete().eq('id', id);
-        if (error) throw error;
+        // Llamamos a la API de borrado
+        const response = await fetch(`/api/delete-message/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
 
-        await showConfirmationModal('Éxito', 'Mensaje eliminado exitosamente.');
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        await showConfirmationModal('Éxito', result.message);
         loadMessages();
     } catch (error) {
         console.error("Error al eliminar mensaje:", error.message);

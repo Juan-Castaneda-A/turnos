@@ -936,6 +936,135 @@ def api_save_services_config():
         logging.error(f"Error en api_save_services_config: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/get-messages')
+@admin_required
+def api_get_messages():
+    """
+    Obtiene TODOS los mensajes del visualizador
+    pertenecientes a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('mensajes_visualizador') \
+            .select('*') \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .order('created_at', desc=True) \
+            .execute()
+            
+        return jsonify({"success": True, "messages": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_messages: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/get-message/<int:message_id>')
+@admin_required
+def api_get_message(message_id):
+    """
+    Obtiene UN mensaje por su ID,
+    verificando que pertenezca a la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+
+    try:
+        response = supabase.table('mensajes_visualizador') \
+            .select('*') \
+            .eq('id', message_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .single() \
+            .execute()
+        
+        if response.data:
+            return jsonify({"success": True, "message": response.data}), 200
+        else:
+            return jsonify({"success": False, "error": "Mensaje no encontrado o no pertenece a esta organización"}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_get_message: {e}")
+        return jsonify({"success": False, "error": "Mensaje no encontrado."}), 404
+
+
+@app.route('/api/delete-message/<int:message_id>', methods=['DELETE'])
+@admin_required
+def api_delete_message(message_id):
+    """
+    Endpoint seguro para ELIMINAR un mensaje
+    perteneciente a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('mensajes_visualizador') \
+            .delete() \
+            .eq('id', message_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .execute()
+            
+        if response.data:
+            logging.info(f"Mensaje {message_id} eliminado por {g.user['name']}.")
+            return jsonify({"success": True, "message": "Mensaje eliminado exitosamente."}), 200
+        else:
+            logging.warning(f"Intento de borrado fallido para mensaje {message_id} por {g.user['name']}.")
+            return jsonify({"success": False, "error": "No se pudo eliminar el mensaje."}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_delete_message: {e}")
+        return jsonify({"success": False, "error": f"Error al eliminar mensaje: {e}"}), 500
+
+
+@app.route('/api/save-message', methods=['POST'])
+@admin_required
+def api_save_message():
+    """
+    Endpoint seguro para CREAR o ACTUALIZAR un mensaje del visualizador.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    data = request.get_json()
+    if not data or not data.get('texto_mensaje'):
+        return jsonify({"success": False, "error": "El texto del mensaje es requerido"}), 400
+
+    message_id = data.get('id')
+    
+    message_data = {
+        'texto_mensaje': data.get('texto_mensaje'),
+        'is_active': data.get('is_active', True)
+    }
+
+    try:
+        if message_id:
+            # --- LÓGICA DE ACTUALIZAR (UPDATE) ---
+            response = supabase.table('mensajes_visualizador') \
+                .update(message_data) \
+                .eq('id', message_id) \
+                .eq('id_organizacion', g.org['id_organizacion']) \
+                .execute()
+            message = "Mensaje actualizado exitosamente."
+
+        else:
+            # --- LÓGICA DE CREAR (INSERT) ---
+            message_data['id_organizacion'] = g.org['id_organizacion']
+            response = supabase.table('mensajes_visualizador') \
+                .insert(message_data) \
+                .execute()
+            message = "Mensaje creado exitosamente."
+
+        if response.data:
+            return jsonify({"success": True, "message": message, "service": response.data[0]}), 200
+        else:
+            raise Exception("No se pudo guardar el mensaje, o no se tiene permiso sobre él.")
+
+    except Exception as e:
+        logging.error(f"Error en api_save_message: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)
