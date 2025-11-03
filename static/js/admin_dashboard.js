@@ -408,35 +408,41 @@ function assignEventListeners() {
 
     moduleForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = moduleIdField.value;
-        const name = moduleNameField.value;
-        const description = moduleDescriptionField.value;
-        const status = moduleStatusField.checked ? 'activo' : 'inactivo';
 
+        const id = moduleIdField.value;
         const moduleData = {
-            nombre_modulo: name,
-            descripcion: description,
-            estado: status
+            nombre_modulo: moduleNameField.value,
+            descripcion: moduleDescriptionField.value,
+            estado: moduleStatusField.checked ? 'activo' : 'inactivo'
         };
 
+        if (id) {
+            moduleData.id_modulo = id;
+        }
+
+        const actionText = id ? 'Editar Módulo' : 'Crear Módulo';
+        const confirmed = await showConfirmationModal(actionText, `¿Está seguro de que desea guardar este módulo?`);
+        if (!confirmed) return;
+
         try {
-            if (id) {
-                const confirmed = await showConfirmationModal('Editar Módulo', '¿Está seguro de que desea guardar los cambios de este módulo?');
-                if (!confirmed) return;
+            const response = await fetch('/api/save-module', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(moduleData),
+            });
 
-                const { error } = await supabase.from('modulos').update(moduleData).eq('id_modulo', id);
-                if (error) throw error;
-                await showConfirmationModal('Éxito', 'Módulo actualizado exitosamente.');
-            } else {
-                const confirmed = await showConfirmationModal('Crear Módulo', '¿Está seguro de que desea crear este nuevo módulo?');
-                if (!confirmed) return;
+            const result = await response.json();
 
-                const { error } = await supabase.from('modulos').insert(moduleData);
-                if (error) throw error;
-                await showConfirmationModal('Éxito', 'Módulo creado exitosamente.');
+            if (!response.ok || !result.success) {
+                throw new Error(result.error);
             }
+
+            await showConfirmationModal('Éxito', result.message);
             moduleFormContainer.classList.add('hidden');
             loadModules();
+
         } catch (error) {
             console.error("Error al guardar módulo:", error.message);
             await showConfirmationModal('Error', `Error al guardar módulo: ${error.message}`);
@@ -1547,11 +1553,14 @@ async function loadReportFilters() {
 async function loadModules() {
     modulesTableBody.innerHTML = `<tr><td colspan="4" class="text-center text-gray-500 py-4">Cargando módulos...</td></tr>`;
     try {
-        const { data: modules, error } = await supabase
-            .from('modulos')
-            .select('*')
-            .order('nombre_modulo', { ascending: true });
-        if (error) throw error;
+        const response = await fetch('/api/get-modules');
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Error del servidor');
+        }
+
+        const modules = result.modules;
 
         modulesTableBody.innerHTML = '';
         if (modules.length === 0) {
@@ -1823,8 +1832,14 @@ async function deleteUser(id) {
 
 async function editModule(id) {
     try {
-        const { data: mod, error } = await supabase.from('modulos').select('*').eq('id_modulo', id).single();
-        if (error) throw error;
+        const response = await fetch(`/api/get-module/${id}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const mod = result.module;
 
         moduleFormContainer.classList.remove('hidden');
         moduleFormTitle.textContent = `Editar Módulo: ${mod.nombre_modulo}`;
@@ -1833,6 +1848,7 @@ async function editModule(id) {
         moduleDescriptionField.value = mod.descripcion || '';
         moduleStatusField.checked = mod.estado === 'activo';
         moduleStatusText.textContent = mod.estado === 'activo' ? 'Activo' : 'Inactivo';
+
     } catch (error) {
         console.error("Error al cargar módulo para edición:", error.message);
         await showConfirmationModal('Error', `Error al cargar módulo para edición: ${error.message}`);
@@ -1840,14 +1856,23 @@ async function editModule(id) {
 }
 
 async function deleteModule(id) {
-    const confirmed = await showConfirmationModal('Eliminar Módulo', '¿Está seguro de que desea eliminar este módulo? Esto también eliminará sus asignaciones de servicio y cualquier usuario asignado. Esta acción no se puede deshacer.');
+    const confirmed = await showConfirmationModal('Eliminar Módulo', '¿Está seguro de que desea eliminar este módulo? Esta acción no se puede deshacer.');
     if (!confirmed) return;
 
     try {
-        const { error } = await supabase.from('modulos').delete().eq('id_modulo', id);
-        if (error) throw error;
-        await showConfirmationModal('Éxito', 'Módulo eliminado exitosamente.');
+        const response = await fetch(`/api/delete-module/${id}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Error del servidor');
+        }
+
+        await showConfirmationModal('Éxito', result.message);
         loadModules();
+
     } catch (error) {
         console.error("Error al eliminar módulo:", error.message);
         await showConfirmationModal('Error', `Error al eliminar módulo: ${error.message}`);

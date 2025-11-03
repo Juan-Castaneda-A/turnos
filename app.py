@@ -41,42 +41,95 @@ SESSION_TOKEN_LIFESPAN_HOURS = 8
 
 # --- Middleware para cargar usuario desde el token de sesión --- #
 @app.before_request
-def load_logged_in_user():
+def load_context():
     """
-    Carga la información del usuario en el objeto 'g' (global request context)
-    basándose en el token de sesión almacenado en la cookie.
+    Carga la ORGANIZACIÓN y el USUARIO en el objeto 'g' (global request context).
+    La organización se determina por el subdominio.
     """
-    session_token = session.get('session_token')
-    g.user = None #por defecto, no hay usuario logueado
+    g.user = None
+    g.org = None 
 
+    try:
+        host = request.host.split(':')[0]
+        subdomain = host.split('.')[0]
+        
+        logging.info(f"--- DEBUGGING MULTI-TENANT (v3) ---")
+        logging.info(f"Host: {host}, Subdominio: {subdomain}")
+
+        # 1. Intentamos buscar en la columna de PRODUCCIÓN ('subdominio')
+        #    ¡¡SIN .single()!!
+        org_response = supabase.table('organizaciones') \
+            .select('id_organizacion, nombre_organizacion, subdominio, configuracion') \
+            .eq('subdominio', subdomain) \
+            .execute()
+
+        # 2. Si NO se encuentra (lista vacía)...
+        if not org_response.data:
+            logging.warning(f"No en 'subdominio'. Intentando 'subdominio_local'...")
+            
+            # ...intentamos buscar en la columna LOCAL ('subdominio_local')
+            #    ¡¡SIN .single()!!
+            org_response = supabase.table('organizaciones') \
+                .select('id_organizacion, nombre_organizacion, subdominio, configuracion') \
+                .eq('subdominio_local', subdomain) \
+                .execute()
+
+        # 3. Ahora verificamos si, después de AMBOS intentos, lo encontramos.
+        if not org_response.data:
+            # Sigue sin encontrarse. 0 filas.
+            logging.warning(f"Subdominio '{subdomain}' NO ENCONTRADO.")
+            
+            # ¡MEJORA! Si la petición es a una API, devolver JSON, no HTML.
+            if request.path.startswith('/api/'):
+                return jsonify({"success": False, "error": "Organización no identificada"}), 404
+            return render_template('error.html', message="La organización solicitada no existe.")
+
+        if len(org_response.data) > 1:
+            # Esto no debería pasar si las columnas son UNIQUE, pero es un buen control.
+            logging.error(f"¡Error! Múltiples organizaciones encontradas para '{subdomain}'")
+            if request.path.startswith('/api/'):
+                return jsonify({"success": False, "error": "Configuración de organización duplicada"}), 500
+            return render_template('error.html', message="Error de configuración del sistema.")
+
+        # ¡Éxito! Tenemos exactamente 1 fila.
+        g.org = org_response.data[0] # Tomamos el primer (y único) elemento
+        logging.info(f"Contexto cargado para: {g.org['nombre_organizacion']}")
+
+    except Exception as e:
+        # Esto ahora solo atrapará errores REALES (ej. no se puede conectar a Supabase)
+        logging.error(f"Error crítico al cargar contexto de organización: {e}")
+        if request.path.startswith('/api/'):
+            return jsonify({"success": False, "error": f"Error interno del servidor: {e}"}), 500
+        return render_template('error.html', message="Error al identificar la organización.")
+
+    # 4. Cargar el usuario (sin cambios)
+    session_token = session.get('session_token')
     if session_token:
         try:
-            #Buscar la sesión en la base de datos
+            # Esta lógica está bien porque aquí SÍ esperamos un error si el token no existe
             response = supabase.table('user_sessions') \
-                .select('user_id, role, assigned_module_id, usuarios(nombre_completo)')\
-                .eq('session_token',session_token) \
-                .gte('expires_at',datetime.now(timezone.utc).isoformat()) \
+                .select('user_id, role, assigned_module_id, usuarios(nombre_completo)') \
+                .eq('session_token', session_token) \
+                .eq('id_organizacion', g.org['id_organizacion']) \
+                .gte('expires_at', datetime.now(timezone.utc).isoformat()) \
                 .single() \
                 .execute()
             
             if response.data:
                 user_session_data = response.data
-                #Almacenar la información del usuario en 'g.user'
                 g.user = {
                     'id': user_session_data['user_id'],
                     'name': user_session_data['usuarios']['nombre_completo'],
                     'role': user_session_data['role'],
                     'assigned_module_id': user_session_data['assigned_module_id']
                 }
-                logging.info(f"Usuario {g.user['name']} ({g.user['role']}) cargado para la petición.")
             else:
-                #Sesión no encontrada o expirada, limpiar la cookie
-                session.pop('session_token',None)
-                logging.info("Token de sesión no válido o expirado, cookie de sesión limpiada.")
+                session.pop('session_token', None)
         
         except Exception as e:
-            logging.error(f"Error al cargar usuario desde el token de sesión: {e}")
-            session.pop('session_token',None) #Limpiar por si acaso
+            # Esto es normal si el token es inválido o expiró
+            logging.info(f"Token de sesión no válido o expirado: {e}")
+            session.pop('session_token', None)
 
 # --- Decorador para rutas protegidas --- #
 def login_required(f):
@@ -123,13 +176,19 @@ def solicitar_turno_ui():
     Interfaz para que los clientes soliciten un turno desde la PC táctil.
     Aquí se mostrarán los botones de servicio.
     """
+    if not g.org:
+         return render_template('error.html', message="Kiosko no configurado para una organización.")
+    
     if supabase is None:
         flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
         return render_template('error.html', message="Problema de configuración del sistema.")
 
     try:
         # Obtener los servicios disponibles desde Supabase
-        response = supabase.table('servicios').select('id_servicio, nombre_servicio, prefijo_ticket').execute()
+        response = (supabase.table('servicios')
+            .select('id_servicio, nombre_servicio, prefijo_ticket') \
+            .eq('id_organizacion', g.org['id_organizacion']) # <-- FILTRO MULTI-TENANT
+            .execute())
         
         if response.data:
             servicios = response.data
@@ -139,7 +198,7 @@ def solicitar_turno_ui():
             logging.warning("No se encontraron servicios en la base de datos.")
             flash("No hay servicios configurados en este momento. Por favor, intente más tarde.", "warning")
 
-        return render_template('solicitar_turno.html', servicios=servicios)
+        return render_template('solicitar_turno.html', servicios=servicios, organizacion=g.org)
     except Exception as e:
         logging.error(f"Error al cargar servicios para solicitar turno: {e}")
         flash(f"Error al cargar los servicios: {e}. Por favor, intente de nuevo más tarde.", "error")
@@ -153,6 +212,9 @@ def solicitar_turno_action():
     Maneja la lógica cuando un cliente solicita un turno llamando
     a una función RPC de Supabase para evitar condiciones de carrera.
     """
+    if not g.org:
+         return jsonify({"error": "Organización no identificada"}), 400
+    
     if supabase is None:
         flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
         return redirect(url_for('solicitar_turno_ui'))
@@ -178,14 +240,12 @@ def solicitar_turno_action():
                 'nombre_completo': nombre_completo
             }).execute()
             id_cliente = nuevo_cliente.data[0]['id_cliente']
-        # --- Lógica Antigua (eliminada) ---
-        # Ya no necesitamos obtener el prefijo ni calcular el último número aquí.
-        # La función de la base de datos 'crear_nuevo_turno' hace todo eso.
-
-        # --- Nueva Lógica: Llamada a la Función RPC ---
-        # Simplemente llamamos a la función que creamos en Supabase y le pasamos el id_servicio.
         
-        params = {'_id_servicio': int(id_servicio), '_id_cliente': id_cliente}
+        params = {
+        '_id_servicio': int(id_servicio), 
+        '_id_cliente': id_cliente,
+        '_id_organizacion': g.org['id_organizacion'] # <-- DATO NUEVO
+        }
         response = supabase.rpc('crear_nuevo_turno', params).execute()
 
         if response.data:
@@ -203,7 +263,8 @@ def solicitar_turno_action():
             # Aquí se integraría la lógica para imprimir el ticket.
             return render_template('ticket_confirmacion.html',
                                    turno_id=f"{prefijo_ticket}-{nuevo_numero_turno:03d}",
-                                   servicio_nombre=nombre_servicio)
+                                   servicio_nombre=nombre_servicio,
+                                   organizacion=g.org)
         else:
             # Esto podría pasar si la función RPC lanza un error (ej. servicio no existe)
             error_message = response.error.message if response.error else "Error desconocido al crear el turno."
@@ -243,6 +304,10 @@ def funcionario_login():
     """
     Página de inicio de sesión para funcionarios. Ahora con verificación de hash.
     """
+    # g.org es requerido para el login. Si es None, el middleware falló.
+    if not g.org:
+         return render_template('error.html', message="No se pudo identificar la organización para el login.")
+    
     if g.user:
         if g.user['role'] == 'administrador':
             return redirect(url_for('admin_dashboard'))
@@ -254,14 +319,19 @@ def funcionario_login():
         password = request.form.get('password')
 
         try:
-            # En un sistema real, aquí se verificaría la contraseña hasheada
-            # Por simplicidad, solo verificamos el nombre de usuario por ahora
-            user_response = supabase.table('usuarios').select('id_usuario, nombre_completo, rol, id_modulo_asignado, contrasena').eq('nombre_usuario', username).single().execute()
+            # ¡CAMBIO CLAVE! Filtramos por 'nombre_usuario' Y 'id_organizacion'
+            user_response = (supabase.table('usuarios')
+                .select('id_usuario, nombre_completo, rol, id_modulo_asignado, contrasena')
+                .eq('nombre_usuario', username)
+                .eq('id_organizacion', g.org['id_organizacion']) # <-- FILTRO MULTI-TENANT
+                .single()
+                .execute())
+            
             user_data = user_response.data
 
             #-- línea donde se checkea la contraseña hasheada
 
-            if user_data and check_password_hash(user_data['contrasena'], password): # ¡REEMPLAZAR CON VERIFICACIÓN DE HASH!
+            if user_data and check_password_hash(user_data['contrasena'], password):
                 #Generar un token de sesión único   
                 new_session_token = str(uuid.uuid4())
                 #Calcular la fecha de expiración
@@ -273,7 +343,8 @@ def funcionario_login():
                     'session_token': new_session_token,
                     'role': user_data['rol'],
                     'assigned_module_id': user_data['id_modulo_asignado'],
-                    'expires_at': expires_at.isoformat()
+                    'expires_at': expires_at.isoformat(),
+                    'id_organizacion': g.org['id_organizacion'] # <-- DATO NUEVO
                 }
                 session_response = supabase.table('user_sessions').insert(session_insert_data).execute()
                 if session_response.data:
@@ -289,16 +360,6 @@ def funcionario_login():
                     flash("Error al crear la sesión. Por favor, intente de nuevo.", "error")
                     logging.error(f"Error al insertar sesión en base de datos: {session_response.error}")
 
-                #session['user_id'] = user_data['id_usuario']
-                #session['user_name'] = user_data['nombre_completo']
-                #session['user_role'] = user_data['rol']
-                #session['assigned_module_id'] = user_data['id_modulo_asignado']
-                #flash(f"Bienvenido, {user_data['nombre_completo']}!", "success")
-                #logging.info(f"Usuario {username} ha iniciado sesión.")
-                #if user_data['rol'] == 'administrador':
-                #    return redirect(url_for('admin_dashboard'))
-                #else:
-                #    return redirect(url_for('funcionario_panel'))
             else:
                 flash("Usuario o contraseña incorrectos.", "danger")
                 logging.warning(f"Intento de inicio de sesión fallido para {username}.")
@@ -306,7 +367,7 @@ def funcionario_login():
             logging.error(f"Error en el inicio de sesión del funcionario: {e}")
             flash("Ocurrió un error al intentar iniciar sesión.", "error")
 
-    return render_template('funcionario_login.html')
+    return render_template('funcionario_login.html', organizacion=g.org)
 
 @app.route('/funcionario/panel')
 @login_required # Proteger esta ruta
@@ -321,42 +382,6 @@ def funcionario_panel():
                            supabase_key=SUPABASE_KEY,
                            session_user_id=g.user['id'], #pasar el ID real desde g.user
                            session_assigned_module_id=g.user['assigned_module_id']) #pasar el módulo desde g.user
-    #if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
-    #    flash("Necesita iniciar sesión para acceder a esta página.", "info")
-    #    return redirect(url_for('funcionario_login'))
-
-    #user_id = session['user_id']
-    #user_name = session['user_name']
-    #assigned_module_id = session.get('assigned_module_id')
-
-    #try:
-        # Obtener los servicios que atiende este módulo (si está asignado)
-    #    servicios_atendidos = []
-    #    if assigned_module_id:
-    #        service_module_response = supabase.table('modulos_servicios') \
-    #            .select('servicios(id_servicio, nombre_servicio, prefijo_ticket)') \
-    #            .eq('id_modulo', assigned_module_id) \
-    #            .execute()
-    #        servicios_atendidos = [s['servicios'] for s in service_module_response.data]
-
-        # Obtener turnos pendientes para este módulo/servicios
-        # Esto se actualizará en tiempo real vía Supabase Realtime
-    #    turnos_pendientes = [] # Se llenará con JS
-
-        # Obtener historial de turnos atendidos por este funcionario
-    #    historial_turnos = [] # Se llenará con JS
-
-    #    return render_template('funcionario_panel.html',
-    #                           user_name=user_name,
-    #                           module_id=assigned_module_id,
-    #                           servicios_atendidos=servicios_atendidos,
-    #                           supabase_url=SUPABASE_URL,
-    #                           supabase_key=SUPABASE_KEY)
-    #except Exception as e:
-    #    logging.error(f"Error al cargar el panel del funcionario: {e}")
-    #    flash("Error al cargar el panel. Por favor, intente de nuevo más tarde.", "error")
-    #    return redirect(url_for('funcionario_login'))
-
 
 @app.route('/admin/dashboard')
 @admin_required #proteger esta ruta y requerir rol de administrador
@@ -368,29 +393,7 @@ def admin_dashboard():
     return render_template('admin_dashboard.html',
                            supabase_url=SUPABASE_URL,
                            supabase_key=SUPABASE_KEY,
-                           user_name=g.user['name']) #user el nombre de g.user
-    #if 'user_id' not in session or session.get('user_role') != 'administrador':
-    #    flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
-    #    return redirect(url_for('funcionario_login'))
-
-    #if supabase is None:
-    #    flash("Error de configuración: No se pudo conectar a la base de datos.", "error")
-    #    return render_template('error.html', message="Problema de configuración del sistema.")
-
-    #try:
-        # Aquí se cargarían los datos para el dashboard:
-        # - Número de turnos en espera
-        # - Total de turnos atendidos en el día
-        # - Estado de cada ventanilla
-        # Estos datos se pueden obtener de Supabase o se pueden cargar en el frontend con JS.
-    #    return render_template('admin_dashboard.html',
-    #                           supabase_url=SUPABASE_URL, # ¡Asegurarse de pasar la URL!
-    #                           supabase_key=SUPABASE_KEY,   # ¡Asegurarse de pasar la KEY!
-    #                           user_name=session.get('user_name', 'Administrador')) # También pasamos el nombre
-    #except Exception as e:
-    #    logging.error(f"Error al cargar el dashboard de administración: {e}")
-    #    flash("Error al cargar el dashboard. Por favor, intente de nuevo más tarde.", "error")
-    #    return redirect(url_for('funcionario_login'))
+                           user_name=g.user['name'])
 
 @app.route('/logout')
 def logout():
@@ -405,48 +408,11 @@ def logout():
             logging.info(f"Sesión con token {session_token} eliminada de la base de datos.")
         except Exception as e:
             logging.error(f"Error al eliminar sesión de la base de datos: {e}")
-    
-    #Limpiar la cookie de sesión de Flask
-    #session.pop('user_id', None)
-    #session.pop('user_name', None)
-    #session.pop('user_role', None)
-    #session.pop('assigned_module_id', None)
-    #flash("Has cerrado sesión exitosamente.", "info")
+
     session.pop('session_token',None)
     flash("Has cerrado sesión exitosamente.","info")
     logging.info("Cookie de sesión limpiada.")
     return redirect(url_for('funcionario_login'))
-
-# --- Funciones de API (para HTMX o llamadas directas) ---
-
-# Ejemplo de API para llamar al siguiente turno
-#@app.route('/api/call_next_turn', methods=['POST'])
-#def api_call_next_turn():
-#    if 'user_id' not in session or session.get('user_role') not in ['funcionario', 'administrador']:
-#        return {"status": "error", "message": "No autorizado"}, 401
-
-#    user_id = session['user_id']
-#    module_id = session.get('assigned_module_id')
-
-#    if not module_id:
-#        return {"status": "error", "message": "Funcionario no asignado a un módulo."}, 400
-
-#    try:
-        # Lógica para encontrar el siguiente turno disponible para este módulo
-        # y actualizar su estado a 'en atencion'.
-        # Esto es complejo y requerirá transacciones y manejo de concurrencia.
-        # Por ahora, es un placeholder.
-        # La actualización en Supabase Realtime notificará a los visualizadores.
-#        logging.info(f"Funcionario {user_id} en módulo {module_id} intentando llamar siguiente turno.")
-        # Simulación de llamada exitosa
-        # response = supabase.table('turnos').update({'estado': 'en atencion', 'hora_llamado': 'NOW()', 'id_modulo_atencion': module_id}).eq('id_turno', some_turn_id).execute()
-        # supabase.table('logs_turnos').insert({'id_turno': some_turn_id, 'id_usuario': user_id, 'accion': 'llamado'}).execute()
-
-#        return {"status": "success", "message": "Turno llamado (simulado)."}, 200
-#    except Exception as e:
-#        logging.error(f"Error en api_call_next_turn: {e}")
-#        return {"status": "error", "message": f"Error al llamar turno: {e}"}, 500
-
 
 # --- API Segura para Administración ---
 
@@ -521,9 +487,6 @@ def register_cliente():
         return jsonify({"success": False, "error": "Faltan datos requeridos"}), 400
 
     try:
-        # Usamos upsert (update or insert).
-        # Primero intenta hacer un UPDATE donde coincida el 'numero_identificacion'.
-        # Si no encuentra coincidencia, hace un INSERT con todos los datos.
         response = supabase.table('clientes').upsert({
             'numero_identificacion': identificacion,
             'nombre_completo': nombre
@@ -562,57 +525,6 @@ def check_cliente(identificacion):
         logging.error(f"Error en check_cliente para {identificacion}: {e}")
         return jsonify({"error": str(e)}), 500
 
-# @app.route('/api/text-to-speech', methods=['POST'])
-# def text_to_speech():
-#     """
-#     Endpoint seguro que actúa como proxy para la API de Gemini TTS.
-#     Recibe texto y devuelve el audio generado.
-#     """
-#     if not request.is_json:
-#         return jsonify({"error": "La solicitud debe ser JSON"}), 400
-
-#     data = request.get_json()
-#     text_to_speak = data.get('text')
-
-#     if not text_to_speak:
-#         return jsonify({"error": "No se proporcionó texto"}), 400
-
-#     # Carga la API Key de forma segura desde las variables de entorno
-#     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-#     if not GEMINI_API_KEY:
-#         logging.error("La variable de entorno GEMINI_API_KEY no está configurada.")
-#         return jsonify({"error": "El servicio de voz no está configurado en el servidor."}), 500
-
-#     # La misma estructura de payload que tenías en el frontend
-#     payload = {
-#         "contents": [{"parts": [{"text": text_to_speak}]}],
-#         "generationConfig": {
-#             "responseModalities": ["AUDIO"],
-#             "speechConfig": {
-#                 "voiceConfig": {
-#                     "prebuiltVoiceConfig": {"voiceName": "Charon"}
-#                 }
-#             }
-#         },
-#         "model": "gemini-2.5-flash-preview-tts"
-#     }
-
-#     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={GEMINI_API_KEY}"
-
-#     try:
-#         # Llamada a la API de Gemini desde el backend
-#         response = requests.post(api_url, json=payload)
-
-#         # Si la respuesta de Google no es exitosa, devuelve el error
-#         response.raise_for_status() 
-
-#         # Devuelve la respuesta JSON de Gemini directamente al frontend
-#         return jsonify(response.json())
-
-#     except requests.exceptions.RequestException as e:
-#         logging.error(f"Error al llamar a la API de Gemini: {e}")
-#         return jsonify({"error": f"Error de comunicación con el servicio de voz: {e}"}), 502 # 502 Bad Gateway
-
 @app.route('/api/reports')
 @admin_required # Asegúrate de que siga protegida
 def get_reports():
@@ -631,7 +543,9 @@ def get_reports():
         params = {
             'start_date': start_date,
             'end_date': end_date,
-            'group_by_param': group_by # 'group_by' se convierte en 'group_by_param'
+            'group_by_param': group_by,
+            # ¡CAMBIO CLAVE! Añadimos el ID de la organización del admin logueado
+            '_id_organizacion': g.org['id_organizacion'] # <-- DATO NUEVO
         }
 
         # 3. Añadimos los parámetros OPCIONALES solo si existen, usando los nombres con guion bajo
@@ -654,6 +568,140 @@ def get_reports():
     except Exception as e:
         logging.error(f"Error al generar el reporte: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/get-modules')
+@admin_required
+def api_get_modules():
+    """
+    Endpoint seguro para obtener TODOS los módulos
+    pertenecientes a la organización del admin logueado.
+    """
+    
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('modulos') \
+            .select('*') \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .order('nombre_modulo', desc=False) \
+            .execute()
+            
+        if response.data:
+            return jsonify({"success": True, "modules": response.data}), 200
+        else:
+            return jsonify({"success": True, "modules": []}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_modules: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/delete-module/<int:module_id>', methods=['DELETE'])
+@admin_required
+def api_delete_module(module_id):
+    """
+    Endpoint seguro para ELIMINAR un módulo
+    perteneciente a la organización del admin logueado.
+    """
+    
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('modulos') \
+            .delete() \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .execute()
+            
+        if response.data:
+            logging.info(f"Módulo {module_id} eliminado exitosamente por {g.user['name']}.")
+            return jsonify({"success": True, "message": "Módulo eliminado exitosamente."}), 200
+        else:
+            logging.warning(f"Intento de borrado fallido para módulo {module_id} por {g.user['name']}. No se encontró o no pertenece a la org {g.org['id_organizacion']}.")
+            return jsonify({"success": False, "error": "No se pudo eliminar el módulo. Es posible que no exista o no le pertenezca."}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_delete_module: {e}")
+        return jsonify({"success": False, "error": f"Error al eliminar módulo: {e}"}), 500
+
+@app.route('/api/get-module/<int:module_id>')
+@admin_required
+def api_get_module(module_id):
+    """
+    Endpoint seguro para obtener UN módulo por su ID,
+    verificando que pertenezca a la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+
+    try:
+        response = supabase.table('modulos') \
+            .select('*') \
+            .eq('id_modulo', module_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .single() \
+            .execute()
+        
+        if response.data:
+            return jsonify({"success": True, "module": response.data}), 200
+        else:
+            return jsonify({"success": False, "error": "Módulo no encontrado o no pertenece a esta organización"}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_get_module: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/save-module', methods=['POST'])
+@admin_required
+def api_save_module():
+    """
+    Endpoint seguro para CREAR o ACTUALIZAR un módulo.
+    Asegura que la operación se realice solo dentro de la org del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    data = request.get_json()
+    if not data or not data.get('nombre_modulo'):
+        return jsonify({"success": False, "error": "Nombre del módulo es requerido"}), 400
+
+    module_id = data.get('id_modulo')
+    
+    module_data = {
+        'nombre_modulo': data.get('nombre_modulo'),
+        'descripcion': data.get('descripcion'),
+        'estado': data.get('estado', 'activo')
+    }
+
+    try:
+        if module_id:
+            logging.info(f"Actualizando módulo {module_id} para org {g.org['id_organizacion']}")
+            response = supabase.table('modulos') \
+                .update(module_data) \
+                .eq('id_modulo', module_id) \
+                .eq('id_organizacion', g.org['id_organizacion']) \
+                .execute()
+            message = "Módulo actualizado exitosamente."
+
+        else:
+            module_data['id_organizacion'] = g.org['id_organizacion']
+            
+            logging.info(f"Creando nuevo módulo para org {g.org['id_organizacion']}")
+            response = supabase.table('modulos') \
+                .insert(module_data) \
+                .execute()
+            message = "Módulo creado exitosamente."
+
+        if response.data:
+            return jsonify({"success": True, "message": message}), 200
+        else:
+            raise Exception("No se pudo guardar el módulo, o no se tiene permiso sobre él.")
+
+    except Exception as e:
+        logging.error(f"Error en api_save_module: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':

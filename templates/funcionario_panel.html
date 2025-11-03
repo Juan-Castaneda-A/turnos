@@ -115,6 +115,7 @@
         window.USER_ID = "{{ session_user_id }}";
         window.ASSIGNED_MODULE_ID = "{{ session_assigned_module_id }}" === 'None' ? null : parseInt("{{ session_assigned_module_id }}");
         window.USER_NAME = "{{ user_name }}";
+        window.ORGANIZACION_ID = "{{ g.org.id_organizacion }}";
     </script>
     <script type="module" src="{{ url_for('static', filename='js/funcionario_panel.js') }}"></script>
 </body>

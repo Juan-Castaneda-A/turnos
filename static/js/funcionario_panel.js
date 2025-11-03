@@ -82,6 +82,7 @@ async function updateAssignedModuleName() {
                 .from('modulos')
                 .select('nombre_modulo')
                 .eq('id_modulo', window.ASSIGNED_MODULE_ID)
+                .eq('id_organizacion', window.ORGANIZACION_ID)
                 .single();
             if (error) throw error;
             assignedModuleNameElement.textContent = data.nombre_modulo;
@@ -114,7 +115,8 @@ async function loadPendingTurns() {
         const { data: moduleServices, error: msError } = await supabase
             .from('modulos_servicios')
             .select('id_servicio, prioridad')
-            .eq('id_modulo', window.ASSIGNED_MODULE_ID);
+            .eq('id_modulo', window.ASSIGNED_MODULE_ID)
+            .eq('id_organizacion', window.ORGANIZACION_ID);
 
         if (msError) throw msError;
 
@@ -214,6 +216,7 @@ async function loadCurrentTurn() {
     `)
             .eq('estado', 'en atencion')
             .eq('id_modulo_atencion', window.ASSIGNED_MODULE_ID)
+            .eq('id_organizacion', window.ORGANIZACION_ID)
             .order('hora_llamado', { ascending: false })
             .limit(1);
 
@@ -272,6 +275,7 @@ async function loadDailyHistory() {
             .select('*')
             .eq('estado', 'atendido')
             .eq('id_modulo_atencion', window.ASSIGNED_MODULE_ID)
+            .eq('id_organizacion', window.ORGANIZACION_ID)
             .gte('hora_finalizacion', today)
             .order('hora_finalizacion', { ascending: false });
 
@@ -319,7 +323,7 @@ function updateButtonStates() {
 function setupRealtimeSubscriptions() {
     console.log("Configurando suscripciones en tiempo real para el panel...");
 
-    turnosChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'turnos' },
+    turnosChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'turnos', filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` },
         (payload) => {
             console.log(`Cambio en 'turnos' detectado: ${payload.eventType}`);
 
@@ -385,38 +389,6 @@ btnCallNext.addEventListener('click', async () => {
 
     btnCallNext.disabled = true;
     try {
-        // console.log("Obteniendo servicios del módulo...");
-        // const { data: moduleServices, error: msError } = await supabase
-        //     .from('modulos_servicios')
-        //     .select('id_servicio')
-        //     .eq('id_modulo', window.ASSIGNED_MODULE_ID);
-
-        // if (msError) throw msError;
-
-        // const serviceIds = moduleServices.map(ms => ms.id_servicio);
-        // console.log("Servicios del módulo:", serviceIds);
-
-        // if (serviceIds.length === 0) {
-        //     throw new Error("Este módulo no tiene servicios configurados");
-        // }
-
-        // console.log("Buscando siguiente turno disponible...");
-        // const { data: nextTurn, error: nextTurnError } = await supabase
-        //     .from('turnos')
-        //     .select('id_turno, prefijo_turno, numero_turno, id_servicio, servicios(nombre_servicio)')
-        //     .eq('estado', 'en espera')
-        //     .in('id_servicio', serviceIds)
-        //     .order('hora_solicitud', { ascending: true })
-        //     .limit(1)
-        //     .maybeSingle();
-
-        // if (nextTurnError) throw nextTurnError;
-
-        // if (!nextTurn) {
-        //     console.log("No hay turnos pendientes para llamar");
-        //     await showConfirmationModal('Atención', 'No hay turnos pendientes para llamar.');
-        //     return;
-        // }
         const nextTurn = sortedPendingTurns[0];
         console.log(`Llamando turno ${nextTurn.prefijo_turno}-${nextTurn.numero_turno}`);
 
@@ -439,8 +411,8 @@ btnCallNext.addEventListener('click', async () => {
 
         // Enviamos un mensaje explícito al visualizador con los datos del nuevo turno.
         console.log("Enviando evento de broadcast 'nuevo_llamado'");
-        
-        const { data: moduloData } = await supabase.from('modulos').select('nombre_modulo').eq('id_modulo', window.ASSIGNED_MODULE_ID).single();
+
+        const { data: moduloData } = await supabase.from('modulos').select('nombre_modulo').eq('id_modulo', window.ASSIGNED_MODULE_ID).eq('id_organizacion', window.ORGANIZACION_ID).single();
 
         turnosChannel.send({
             type: 'broadcast',
@@ -588,41 +560,5 @@ async function init() {
     setupRealtimeSubscriptions();
     console.log("Panel inicializado.");
 }
-
-// function cleanupRealtimeSubscriptions() {
-//     if (channels && channels.length > 0) {
-//         console.log("Limpiando suscripciones existentes...");
-//         channels.forEach(channel => {
-//             try {
-//                 supabase.removeChannel(channel);
-//             } catch (e) {
-//                 console.warn("Error al limpiar canal:", e);
-//             }
-//         });
-//         channels = [];
-//     }
-// }
-
-// window.onload = async () => {
-//     console.log("Inicializando panel de funcionario...");
-//     console.log("Usuario ID:", window.USER_ID);
-//     console.log("Módulo asignado ID:", window.ASSIGNED_MODULE_ID);
-
-//     await updateAssignedModuleName();
-//     console.log("Nombre del módulo actualizado");
-
-//     await loadPendingTurns();
-//     console.log("Turnos pendientes cargados");
-
-//     await loadCurrentTurn();
-//     console.log("Turno actual cargado");
-
-//     await loadDailyHistory();
-//     console.log("Historial diario cargado");
-
-//     setupRealtimeSubscriptions();
-//     console.log("Suscripciones en tiempo real configuradas");
-// };
-// turnosChannel.subscribe();
 
 document.addEventListener('DOMContentLoaded', init);
