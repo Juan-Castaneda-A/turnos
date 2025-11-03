@@ -48,9 +48,21 @@ const transferModuleSelect = document.getElementById('transfer-module-select');
 const transferModalConfirmBtn = document.getElementById('transfer-modal-confirm-btn');
 const transferModalCancelBtn = document.getElementById('transfer-modal-cancel-btn');
 
+const chatModal = document.getElementById('chat-modal');
+const openChatBtn = document.getElementById('open-chat-btn');
+const closeChatBtn = document.getElementById('close-chat-btn');
+const chatRoomList = document.getElementById('chat-room-list');
+const chatMessageHeader = document.getElementById('chat-message-header');
+const chatMessageArea = document.getElementById('chat-message-area');
+const chatMessageForm = document.getElementById('chat-message-form');
+const chatMessageInput = document.getElementById('chat-message-input');
+const chatSendBtn = document.getElementById('chat-send-btn');
+
 let currentAttendingTurnId = null;
 let channels = [];
 let sortedPendingTurns = [];
+let currentChatRoomId = null;
+let userCacheMap = new Map();
 // ==========================================================
 // FUNCIONES DE LÓGICA
 // ==========================================================
@@ -86,18 +98,18 @@ async function handleApiResponse(response) {
         window.location.href = '/funcionario/login';
         throw new Error('Sesión expirada');
     }
-    
+
     // Verificar si la respuesta es HTML (página de login)
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('text/html')) {
         window.location.href = '/funcionario/login';
         throw new Error('Sesión expirada');
     }
-    
+
     if (!response.ok) {
         throw new Error(`Error HTTP: ${response.status}`);
     }
-    
+
     return response.json();
 }
 
@@ -121,7 +133,7 @@ async function updateAssignedModuleName() {
         }
     } catch (error) {
         console.error("Error al obtener nombre del módulo:", error.message);
-        
+
         // Solo mostrar error si no es una redirección
         if (!error.message.includes('Sesión expirada')) {
             assignedModuleNameElement.textContent = 'Error';
@@ -153,7 +165,7 @@ function updateButtonStates() {
 
 async function openTransferModal(turnId, turnName) {
     console.log(`Abriendo modal para transferir turno: ${turnId} (${turnName})`);
-    
+
     // 1. Guardamos el ID del turno en el modal para usarlo después
     transferModal.dataset.turnId = turnId;
     transferModalTitle.textContent = `Transferir Turno ${turnName}`;
@@ -226,7 +238,7 @@ async function handleTransferConfirm() {
         // 2. ¡Éxito! Cerramos el modal
         transferModal.classList.add('hidden');
         await showConfirmationModal('Éxito', result.message);
-        
+
         // 3. NO necesitamos recargar la lista de turnos aquí.
         // El broadcast 'turn_transferred' que acabamos de disparar
         // será recibido por nuestro propio listener y actualizará la lista.
@@ -241,13 +253,213 @@ async function handleTransferConfirm() {
 }
 
 // ==========================================================
+// FUNCIONES DEL CHAT
+// ==========================================================
+
+// --- 1. Abrir y Cerrar el Modal ---
+
+async function openChat() {
+    console.log("Abriendo chat...");
+    chatModal.classList.remove('hidden');
+    // Reseteamos la UI cada vez que se abre
+    chatMessageHeader.querySelector('h3').textContent = "Seleccione un chat";
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">No hay mensajes cargados.</p></div>';
+    chatMessageInput.disabled = true;
+    chatSendBtn.disabled = true;
+    currentChatRoomId = null;
+
+    openChatBtn.classList.remove('animate-pulse', 'bg-red-600', 'hover:bg-red-700');
+    openChatBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+
+    // Cargamos la lista de salas de chat
+    await loadChatRooms();
+}
+
+function closeChat() {
+    chatModal.classList.add('hidden');
+}
+
+// --- 2. Cargar la Lista de Salas de Chat ---
+
+async function loadChatRooms() {
+    chatRoomList.innerHTML = '<p class="text-gray-500 text-sm">Cargando chats...</p>';
+    try {
+        const response = await fetch('/api/chat/rooms');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        chatRoomList.innerHTML = ''; // Limpiamos "Cargando..."
+
+        if (result.rooms.length === 0) {
+            chatRoomList.innerHTML = '<p class="text-gray-500 text-sm">No hay chats disponibles.</p>';
+            return;
+        }
+
+        result.rooms.forEach(room => {
+            const roomElement = document.createElement('button');
+            roomElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-200 hover:bg-gray-700 focus:outline-none focus:bg-teal-600";
+            roomElement.textContent = room.nombre;
+            // Guardamos los datos en el elemento para usarlos al hacer clic
+            roomElement.dataset.roomId = room.id;
+            roomElement.dataset.roomName = room.nombre;
+
+            // ¡IMPORTANTE! Añadimos el 'onclick'
+            roomElement.onclick = () => {
+                // Quitamos el 'focus' de todos los demás
+                document.querySelectorAll('#chat-room-list button').forEach(btn => btn.classList.remove('focus:bg-teal-600'));
+                // Añadimos el 'focus' a este
+                roomElement.classList.add('focus:bg-teal-600');
+                // Cargamos la sala
+                selectChatRoom(room.id, room.nombre);
+            };
+
+            chatRoomList.appendChild(roomElement);
+        });
+
+    } catch (error) {
+        console.error("Error al cargar salas de chat:", error.message);
+        chatRoomList.innerHTML = '<p class="text-red-400 text-sm">Error al cargar chats.</p>';
+    }
+}
+
+// --- 3. Seleccionar una Sala y Cargar sus Mensajes ---
+
+async function selectChatRoom(roomId, roomName) {
+    console.log(`Seleccionando sala: ${roomName} (ID: ${roomId})`);
+
+    // Actualizamos el estado global
+    currentChatRoomId = roomId;
+
+    const roomButton = document.querySelector(`#chat-room-list button[data-room-id="${roomId}"]`);
+    if (roomButton) {
+        const dot = roomButton.querySelector('.notification-dot');
+        if (dot) dot.remove();
+    }
+
+    // Actualizamos la UI
+    chatMessageHeader.querySelector('h3').textContent = roomName;
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">Cargando mensajes...</p></div>';
+    chatMessageInput.disabled = false; // Habilitamos el input
+    chatSendBtn.disabled = false;
+    chatMessageInput.focus();
+
+    // Llamamos a la API para cargar el historial
+    await loadChatMessages(roomId);
+}
+
+async function loadChatMessages(roomId) {
+    try {
+        const response = await fetch(`/api/chat/messages/${roomId}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        chatMessageArea.innerHTML = ''; // Limpiamos "Cargando..."
+
+        if (result.messages.length === 0) {
+            chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">No hay mensajes. ¡Sé el primero en saludar!</p></div>';
+            return;
+        }
+
+        // Renderizamos cada mensaje
+        result.messages.forEach(msg => {
+            const isMe = msg.sender_id === window.USER_ID; // Comparamos con el ID del funcionario logueado
+            renderMessage(msg, isMe);
+        });
+
+        // Scroll automático al fondo
+        chatMessageArea.scrollTop = chatMessageArea.scrollHeight;
+
+    } catch (error) {
+        console.error("Error al cargar mensajes:", error.message);
+        chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-red-400">Error al cargar mensajes.</p></div>';
+    }
+}
+
+// --- 4. Renderizar un solo mensaje (Función "Ayudante") ---
+
+function renderMessage(message, isMe) {
+    const bubble = document.createElement('div');
+    bubble.className = `p-3 max-w-xs md:max-w-md chat-bubble-${isMe ? 'sent' : 'received'}`;
+
+    // --- ¡ESTA ES LA LÓGICA DEL CACHÉ! ---
+    // Usamos el caché para buscar el nombre.
+    // Si el mensaje viene del 'loadChatMessages', tendrá 'message.sender.nombre_completo'.
+    // Si viene de Realtime, solo tendrá 'message.sender_id' y usaremos el caché.
+    let senderName = 'Usuario Desconocido';
+    if (isMe) {
+        senderName = 'Tú';
+    } else if (message.sender && message.sender.nombre_completo) {
+        senderName = message.sender.nombre_completo; // De la API
+    } else if (message.sender_id) {
+        senderName = userCacheMap.get(message.sender_id) || 'Usuario'; // De Realtime
+    }
+    const sentTime = new Date(message.sent_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+    bubble.innerHTML = `
+        <p class="font-bold text-sm ${isMe ? 'text-teal-100' : 'text-green-300'}">${senderName}</p>
+        <p class="text-base">${message.content}</p>
+        <p class="text-xs text-right opacity-70 mt-1">${sentTime}</p>
+    `;
+
+    chatMessageArea.appendChild(bubble);
+
+    chatMessageArea.scrollTop = chatMessageArea.scrollHeight;
+}
+
+// --- 5. Enviar un Mensaje Nuevo ---
+
+async function handleSendMessage(event) {
+    event.preventDefault(); // Evita que la página se recargue
+    const content = chatMessageInput.value;
+
+    if (!content.trim() || !currentChatRoomId) {
+        return; // No enviar mensajes vacíos o sin sala
+    }
+
+    // Deshabilitamos el form temporalmente para evitar doble envío
+    chatMessageInput.disabled = true;
+    chatSendBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/chat/send-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room_id: currentChatRoomId,
+                content: content
+            })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        // ¡Éxito!
+        chatMessageInput.value = ''; // Limpiamos el input
+
+        // NO necesitamos llamar a renderMessage() aquí.
+        // El truco es que el Realtime (que configuraremos en Fase 4)
+        // verá este nuevo mensaje en la BD y se lo enviará a TODOS,
+        // ¡incluyéndonos a nosotros! Esto evita mensajes duplicados.
+
+    } catch (error) {
+        console.error("Error al enviar mensaje:", error.message);
+        // Opcional: mostrar un error al usuario
+    } finally {
+        // Volvemos a habilitar el form
+        chatMessageInput.disabled = false;
+        chatSendBtn.disabled = false;
+        chatMessageInput.focus();
+    }
+}
+
+// ==========================================================
 // FUNCIONES DE RENDERIZADO (NUEVAS)
 // (Estas funciones solo actualizan el HTML)
 // ==========================================================
 
 function renderPendingTurns(turns) {
     pendingTurnsBody.innerHTML = '';
-    
+
     if (window.ASSIGNED_MODULE_ID === null) {
         pendingTurnsBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Asigne un módulo a este funcionario para ver turnos.</td></tr>`;
         btnCallNext.disabled = true;
@@ -339,7 +551,7 @@ function renderDailyHistory(history) {
 async function loadAllPanelData() {
     // 1. Hacemos UNA SOLA llamada a nuestra nueva API
     const response = await fetch('/api/funcionario/get-panel-data');
-    
+
     if (!response.ok) {
         // Si la API maestra falla, mostramos el error en todas las secciones
         const errorMsg = `Error HTTP ${response.status}: No se pudo cargar datos del panel.`;
@@ -349,7 +561,7 @@ async function loadAllPanelData() {
         dailyHistoryBody.innerHTML = `<tr><td colspan="2" class="text-center text-red-400 py-4">${errorMsg}</td></tr>`;
         return; // Detenemos la ejecución
     }
-    
+
     const result = await response.json();
 
     if (!result.success) {
@@ -368,17 +580,33 @@ async function loadAllPanelData() {
     updateButtonStates();
 }
 
+async function loadUserCache() {
+    try {
+        const response = await fetch('/api/get-users-list');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        // Limpiamos el caché y lo volvemos a llenar
+        userCacheMap.clear();
+        result.users.forEach(user => {
+            userCacheMap.set(user.id_usuario, user.nombre_completo);
+        });
+        console.log("Caché de usuarios cargado.");
+    } catch (error) {
+        console.error("Error al cargar caché de usuarios:", error.message);
+    }
+}
 
 function setupRealtimeSubscriptions() {
     console.log("Configurando suscripciones en tiempo real para el panel...");
 
     // --- ¡LÓGICA DEBOUNCE / MUTEX (MODIFICADA)! ---
     let reloadTimeout;
-    let isReloading = false; 
+    let isReloading = false;
 
     const debouncedReloadAll = () => {
-        clearTimeout(reloadTimeout); 
-        
+        clearTimeout(reloadTimeout);
+
         reloadTimeout = setTimeout(async () => {
             if (isReloading) {
                 console.log("DEBOUNCED RELOAD: Ignorado, recarga ya en curso.");
@@ -387,7 +615,7 @@ function setupRealtimeSubscriptions() {
 
             isReloading = true;
             console.log("DEBOUNCED RELOAD: Recargando TODO el panel...");
-            
+
             try {
                 // ¡AHORA SOLO LLAMAMOS A UNA FUNCIÓN!
                 await loadAllPanelData();
@@ -402,12 +630,12 @@ function setupRealtimeSubscriptions() {
     // --- FIN DE LA MODIFICACIÓN ---
 
     turnosChannel.on(
-        'postgres_changes', 
-        { 
+        'postgres_changes',
+        {
             event: '*',
-            schema: 'public', 
-            table: 'turnos', 
-            filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` 
+            schema: 'public',
+            table: 'turnos',
+            filter: `id_organizacion=eq.${window.ORGANIZACION_ID}`
         },
         (payload) => {
             console.log(`Cambio en 'turnos' detectado: ${payload.eventType}`);
@@ -419,6 +647,52 @@ function setupRealtimeSubscriptions() {
             console.log('Panel de funcionario conectado al canal de tiempo real.');
         }
     });
+
+    // 1. Creamos un nuevo canal para los mensajes
+    const chatMessagesChannel = supabase.channel('chat_messages_channel');
+
+    chatMessagesChannel.on(
+        'postgres_changes',
+        {
+            event: 'INSERT', // Solo nos importan los NUEVOS mensajes
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `id_organizacion=eq.${window.ORGANIZACION_ID}` // Filtrado por Org
+        },
+        (payload) => {
+            console.log("Nuevo mensaje de chat recibido:", payload.new);
+            const msg = payload.new;
+            const isMe = msg.sender_id === window.USER_ID;
+
+            // 1. ¿El chat está abierto y es la sala correcta?
+            if (!chatModal.classList.contains('hidden') && msg.room_id === currentChatRoomId) {
+                // Si estamos viendo la sala, renderiza el mensaje
+                renderMessage(msg, isMe);
+            } else {
+                // Si no, mostramos una notificación
+                showChatNotification(msg.room_id);
+            }
+        }
+    ).subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Panel de funcionario conectado al canal de chat.');
+        }
+    });
+}
+
+function showChatNotification(roomId) {
+    // 1. Añade un punto rojo al botón principal de "Chat"
+    openChatBtn.classList.add('animate-pulse'); // Hacemos que parpadee
+    openChatBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+    openChatBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+
+    // 2. (Opcional) Añade un punto a la sala específica en la lista
+    const roomButton = document.querySelector(`#chat-room-list button[data-room-id="${roomId}"]`);
+    if (roomButton && !roomButton.querySelector('.notification-dot')) {
+        const dot = document.createElement('span');
+        dot.className = 'notification-dot w-3 h-3 bg-red-500 rounded-full inline-block ml-2';
+        roomButton.appendChild(dot);
+    }
 }
 
 // ==========================================================
@@ -513,13 +787,13 @@ btnRecall.addEventListener('click', async () => {
         const turnParts = turnText.split('-');
         const turnPrefix = turnParts[0];
         const turnNumber = parseInt(turnParts[1], 10);
-        
+
         // 3. Enviamos un broadcast con TODA la información
         console.log("Enviando evento de broadcast 'rellamar' con datos completos");
         turnosChannel.send({
             type: 'broadcast',
             event: 'rellamar',
-            payload: { 
+            payload: {
                 id_turno: currentAttendingTurnId,
                 prefijo_turno: turnPrefix,
                 numero_turno: turnNumber,
@@ -551,7 +825,7 @@ btnFinish.addEventListener('click', async () => {
 
     btnFinish.disabled = true;
     try {
-        const finishedTurnId = currentAttendingTurnId; 
+        const finishedTurnId = currentAttendingTurnId;
 
         // 1. Llamamos a nuestra API. Su único trabajo es actualizar la BD.
         const response = await fetch('/api/funcionario/finish-turn', {
@@ -572,7 +846,7 @@ btnFinish.addEventListener('click', async () => {
         // Ya no enviamos un 'turno_finalizado'.
         // Confiamos en que el 'postgres_changes' (de la BD) 
         // hará el trabajo de actualizar la UI.
-        
+
     } catch (error) {
         console.error("Error al finalizar turno:", error.message);
         await showConfirmationModal('Error', `Error al finalizar turno: ${error.message}`);
@@ -607,7 +881,13 @@ async function init() {
     await updateAssignedModuleName(); // Esta es separada y está bien
     await loadAllPanelData();         // Llamamos a nuestra nueva función
     // updateButtonStates(); // loadAllPanelData() ya llama a esto
+    await loadUserCache();
     setupRealtimeSubscriptions();
+
+    openChatBtn.addEventListener('click', openChat);
+    closeChatBtn.addEventListener('click', closeChat);
+    chatMessageForm.addEventListener('submit', handleSendMessage);
+
     console.log("Panel inicializado.");
 }
 
