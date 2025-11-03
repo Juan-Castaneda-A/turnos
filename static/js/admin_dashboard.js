@@ -2027,13 +2027,17 @@ async function generateReport() {
 async function loadServices() {
     servicesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">Cargando servicios...</td></tr>`;
     try {
-        const { data: services, error } = await supabase
-            .from('servicios')
-            .select('*')
-            .order('nombre_servicio', { ascending: true });
+        // Llamamos a la nueva API
+        const response = await fetch('/api/get-services');
+        const result = await response.json();
 
-        if (error) throw error;
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+        
+        const services = result.services; // Obtenemos los servicios del JSON
 
+        // El resto de tu lógica para pintar la tabla es IDÉNTICA
         servicesTableBody.innerHTML = '';
         if (services.length === 0) {
             servicesTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-gray-500 py-4">No hay servicios registrados.</td></tr>`;
@@ -2061,25 +2065,36 @@ async function loadServices() {
 
 async function handleSaveService(event) {
     event.preventDefault();
+    
     const id = serviceIdField.value;
     const serviceData = {
         nombre_servicio: serviceNameField.value,
-        prefijo_ticket: servicePrefixField.value.toUpperCase()
+        prefijo_ticket: servicePrefixField.value
     };
+    
+    if (id) {
+        serviceData.id_servicio = id;
+    }
 
     const actionText = id ? 'Actualizar' : 'Crear';
     const confirmed = await showConfirmationModal(`${actionText} Servicio`, `¿Está seguro de que desea guardar este servicio?`);
     if (!confirmed) return;
 
     try {
-        if (id) {
-            serviceData.id_servicio = id;
+        // Llamamos a la API unificada
+        const response = await fetch('/api/save-service', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(serviceData),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
         }
 
-        const { error } = await supabase.from('servicios').upsert(serviceData);
-        if (error) throw error;
-
-        await showConfirmationModal('Éxito', `Servicio guardado exitosamente.`);
+        await showConfirmationModal('Éxito', result.message);
         serviceFormContainer.classList.add('hidden');
         loadServices(); // Recargar la tabla
     } catch (error) {
@@ -2090,9 +2105,17 @@ async function handleSaveService(event) {
 
 async function handleEditService(id) {
     try {
-        const { data: service, error } = await supabase.from('servicios').select('*').eq('id_servicio', id).single();
-        if (error) throw error;
+        // Llamamos a la API para obtener el servicio
+        const response = await fetch(`/api/get-service/${id}`);
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+        
+        const service = result.service; // Obtenemos el servicio del JSON
+
+        // El resto de tu lógica para rellenar el formulario es IDÉNTICA
         serviceForm.reset();
         serviceIdField.value = service.id_servicio;
         serviceNameField.value = service.nombre_servicio;
@@ -2111,14 +2134,24 @@ async function handleDeleteService(id, name) {
     if (!confirmed) return;
 
     try {
-        const { error } = await supabase.from('servicios').delete().eq('id_servicio', id);
-        if (error) throw error;
+        // Llamamos a la API de borrado
+        const response = await fetch(`/api/delete-service/${id}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
 
-        await showConfirmationModal('Éxito', 'Servicio eliminado exitosamente.');
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        await showConfirmationModal('Éxito', result.message);
         loadServices();
-    } catch (error) {
+    } catch (error)
+    {
         console.error("Error al eliminar servicio:", error.message);
-        await showConfirmationModal('Error', `No se pudo eliminar el servicio: ${error.message}. Es posible que esté en uso.`);
+        // Mostramos el error del backend (ej. "El servicio está en uso")
+        await showConfirmationModal('Error', `No se pudo eliminar el servicio: ${error.message}`);
     }
 }
 

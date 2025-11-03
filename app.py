@@ -703,6 +703,144 @@ def api_save_module():
         logging.error(f"Error en api_save_module: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/get-services')
+@admin_required
+def api_get_services():
+    """
+    Endpoint seguro para obtener TODOS los servicios
+    pertenecientes a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        response = supabase.table('servicios') \
+            .select('*') \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .order('nombre_servicio', desc=False) \
+            .execute()
+            
+        if response.data:
+            return jsonify({"success": True, "services": response.data}), 200
+        else:
+            return jsonify({"success": True, "services": []}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_services: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/get-service/<int:service_id>')
+@admin_required
+def api_get_service(service_id):
+    """
+    Endpoint seguro para obtener UN servicio por su ID,
+    verificando que pertenezca a la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+
+    try:
+        response = supabase.table('servicios') \
+            .select('*') \
+            .eq('id_servicio', service_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .single() \
+            .execute()
+        
+        if response.data:
+            return jsonify({"success": True, "service": response.data}), 200
+        else:
+            return jsonify({"success": False, "error": "Servicio no encontrado o no pertenece a esta organización"}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_get_service: {e}")
+        return jsonify({"success": False, "error": "Servicio no encontrado."}), 404
+
+
+@app.route('/api/delete-service/<int:service_id>', methods=['DELETE'])
+@admin_required
+def api_delete_service(service_id):
+    """
+    Endpoint seguro para ELIMINAR un servicio
+    perteneciente a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        # Filtramos por ID de servicio Y ID de organización
+        response = supabase.table('servicios') \
+            .delete() \
+            .eq('id_servicio', service_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .execute()
+            
+        if response.data:
+            logging.info(f"Servicio {service_id} eliminado exitosamente por {g.user['name']}.")
+            return jsonify({"success": True, "message": "Servicio eliminado exitosamente."}), 200
+        else:
+            logging.warning(f"Intento de borrado fallido para servicio {service_id} por {g.user['name']}.")
+            return jsonify({"success": False, "error": "No se pudo eliminar el servicio. Es posible que no exista o no le pertenezca."}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_delete_service: {e}")
+        if 'violates foreign key constraint' in str(e).lower():
+             return jsonify({"success": False, "error": "No se puede eliminar: El servicio está en uso (ej. en un turno o asignado a un módulo)."}), 409
+        return jsonify({"success": False, "error": f"Error al eliminar servicio: {e}"}), 500
+
+
+@app.route('/api/save-service', methods=['POST'])
+@admin_required
+def api_save_service():
+    """
+    Endpoint seguro para CREAR o ACTUALIZAR un servicio.
+    Asegura que la operación se realice solo dentro de la org del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    data = request.get_json()
+    if not data or not data.get('nombre_servicio') or not data.get('prefijo_ticket'):
+        return jsonify({"success": False, "error": "Nombre y prefijo son requeridos"}), 400
+
+    service_id = data.get('id_servicio')
+    
+    service_data = {
+        'nombre_servicio': data.get('nombre_servicio'),
+        'prefijo_ticket': data.get('prefijo_ticket').upper() # Guardamos en mayúsculas
+    }
+
+    try:
+        if service_id:
+            # --- LÓGICA DE ACTUALIZAR (UPDATE) ---
+            response = supabase.table('servicios') \
+                .update(service_data) \
+                .eq('id_servicio', service_id) \
+                .eq('id_organizacion', g.org['id_organizacion']) \
+                .execute()
+            message = "Servicio actualizado exitosamente."
+
+        else:
+            # --- LÓGICA DE CREAR (INSERT) ---
+            service_data['id_organizacion'] = g.org['id_organizacion']
+            response = supabase.table('servicios') \
+                .insert(service_data) \
+                .execute()
+            message = "Servicio creado exitosamente."
+
+        if response.data:
+            return jsonify({"success": True, "message": message, "service": response.data[0]}), 200
+        else:
+            raise Exception("No se pudo guardar el servicio, o no se tiene permiso sobre él.")
+
+    except Exception as e:
+        logging.error(f"Error en api_save_service: {e}")
+        # Manejo de error de prefijo duplicado
+        if 'violates unique constraint "servicios_prefijo_ticket_key"' in str(e).lower():
+             return jsonify({"success": False, "error": "Error: Ese prefijo de ticket ya está en uso."}), 409
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)
