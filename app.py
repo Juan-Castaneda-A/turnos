@@ -421,11 +421,11 @@ def logout():
 def api_save_user():
     """
     Endpoint para crear o actualizar usuarios de forma segura.
-    Recibe datos JSON desde el panel de administración.
+    Asegura que la operación se realice solo dentro de la org del admin.
     """
-    if not request.is_json:
-        return jsonify({"success": False, "error": "La solicitud debe ser JSON"}), 400
-
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
     data = request.get_json()
     user_id = data.get('id_usuario')
 
@@ -438,37 +438,49 @@ def api_save_user():
             'nombre_completo': data.get('nombre_completo'),
             'nombre_usuario': data.get('nombre_usuario'),
             'rol': data.get('rol', 'funcionario'),
-            'id_modulo_asignado': data.get('id_modulo_asignado')
+            'id_modulo_asignado': data.get('id_modulo_asignado') or None # Asegura que sea NULL si está vacío
         }
 
-        # --- Lógica de Hashing de Contraseña ---
-        # Solo hashea y guarda la contraseña si se proporcionó una.
         password = data.get('password')
         if password:
             user_data['contrasena'] = generate_password_hash(password)
 
         if user_id:
-            # --- Actualizar Usuario Existente ---
+            # --- LÓGICA DE ACTUALIZAR (UPDATE) ---
             if not password:
-                # Si no se envía contraseña al editar, no se actualiza
-                user_data.pop('contrasena', None) 
+                user_data.pop('contrasena', None) # No actualizar contraseña si viene vacía
 
-            response = supabase.table('usuarios').update(user_data).eq('id_usuario', user_id).execute()
+            response = supabase.table('usuarios') \
+                .update(user_data) \
+                .eq('id_usuario', user_id) \
+                .eq('id_organizacion', g.org['id_organizacion']) \
+                .execute()
+            message = "Usuario actualizado exitosamente."
+
         else:
-            # --- Crear Nuevo Usuario ---
+            # --- LÓGICA DE CREAR (INSERT) ---
             if not password:
                 return jsonify({"success": False, "error": "La contraseña es requerida para nuevos usuarios."}), 400
-            response = supabase.table('usuarios').insert(user_data).execute()
+            
+            # ¡Vinculación automática!
+            user_data['id_organizacion'] = g.org['id_organizacion']
+            
+            response = supabase.table('usuarios') \
+                .insert(user_data) \
+                .execute()
+            message = "Usuario creado exitosamente."
 
         if response.data:
-            logging.info(f"Usuario {'actualizado' if user_id else 'creado'} exitosamente por {g.user['name']}.")
-            return jsonify({"success": True, "message": "Usuario guardado exitosamente."}), 200
+            logging.info(f"Usuario {'actualizado' if user_id else 'creado'} por {g.user['name']}.")
+            return jsonify({"success": True, "message": message}), 200
         else:
-            logging.error(f"Error de Supabase al guardar usuario: {response.error}")
-            return jsonify({"success": False, "error": str(response.error)}), 500
+            raise Exception("No se pudo guardar el usuario, o no se tiene permiso sobre él.")
 
     except Exception as e:
         logging.error(f"Error en api_save_user: {e}")
+        # Manejo de error de nombre de usuario duplicado
+        if 'violates unique constraint "usuarios_nombre_usuario_key"' in str(e).lower():
+             return jsonify({"success": False, "error": "Error: Ese nombre de usuario ya está en uso."}), 409
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/register-cliente', methods=['POST'])
@@ -1246,6 +1258,92 @@ def api_reset_turns():
     except Exception as e:
         logging.error(f"Error en api_reset_turns: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/get-users')
+@admin_required
+def api_get_users():
+    """
+    Obtiene TODOS los usuarios (funcionarios, admins)
+    pertenecientes a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+        
+    try:
+        # Hacemos un 'join' con la tabla 'modulos' para obtener el nombre del módulo
+        response = supabase.table('usuarios') \
+            .select('*, modulos(nombre_modulo)') \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .order('nombre_completo', desc=False) \
+            .execute()
+            
+        return jsonify({"success": True, "users": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_users: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/get-user/<int:user_id>')
+@admin_required
+def api_get_user(user_id):
+    """
+    Obtiene UN usuario por su ID,
+    verificando que pertenezca a la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+
+    try:
+        response = supabase.table('usuarios') \
+            .select('*') \
+            .eq('id_usuario', user_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .single() \
+            .execute()
+        
+        if response.data:
+            return jsonify({"success": True, "user": response.data}), 200
+        else:
+            return jsonify({"success": False, "error": "Usuario no encontrado o no pertenece a esta organización"}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_get_user: {e}")
+        return jsonify({"success": False, "error": "Usuario no encontrado."}), 404
+
+
+@app.route('/api/delete-user/<int:user_id>', methods=['DELETE'])
+@admin_required
+def api_delete_user(user_id):
+    """
+    Endpoint seguro para ELIMINAR un usuario
+    perteneciente a la organización del admin logueado.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    # ¡Control de seguridad! Un usuario no puede borrarse a sí mismo.
+    if user_id == g.user['id']:
+        return jsonify({"success": False, "error": "No puede eliminarse a sí mismo."}), 403
+        
+    try:
+        # Filtramos por ID de usuario Y ID de organización
+        response = supabase.table('usuarios') \
+            .delete() \
+            .eq('id_usuario', user_id) \
+            .eq('id_organizacion', g.org['id_organizacion']) \
+            .execute()
+            
+        if response.data:
+            logging.info(f"Usuario {user_id} eliminado por {g.user['name']}.")
+            return jsonify({"success": True, "message": "Usuario eliminado exitosamente."}), 200
+        else:
+            logging.warning(f"Intento de borrado fallido para usuario {user_id} por {g.user['name']}.")
+            return jsonify({"success": False, "error": "No se pudo eliminar el usuario."}), 404
+
+    except Exception as e:
+        logging.error(f"Error en api_delete_user: {e}")
+        return jsonify({"success": False, "error": f"Error al eliminar usuario: {e}"}), 500
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':

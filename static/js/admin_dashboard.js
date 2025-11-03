@@ -1284,12 +1284,17 @@ async function loadRealtimeModulesStatus() {
 async function loadUsers() {
     usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">Cargando usuarios...</td></tr>`;
     try {
-        const { data: users, error } = await supabase
-            .from('usuarios')
-            .select('*, modulos(nombre_modulo)')
-            .order('nombre_completo', { ascending: true });
-        if (error) throw error;
+        // Llamamos a la nueva API
+        const response = await fetch('/api/get-users');
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const users = result.users; // Obtenemos los usuarios del JSON
+
+        // El resto de tu lógica para pintar la tabla es IDÉNTICA
         usersTableBody.innerHTML = '';
         if (users.length === 0) {
             usersTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">No hay usuarios registrados.</td></tr>`;
@@ -1831,21 +1836,30 @@ async function loadPriorityEditor() {
 // --- Funciones de Manejo de Acciones (handle...) ---
 async function editUser(id) {
     try {
-        const { data: user, error } = await supabase.from('usuarios').select('*').eq('id_usuario', id).single();
-        if (error) throw error;
+        // Llamamos a la API para obtener el usuario
+        const response = await fetch(`/api/get-user/${id}`);
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const user = result.user; // Obtenemos el usuario del JSON
+
+        // El resto de tu lógica para rellenar el formulario es IDÉNTICA
         userFormContainer.classList.remove('hidden');
         userFormTitle.textContent = `Editar Usuario: ${user.nombre_completo}`;
         userIdField.value = user.id_usuario;
         fullNameField.value = user.nombre_completo;
         usernameField.value = user.nombre_usuario;
         passwordField.value = '';
-        passwordField.required = false;
+        passwordField.required = false; // No requerir contraseña al editar
+        passwordField.placeholder = "Contraseña (dejar en blanco para no cambiar)";
         roleField.value = user.rol;
         assignedModuleField.value = user.id_modulo_asignado || '';
     } catch (error) {
         console.error("Error al cargar usuario para edición:", error.message);
-        await showConfirmationModal('Error', `Error al cargar usuario para edición: ${error.message}`);
+        await showConfirmationModal('Error', `Error al cargar usuario: ${error.message}`);
     }
 }
 
@@ -1854,9 +1868,18 @@ async function deleteUser(id) {
     if (!confirmed) return;
 
     try {
-        const { error } = await supabase.from('usuarios').delete().eq('id_usuario', id);
-        if (error) throw error;
-        await showConfirmationModal('Éxito', 'Usuario eliminado exitosamente.');
+        // Llamamos a la API de borrado
+        const response = await fetch(`/api/delete-user/${id}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        await showConfirmationModal('Éxito', result.message);
         loadUsers();
     } catch (error) {
         console.error("Error al eliminar usuario:", error.message);
