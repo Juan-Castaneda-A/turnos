@@ -841,6 +841,101 @@ def api_save_service():
              return jsonify({"success": False, "error": "Error: Ese prefijo de ticket ya está en uso."}), 409
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/get-services-config')
+@admin_required
+def api_get_services_config():
+    """
+    Obtiene todos los datos necesarios para la matriz de configuración
+    de servicios por módulo, filtrados por la organización del admin.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    
+    try:
+        # 1. Obtenemos los módulos de esta organización
+        modules_resp = supabase.table('modulos') \
+            .select('*') \
+            .eq('id_organizacion', org_id) \
+            .order('nombre_modulo', desc=False) \
+            .execute()
+            
+        # 2. Obtenemos los servicios de esta organización
+        services_resp = supabase.table('servicios') \
+            .select('*') \
+            .eq('id_organizacion', org_id) \
+            .order('nombre_servicio', desc=False) \
+            .execute()
+            
+        # 3. Obtenemos las conexiones actuales para esta organización
+        config_resp = supabase.table('modulos_servicios') \
+            .select('id_modulo, id_servicio') \
+            .eq('id_organizacion', org_id) \
+            .execute()
+
+        return jsonify({
+            "success": True,
+            "modules": modules_resp.data,
+            "services": services_resp.data,
+            "config": config_resp.data  # Esto es una lista de {id_modulo, id_servicio}
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_services_config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/save-services-config', methods=['POST'])
+@admin_required
+def api_save_services_config():
+    """
+    Guarda la nueva configuración de la matriz de servicios por módulo.
+    Es una operación transaccional: Borra todo lo de la org y re-inserta.
+    """
+    if not g.org:
+        return jsonify({"success": False, "error": "Organización no identificada"}), 401
+    
+    org_id = g.org['id_organizacion']
+    new_config_list = request.get_json() # Esperamos una lista de {id_modulo, id_servicio}
+
+    if not isinstance(new_config_list, list):
+        return jsonify({"success": False, "error": "Formato de datos inválido"}), 400
+
+    try:
+        # 1. ¡BORRADO SEGURO! Borramos solo las conexiones de ESTA organización
+        logging.info(f"Borrando config de servicios antigua para org {org_id}")
+        del_resp = supabase.table('modulos_servicios') \
+            .delete() \
+            .eq('id_organizacion', org_id) \
+            .execute()
+
+        # 2. Preparamos los nuevos datos para insertar, "etiquetando" cada uno
+        inserts_with_org = []
+        for item in new_config_list:
+            inserts_with_org.append({
+                'id_modulo': item.get('id_modulo'),
+                'id_servicio': item.get('id_servicio'),
+                'id_organizacion': org_id # ¡La clave de vinculación!
+                # La 'prioridad' no la estamos manejando aquí, se hace en otra pantalla
+            })
+
+        # 3. Insertamos la nueva configuración (si hay algo que insertar)
+        if inserts_with_org:
+            logging.info(f"Insertando {len(inserts_with_org)} nuevas configs de servicios para org {org_id}")
+            ins_resp = supabase.table('modulos_servicios') \
+                .insert(inserts_with_org) \
+                .execute()
+            
+            if not ins_resp.data:
+                 raise Exception("Error en la inserción de la nueva configuración.")
+
+        return jsonify({"success": True, "message": "Configuración de servicios guardada exitosamente."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_save_services_config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)

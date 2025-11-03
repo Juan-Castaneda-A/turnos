@@ -452,41 +452,40 @@ function assignEventListeners() {
         const confirmed = await showConfirmationModal('Guardar Configuración de Servicios', '¿Está seguro de que desea guardar los cambios en la asignación de servicios?');
         if (!confirmed) return;
 
-        isSavingConfig = true;
+        isSavingConfig = true; // (Esto es para tu lógica de Realtime, ¡bien hecho!)
 
-        const newConfig = {};
+        // 1. La lógica para recolectar los datos del DOM es IDÉNTICA
+        const inserts = [];
         servicesConfigBody.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-            const moduleId = parseInt(checkbox.dataset.moduleId);
-            const serviceId = parseInt(checkbox.dataset.serviceId);
             if (checkbox.checked) {
-                if (!newConfig[moduleId]) {
-                    newConfig[moduleId] = [];
-                }
-                newConfig[moduleId].push(serviceId);
+                inserts.push({
+                    id_modulo: parseInt(checkbox.dataset.moduleId),
+                    id_servicio: parseInt(checkbox.dataset.serviceId)
+                });
             }
         });
 
         try {
-            const { error: deleteError } = await supabase.from('modulos_servicios').delete().neq('id', 0);
-            if (deleteError) throw deleteError;
+            // 2. Llamamos a nuestra API unificada con la lista de inserts
+            const response = await fetch('/api/save-services-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(inserts), // Enviamos la lista como JSON
+            });
 
-            const inserts = [];
-            for (const moduleId in newConfig) {
-                newConfig[moduleId].forEach(serviceId => {
-                    inserts.push({ id_modulo: moduleId, id_servicio: serviceId });
-                });
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error);
             }
 
-            if (inserts.length > 0) {
-                const { error: insertError } = await supabase.from('modulos_servicios').insert(inserts);
-                if (insertError) throw insertError;
-            }
+            // 3. Lógica de éxito
+            await showConfirmationModal('Éxito', result.message);
+            loadServicesConfig(); // Recargamos la vista
 
-            await showConfirmationModal('Éxito', 'Configuración de servicios guardada exitosamente.');
-            loadServicesConfig();
         } catch (error) {
             console.error("Error al guardar configuración de servicios:", error.message);
-            await showConfirmationModal('Error', `Error al guardar configuración de servicios: ${error.message}`);
+            await showConfirmationModal('Error', `Error al guardar configuración: ${error.message}`);
         } finally {
             isSavingConfig = false;
         }
@@ -1599,58 +1598,43 @@ async function loadModules() {
 }
 
 async function loadServicesConfig() {
-    // Referencias a los elementos del DOM
-    const servicesConfigHeader = document.getElementById('services-config-header');
-    const servicesConfigBody = document.getElementById('services-config-body');
-
-    // Limpiamos el contenido anterior
     servicesConfigHeader.innerHTML = '';
     servicesConfigBody.innerHTML = `<tr><td colspan="99" class="text-center text-gray-500 py-4">Cargando configuración...</td></tr>`;
 
     try {
-        // Obtenemos los módulos y servicios de la base de datos
-        const { data: modules, error: modulesError } = await supabase.from('modulos').select('*').order('nombre_modulo', { ascending: true });
-        if (modulesError) throw modulesError;
-        allModules = modules; // Asumiendo que allModules es una variable global o de ámbito superior
+        // 1. Llamamos a nuestra nueva API
+        const response = await fetch('/api/get-services-config');
+        const result = await response.json();
 
-        const { data: services, error: servicesError } = await supabase.from('servicios').select('*').order('nombre_servicio', { ascending: true });
-        if (servicesError) throw servicesError;
-        allServices = services; // Asumiendo que allServices es una variable global o de ámbito superior
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
 
-        // --- INICIO DE LA CORRECCIÓN ---
+        // 2. Obtenemos los 3 bloques de datos
+        const allModules = result.modules; // <-- Viene de la API
+        const allServices = result.services; // <-- Viene de la API
+        const moduleServices = result.config; // <-- Viene de la API
 
-        // 1. Crear una nueva fila de encabezado en memoria
+        // 3. ¡El resto de tu lógica para "pintar" la tabla es IDÉNTICA!
         const newHeaderRow = document.createElement('tr');
-
-        // 2. Crear y añadir la primera celda "Módulo" a la fila
         const moduleHeaderCell = document.createElement('th');
         moduleHeaderCell.className = 'px-4 py-2 rounded-tl-lg';
         moduleHeaderCell.textContent = 'Módulo';
         newHeaderRow.appendChild(moduleHeaderCell);
 
-        // 3. Recorrer los servicios y añadir cada uno como una celda a la MISMA fila
         allServices.forEach((service, index) => {
             const serviceHeaderCell = document.createElement('th');
             serviceHeaderCell.className = 'px-4 py-2';
             serviceHeaderCell.textContent = service.nombre_servicio;
-
-            // Redondear la esquina superior derecha de la última celda
             if (index === allServices.length - 1) {
                 serviceHeaderCell.classList.add('rounded-tr-lg');
             }
             newHeaderRow.appendChild(serviceHeaderCell);
         });
-
-        // 4. Añadir la fila completa al a a la tabla
         servicesConfigHeader.appendChild(newHeaderRow);
 
-        // --- FIN DE LA CORRECIÓN ---
-
-        // Cargar las relaciones actuales entre módulos y servicios
-        const { data: moduleServices, error: msError } = await supabase.from('modulos_servicios').select('*');
-        if (msError) throw msError;
-
-        currentModuleServiceConfig = {};
+        // Crear el mapa de configuración actual
+        const currentModuleServiceConfig = {};
         moduleServices.forEach(ms => {
             if (!currentModuleServiceConfig[ms.id_modulo]) {
                 currentModuleServiceConfig[ms.id_modulo] = [];
@@ -1658,7 +1642,7 @@ async function loadServicesConfig() {
             currentModuleServiceConfig[ms.id_modulo].push(ms.id_servicio);
         });
 
-        // Renderizar el cuerpo de la tabla (esta lógica no cambia)
+        // Renderizar el cuerpo de la tabla
         servicesConfigBody.innerHTML = '';
         allModules.forEach(mod => {
             const tr = document.createElement('tr');
@@ -1677,7 +1661,7 @@ async function loadServicesConfig() {
 
     } catch (error) {
         console.error("Error al cargar configuración de servicios:", error.message);
-        servicesConfigBody.innerHTML = `<tr><td colspan="${allServices.length + 1}" class="text-center text-red-400 py-4">Error al cargar configuración.</td></tr>`;
+        servicesConfigBody.innerHTML = `<tr><td colspan="${(allServices?.length || 1) + 1}" class="text-center text-red-400 py-4">Error al cargar configuración.</td></tr>`;
     }
 }
 
@@ -2034,7 +2018,7 @@ async function loadServices() {
         if (!response.ok || !result.success) {
             throw new Error(result.error);
         }
-        
+
         const services = result.services; // Obtenemos los servicios del JSON
 
         // El resto de tu lógica para pintar la tabla es IDÉNTICA
@@ -2065,13 +2049,13 @@ async function loadServices() {
 
 async function handleSaveService(event) {
     event.preventDefault();
-    
+
     const id = serviceIdField.value;
     const serviceData = {
         nombre_servicio: serviceNameField.value,
         prefijo_ticket: servicePrefixField.value
     };
-    
+
     if (id) {
         serviceData.id_servicio = id;
     }
@@ -2112,7 +2096,7 @@ async function handleEditService(id) {
         if (!response.ok || !result.success) {
             throw new Error(result.error);
         }
-        
+
         const service = result.service; // Obtenemos el servicio del JSON
 
         // El resto de tu lógica para rellenar el formulario es IDÉNTICA
@@ -2138,7 +2122,7 @@ async function handleDeleteService(id, name) {
         const response = await fetch(`/api/delete-service/${id}`, {
             method: 'DELETE'
         });
-        
+
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -2147,8 +2131,7 @@ async function handleDeleteService(id, name) {
 
         await showConfirmationModal('Éxito', result.message);
         loadServices();
-    } catch (error)
-    {
+    } catch (error) {
         console.error("Error al eliminar servicio:", error.message);
         // Mostramos el error del backend (ej. "El servicio está en uso")
         await showConfirmationModal('Error', `No se pudo eliminar el servicio: ${error.message}`);
