@@ -1192,22 +1192,25 @@ def api_save_priorities():
             return jsonify({"success": False, "error": "Módulo no encontrado o no pertenece a esta organización."}), 404
             
         # 2. Creamos la lista de objetos para 'upsert'
-        # 'upsert' es perfecto aquí: actualiza la prioridad si la fila existe, 
-        # (aunque en este caso siempre deberían existir).
         updates = []
         for index, service_id in enumerate(service_ids_order):
             updates.append({
                 'id_modulo': module_id,
                 'id_servicio': service_id,
-                'id_organizacion': org_id, # Clave de seguridad
-                'prioridad': index + 1  # La prioridad es el índice (empezando en 1)
+                'id_organizacion': org_id, # La 'etiqueta' de seguridad
+                'prioridad': index + 1  # La nueva prioridad
             })
 
         # 3. Ejecutamos la actualización
         if updates:
+            
+            # --- ¡ESTA ES LA CORRECCIÓN! ---
+            # Le decimos a 'on_conflict' que use la regla
+            # de 2 columnas que SÍ existe en la base de datos.
             response = supabase.table('modulos_servicios') \
-                .upsert(updates, on_conflict='id_modulo, id_servicio, id_organizacion') \
+                .upsert(updates, on_conflict='id_modulo, id_servicio') \
                 .execute()
+            # --- FIN DE LA CORRECCIÓN ---
                 
             if not response.data:
                  raise Exception("Error al ejecutar upsert de prioridades.")
@@ -2382,6 +2385,69 @@ def api_update_organization(org_id):
         logging.error(f"Error en api_update_organization: {e}")
         if 'violates unique constraint' in str(e).lower():
              return jsonify({"success": False, "error": "Error: Ese subdominio ya está en uso."}), 409
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/superadmin/get-admins')
+@superadmin_required
+def api_get_admins():
+    """
+    Obtiene TODOS los usuarios con rol 'admin' o 'superadmin'
+    y la organización a la que pertenecen.
+    """
+    try:
+        # Hacemos "join" para obtener el nombre de la organización
+        response = supabase.table('usuarios') \
+            .select('id_usuario, nombre_completo, nombre_usuario, rol, organizacion:organizaciones(nombre_organizacion)') \
+            .in_('rol', ['administrador', 'superadmin']) \
+            .order('nombre_completo', desc=False) \
+            .execute()
+            
+        return jsonify({"success": True, "users": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_admins: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/superadmin/create-admin', methods=['POST'])
+@superadmin_required
+def api_create_admin():
+    """
+    Crea un nuevo usuario Administrador y lo vincula a una organización.
+    """
+    data = request.get_json()
+    
+    # Validación de campos
+    if not all([data.get('nombre_completo'), 
+                data.get('nombre_usuario'), 
+                data.get('password'), 
+                data.get('id_organizacion')]):
+        return jsonify({"success": False, "error": "Faltan campos (nombre, usuario, contraseña, ID de organización)"}), 400
+
+    try:
+        # Hasheamos la contraseña (¡Importante!)
+        hashed_password = generate_password_hash(data['password'])
+        
+        new_admin_data = {
+            'nombre_completo': data.get('nombre_completo'),
+            'nombre_usuario': data.get('nombre_usuario'),
+            'contrasena': hashed_password,
+            'id_organizacion': data.get('id_organizacion'),
+            'rol': 'administrador' # El Superadmin solo crea Admins
+        }
+        
+        response = supabase.table('usuarios').insert(new_admin_data).execute()
+
+        if response.data:
+            logging.info(f"Superadmin {g.user['name']} creó el admin: {data.get('nombre_usuario')}")
+            return jsonify({"success": True, "user": response.data[0]}), 201
+        else:
+            raise Exception("No se recibieron datos de Supabase después de insertar.")
+
+    except Exception as e:
+        logging.error(f"Error en api_create_admin: {e}")
+        if 'violates unique constraint "usuarios_nombre_usuario_key"' in str(e).lower():
+             return jsonify({"success": False, "error": "Error: Ese nombre de usuario ya está en uso."}), 409
         return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---

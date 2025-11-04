@@ -24,6 +24,19 @@ const orgStatusField = document.getElementById('org-status-field');
 const orgModalCancelBtn = document.getElementById('org-modal-cancel-btn');
 const orgModalSaveBtn = document.getElementById('org-modal-save-btn');
 
+const adminsTableBody = document.getElementById('admins-table-body');
+const addAdminBtn = document.getElementById('add-admin-btn');
+const adminModal = document.getElementById('admin-modal');
+const adminModalTitle = document.getElementById('admin-modal-title');
+const adminForm = document.getElementById('admin-form');
+const adminIdField = document.getElementById('admin-id-field');
+const adminOrgSelect = document.getElementById('admin-org-select');
+const adminNameField = document.getElementById('admin-name-field');
+const adminUsernameField = document.getElementById('admin-username-field');
+const adminPasswordField = document.getElementById('admin-password-field');
+const adminModalCancelBtn = document.getElementById('admin-modal-cancel-btn');
+const adminModalSaveBtn = document.getElementById('admin-modal-save-btn');
+
 // 3. LÓGICA DE NAVEGACIÓN
 function showView(viewId) {
     contentSections.forEach(section => section.classList.add('hidden'));
@@ -34,6 +47,10 @@ function showView(viewId) {
     // Cargar datos cuando se muestra la vista
     if (viewId === 'manage-orgs') {
         loadOrganizations();
+    }
+
+    if (viewId === 'manage-admins') {
+        loadAdmins();
     }
 }
 
@@ -141,6 +158,135 @@ async function handleSaveOrganization(event) {
     }
 }
 
+// ==========================================================
+// GESTIÓN DE ADMINISTRADORES
+// ==========================================================
+
+/**
+ * Carga la lista de todos los administradores.
+ */
+async function loadAdmins() {
+    adminsTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">Cargando administradores...</td></tr>`;
+
+    try {
+        const response = await fetch('/api/superadmin/get-admins');
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        const users = result.users;
+        adminsTableBody.innerHTML = '';
+        
+        if (users.length === 0) {
+            adminsTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-4">No hay administradores creados.</td></tr>`;
+            return;
+        }
+
+        users.forEach(user => {
+            const tr = document.createElement('tr');
+            tr.className = 'table-row';
+            const rolClass = user.rol === 'superadmin' ? 'text-yellow-400' : 'text-blue-400';
+            
+            tr.innerHTML = `
+                <td class="px-4 py-2">${user.nombre_completo}</td>
+                <td class="px-4 py-2">${user.nombre_usuario}</td>
+                <td class="px-4 py-2">${user.organizacion?.nombre_organizacion || 'N/A'}</td>
+                <td class="px-4 py-2 font-semibold ${rolClass}">${user.rol}</td>
+                <td class="px-4 py-2">
+                    <button class="form-button btn-primary text-sm px-3 py-1" disabled>Editar</button>
+                </td>
+            `;
+            adminsTableBody.appendChild(tr);
+        });
+
+    } catch (error) {
+        console.error("Error al cargar administradores:", error.message);
+        adminsTableBody.innerHTML = `<tr><td colspan="5" class="text-center text-red-400 py-4">Error al cargar datos.</td></tr>`;
+    }
+}
+
+/**
+ * Abre el modal para crear un nuevo admin.
+ * Carga la lista de organizaciones en el dropdown.
+ */
+async function openCreateAdminModal() {
+    adminForm.reset();
+    adminIdField.value = '';
+    adminModalTitle.textContent = 'Crear Nuevo Administrador';
+    adminPasswordField.placeholder = "Contraseña (requerida)";
+    adminPasswordField.required = true; // Hacemos la contraseña requerida al crear
+    adminModal.classList.remove('hidden');
+    adminOrgSelect.innerHTML = '<option value="">Cargando organizaciones...</option>';
+    adminOrgSelect.disabled = true;
+
+    // Cargar las organizaciones en el dropdown
+    try {
+        const response = await fetch('/api/superadmin/get-organizations');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        adminOrgSelect.innerHTML = '<option value="">-- Seleccione una organización --</option>';
+        result.organizations.forEach(org => {
+            const option = document.createElement('option');
+            option.value = org.id_organizacion;
+            option.textContent = org.nombre_organizacion;
+            adminOrgSelect.appendChild(option);
+        });
+        adminOrgSelect.disabled = false;
+    } catch (error) {
+        console.error("Error al cargar organizaciones para el dropdown:", error.message);
+        adminOrgSelect.innerHTML = '<option value="">Error al cargar</option>';
+    }
+}
+
+function closeAdminModal() {
+    adminModal.classList.add('hidden');
+}
+
+/**
+ * Maneja el guardado de un nuevo admin.
+ */
+async function handleSaveAdmin(event) {
+    event.preventDefault();
+    adminModalSaveBtn.disabled = true;
+    adminModalSaveBtn.textContent = 'Guardando...';
+
+    const data = {
+        nombre_completo: adminNameField.value,
+        nombre_usuario: adminUsernameField.value,
+        password: adminPasswordField.value,
+        id_organizacion: adminOrgSelect.value
+    };
+
+    // (Aquí iría la lógica de 'PUT' para editar, pero por ahora solo 'POST')
+    
+    try {
+        const response = await fetch('/api/superadmin/create-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error);
+        }
+
+        closeAdminModal();
+        alert(`¡Éxito! Administrador "${result.user.nombre_completo}" creado.`);
+        loadAdmins(); // Recargamos la tabla
+
+    } catch (error) {
+        console.error("Error al guardar admin:", error.message);
+        alert(`Error: ${error.message}`);
+    } finally {
+        adminModalSaveBtn.disabled = false;
+        adminModalSaveBtn.textContent = 'Guardar Administrador';
+    }
+}
+
 navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -211,6 +357,10 @@ function init() {
     addOrgBtn.addEventListener('click', openCreateModal);
     orgModalCancelBtn.addEventListener('click', closeModal);
     orgForm.addEventListener('submit', handleSaveOrganization);
+
+    addAdminBtn.addEventListener('click', openCreateAdminModal);
+    adminModalCancelBtn.addEventListener('click', closeAdminModal);
+    adminForm.addEventListener('submit', handleSaveAdmin);
 }
 
 document.addEventListener('DOMContentLoaded', init);
