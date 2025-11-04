@@ -160,13 +160,33 @@ def login_required(f):
 def admin_required(f):
     """
     Decorador para proteger rutas que requieren rol de administrador
+    O SUPERADMINISTRADOR.
     """
     from functools import wraps
     @wraps(f)
     def decorated_function(*args,**kwargs):
-        if g.user is None or g.user['role'] != 'administrador':
+        
+        # --- ¡ESTA ES LA CORRECCIÓN! ---
+        # Si el usuario no existe O su rol NO ES 'administrador' Y NO ES 'superadmin'
+        if g.user is None or g.user['role'] not in ('administrador', 'superadmin'):
+        # --- FIN DE LA CORRECCIÓN ---
+        
             flash("Acceso denegado. Solo administradores pueden acceder a esta página.", "danger")
             return redirect(url_for('funcionario_login'))
+        return f(*args,**kwargs)
+    return decorated_function
+
+def superadmin_required(f):
+    """
+    Decorador para rutas que requieren rol de superadministrador
+    """
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args,**kwargs):
+        # Verifica que el usuario esté logueado Y que su rol sea 'superadmin'
+        if g.user is None or g.user['role'] != 'superadmin':
+            flash("Acceso denegado. Esta área es solo para el propietario del sistema.", "danger")
+            return redirect(url_for('funcionario_login')) # Lo enviamos al login
         return f(*args,**kwargs)
     return decorated_function
 
@@ -321,7 +341,8 @@ def funcionario_login():
          return render_template('error.html', message="No se pudo identificar la organización para el login.")
     
     if g.user:
-        if g.user['role'] == 'administrador':
+        # Si el rol es 'administrador' O 'superadmin', va al dashboard
+        if g.user['role'] in ('administrador', 'superadmin'):
             return redirect(url_for('admin_dashboard'))
         else:
             return redirect(url_for('funcionario_panel'))
@@ -364,7 +385,7 @@ def funcionario_login():
                     session['session_token'] = new_session_token
                     flash(f"Bienvenido, {user_data['nombre_completo']}!","success")
                     logging.info(f"Usuario {username} ha iniciado sesión con nuevo token.")
-                    if user_data['rol'] == 'administrador':
+                    if user_data['rol'] in ('administrador', 'superadmin'):
                         return redirect(url_for('admin_dashboard'))
                     else:
                         return redirect(url_for('funcionario_panel'))
@@ -426,6 +447,18 @@ def logout():
     flash("Has cerrado sesión exitosamente.","info")
     logging.info("Cookie de sesión limpiada.")
     return redirect(url_for('funcionario_login'))
+
+@app.route('/superadmin')
+@superadmin_required # ¡Protegida con el nuevo decorador!
+def superadmin_panel():
+    """
+    Panel de administración para el Superadministrador (propietario).
+    """
+    return render_template('superadmin.html',
+        supabase_url=SUPABASE_URL,
+        supabase_key=SUPABASE_KEY,
+        user_name=g.user['name'])
+
 
 # --- API Segura para Administración ---
 
@@ -1395,13 +1428,13 @@ def api_get_turn_history():
     
     try:
         query = supabase.table('turnos') \
-            .select('*, servicios(nombre_servicio), modulos(nombre_modulo), logs_turnos(accion, hora_accion)') \
+            .select('*, servicios(nombre_servicio), modulos:modulos!turnos_id_modulo_atencion_fkey(nombre_modulo), logs_turnos(accion, hora_accion)') \
             .eq('id_organizacion', org_id)
+        # --- FIN DE LA CORRECCIÓN ---
 
         if service_id:
             query = query.eq('id_servicio', service_id)
         
-        # --- ¡ESTA ES LA CORRECCIÓN! ---
         if start_date:
             query = query.gte('hora_solicitud', start_date)
         
@@ -1410,14 +1443,11 @@ def api_get_turn_history():
             end_date_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
             query = query.lt('hora_solicitud', end_date_dt.strftime('%Y-%m-%d'))
         
-        # Si NO se proveen fechas, aplicamos un filtro por defecto (últimos 7 días)
         if not start_date and not end_date:
             from datetime import datetime, timedelta
             seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
             query = query.gte('hora_solicitud', seven_days_ago.isoformat())
-        # --- FIN DE LA CORRECCIÓN ---
 
-        # Añadimos un límite de seguridad y orden
         query = query.order('hora_solicitud', desc=True).limit(250) 
         response = query.execute()
 
@@ -1446,20 +1476,22 @@ def api_get_dashboard_data():
         # 3. KPI: Módulos Activos
         active_modules_resp = supabase.table('modulos').select('id_modulo', count='exact').eq('id_organizacion', org_id).eq('estado', 'activo').execute()
 
+        
         # --- ¡ESTA ES LA CORRECCIÓN! ---
-        # 4. Tabla: Estado de Módulos (Consulta simple)
+        # 4. Tabla: Estado de Módulos (Consulta explícita)
+        # Le decimos que use la relación 'turnos_id_modulo_atencion_fkey'
         modules_status_resp = supabase.table('modulos') \
-            .select('*, turnos(prefijo_turno, numero_turno, estado)') \
+            .select('*, turnos:turnos!turnos_id_modulo_atencion_fkey(prefijo_turno, numero_turno, estado)') \
             .eq('id_organizacion', org_id) \
             .order('nombre_modulo', desc=False) \
             .execute()
+        # --- FIN DE LA CORRECCIÓN ---
 
-        # 5. Obtenemos los usuarios POR SEPARADO
+        # 5. Obtenemos los usuarios POR SEPARADO (Esto ya estaba bien)
         users_resp = supabase.table('usuarios') \
             .select('id_modulo_asignado, nombre_completo') \
             .eq('id_organizacion', org_id) \
             .execute()
-        # --- FIN DE LA CORRECCIÓN ---
 
         kpis = {
             "waiting_count": waiting_resp.count or 0,
@@ -1471,7 +1503,7 @@ def api_get_dashboard_data():
             "success": True, 
             "kpis": kpis,
             "modules_status": modules_status_resp.data,
-            "users": users_resp.data  # <-- Añadimos los usuarios a la respuesta
+            "users": users_resp.data
         }), 200
 
     except Exception as e:
@@ -2226,6 +2258,130 @@ def api_get_users_list():
         return jsonify({"success": True, "users": response.data}), 200
     except Exception as e:
         logging.error(f"Error en api_get_users_list: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==========================================================
+# API SEGURA PARA SUPERADMIN
+# ==========================================================
+
+@app.route('/api/superadmin/get-organizations')
+@superadmin_required
+def api_get_organizations():
+    """
+    Obtiene TODAS las organizaciones (clientes) en el sistema.
+    """
+    try:
+        response = supabase.table('organizaciones') \
+            .select('*') \
+            .order('nombre_organizacion', desc=False) \
+            .execute()
+            
+        return jsonify({"success": True, "organizations": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_organizations: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+
+@app.route('/api/superadmin/create-organization', methods=['POST'])
+@superadmin_required
+def api_create_organization():
+    """
+    Crea una nueva organización (cliente) en el sistema.
+    """
+    data = request.get_json()
+    if not data or not data.get('nombre_organizacion') or not data.get('subdominio_local'):
+        return jsonify({"success": False, "error": "Nombre y Subdominio Local son requeridos"}), 400
+
+    try:
+        # Preparamos la configuración por defecto
+        default_config = {
+            "branding": {
+                "logo_url": data.get('logo_url') or None,
+                "color_primario": data.get('color_primario') or "#1e40af" # Default azul
+            },
+            "features": {
+                "chat_enabled": True,
+                "transfer_enabled": True,
+                "reports_enabled": True
+            }
+        }
+        
+        # Preparamos el nuevo registro
+        new_org_data = {
+            'nombre_organizacion': data.get('nombre_organizacion'),
+            'subdominio': data.get('subdominio') or None,
+            'subdominio_local': data.get('subdominio_local'),
+            'estado': 'activo',
+            'configuracion': default_config
+        }
+        
+        response = supabase.table('organizaciones').insert(new_org_data).execute()
+
+        if response.data:
+            logging.info(f"Superadmin {g.user['name']} creó la organización: {data.get('nombre_organizacion')}")
+            # Devolvemos la organización recién creada
+            return jsonify({"success": True, "organization": response.data[0]}), 201
+        else:
+            raise Exception("No se recibieron datos de Supabase después de insertar.")
+
+    except Exception as e:
+        logging.error(f"Error en api_create_organization: {e}")
+        if 'violates unique constraint' in str(e).lower():
+             return jsonify({"success": False, "error": "Error: Ese subdominio ya está en uso."}), 409
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/superadmin/update-organization/<int:org_id>', methods=['PUT'])
+@superadmin_required
+def api_update_organization(org_id):
+    """
+    Actualiza una organización existente (nombre, subdominios, marca).
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Faltan datos"}), 400
+
+    try:
+        # Obtenemos la configuración actual para no sobreescribirla
+        org_resp = supabase.table('organizaciones').select('configuracion').eq('id_organizacion', org_id).single().execute()
+        if not org_resp.data:
+             return jsonify({"success": False, "error": "Organización no encontrada"}), 404
+        
+        # Empezamos con la configuración existente
+        current_config = org_resp.data.get('configuracion', {})
+        
+        # Actualizamos solo los campos de branding
+        # '||' es el operador de "merge" de JSONB
+        current_config['branding'] = {
+            'logo_url': data.get('logo_url') or None,
+            'color_primario': data.get('color_primario') or "#1e40af"
+        }
+        
+        # Preparamos los datos a actualizar
+        update_data = {
+            'nombre_organizacion': data.get('nombre_organizacion'),
+            'subdominio': data.get('subdominio') or None,
+            'subdominio_local': data.get('subdominio_local'),
+            'estado': data.get('estado', 'activo'),
+            'configuracion': current_config
+        }
+        
+        response = supabase.table('organizaciones') \
+            .update(update_data) \
+            .eq('id_organizacion', org_id) \
+            .execute()
+
+        if response.data:
+            logging.info(f"Superadmin {g.user['name']} actualizó la organización: {org_id}")
+            return jsonify({"success": True, "organization": response.data[0]}), 200
+        else:
+            raise Exception("No se recibieron datos de Supabase después de actualizar.")
+
+    except Exception as e:
+        logging.error(f"Error en api_update_organization: {e}")
+        if 'violates unique constraint' in str(e).lower():
+             return jsonify({"success": False, "error": "Error: Ese subdominio ya está en uso."}), 409
         return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---

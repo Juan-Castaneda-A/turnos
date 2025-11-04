@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - Sistema de Turnos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/admin_dashboard.css') }}" rel="stylesheet">
+</head>
+
+<body class="bg-gray-800 text-gray-200 font-sans antialiased">
+    <div class="flex flex-col lg:flex-row min-h-screen">
+
+        <aside class="w-full lg:w-72 bg-gray-900 p-6 shadow-xl flex flex-col">
+            <div class="mb-10 flex justify-center items-center gap-3">
+                <svg class="w-10 h-10 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12M6 3.75h12M12 20.25V3.75" />
+                </svg>
+                <h2 class="text-xl font-bold text-yellow-400">SUPER ADMIN</h2>
+            </div>
+            
+            <nav class="flex-grow">
+                <ul>
+                    <li>
+                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg font-semibold hover:bg-gray-700 hover:text-white" data-view="dashboard">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg font-semibold hover:bg-gray-700 hover:text-white" data-view="manage-orgs">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.75M9 11.25h6.75M9 15.75h6.75" /></svg>
+                            Gestionar Organizaciones
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link flex items-center px-4 py-3 mb-2 rounded-lg font-semibold hover:bg-gray-700 hover:text-white" data-view="manage-admins">
+                            <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-4.69c.125.13.248.26.37.39a6.375 6.375 0 01-3.834 1.06" /></svg>
+                            Gestionar Administradores
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="mt-auto">
+                <a href="{{ url_for('logout') }}" class="flex items-center px-4 py-3 rounded-lg text-white font-bold bg-red-600 hover:bg-red-700">
+                    <svg class="w-6 h-6 mr-3" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
+                    Cerrar Sesión
+                </a>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+
+            <section id="dashboard-view" class="view-section bg-gray-900 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-3xl font-bold text-yellow-400 mb-6 border-b border-gray-700 pb-4">Dashboard (Próximamente)</h2>
+            </section>
+
+            <section id="manage-orgs-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-3xl font-bold text-yellow-400 mb-6 border-b border-gray-700 pb-4">Gestionar Organizaciones</h2>
+                <button id="add-org-btn" class="mb-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+                    + Crear Nueva Organización
+                </button>
+                <div class="overflow-x-auto bg-gray-800 rounded-lg">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-700 text-sm font-semibold text-gray-400 uppercase">
+                                <th class="p-4">Organización</th>
+                                <th class="p-4">Subdominio Prod.</th>
+                                <th class="p-4">Subdominio Local</th>
+                                <th class="p-4">Estado</th>
+                                <th class="p-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orgs-table-body" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="manage-admins-view" class="view-section hidden bg-gray-900 p-6 rounded-2xl shadow-lg">
+                <h2 class="text-3xl font-bold text-yellow-400 mb-6 border-b border-gray-700 pb-4">Gestionar Administradores (Próximamente)</h2>
+            </section>
+
+        </main>
+    </div>
+
+    <div id="org-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-2xl w-full">
+            
+            <h3 class="text-2xl font-bold text-white mb-6" id="org-modal-title">Crear Nueva Organización</h3>
+            
+            <form id="org-form" class="space-y-4">
+                <input type="hidden" id="org-id-field">
+                
+                <div>
+                    <label for="org-name-field" class="block text-sm font-semibold text-gray-300 mb-1">Nombre de la Organización</label>
+                    <input type="text" id="org-name-field" placeholder="Ej: Notaría Quinta de Bogotá" required
+                           class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="org-subdomain-field" class="block text-sm font-semibold text-gray-300 mb-1">Subdominio (Producción)</label>
+                        <input type="text" id="org-subdomain-field" placeholder="notaria5bta"
+                               class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label for="org-subdomain-local-field" class="block text-sm font-semibold text-gray-300 mb-1">Subdominio (Local)</label>
+                        <input type="text" id="org-subdomain-local-field" placeholder="notaria5" required
+                               class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="org-logo-field" class="block text-sm font-semibold text-gray-300 mb-1">URL del Logo</label>
+                        <input type="url" id="org-logo-field" placeholder="https://..."
+                               class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex flex-col justify-end">
+                        <label for="org-color-field" class="block text-sm font-semibold text-gray-300 mb-1">Color Primario</label>
+                        <input type="color" id="org-color-field" value="#1e40af"
+                               class="w-full h-12 p-1 bg-gray-700 border border-gray-600 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <div id="org-status-container" class="hidden">
+                    <label for="org-status-field" class="block text-sm font-semibold text-gray-300 mb-1">Estado</label>
+                    <select id="org-status-field" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="activo">Activo</option>
+                        <option value="inactivo">Inactivo</option>
+                    </select>
+                </div>
+                
+                <div class="flex justify-end gap-4 pt-4">
+                    <button type="button" id="org-modal-cancel-btn" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="org-modal-save-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">
+                        Guardar Organización
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        window.SUPABASE_URL = "{{ supabase_url }}";
+        window.SUPABASE_KEY = "{{ supabase_key }}";
+    </script>
+    <script type="module" src="{{ url_for('static', filename='js/superadmin.js') }}"></script>
+</body>
+</html>
