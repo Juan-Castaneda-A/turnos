@@ -431,12 +431,11 @@ async function init() {
 async function loadInitialData() {
     // Cargar turno principal solo una vez al inicio
     try {
-        const { data: currentTurnData, error: currentTurnError } = await supabase
-            .from('turnos')
-            .select('*, modulos!turnos_id_modulo_atencion_fkey(*)')
+        const { data: currentTurn, error } = await supabase.from('turnos')
+            .select('*, modulos!turnos_id_modulo_atencion_fkey(*)') // <-- ¡Esta parte ya está bien!
             .eq('estado', 'en atencion')
-            .order('hora_llamado', { ascending: false })
-            .limit(1);
+            .limit(1)
+            .single();
 
         if (currentTurnError) throw currentTurnError;
         if (currentTurnData && currentTurnData.length > 0) {

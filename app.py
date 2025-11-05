@@ -189,11 +189,9 @@ def solicitar_turno_action():
         response = supabase.rpc('crear_nuevo_turno', params).execute()
 
         if response.data:
-            # La función nos devuelve la fila completa del turno que se creó
-            nuevo_turno_data = response.data
-            prefijo_ticket = nuevo_turno_data['prefijo_turno']
+            nuevo_turno_data = response.data[0] # <-- ¡ESTA ES LA CORRECCIÓN!
+            prefijo_ticket = nuevo_turno_data['prefijo_turno'] # <-- Esto ahora funciona
             nuevo_numero_turno = nuevo_turno_data['numero_turno']
-            
             #Obtener el nombre del servicio para pasarlo a la plantilla
             response_servicio = supabase.table('servicios').select('nombre_servicio').eq('id_servicio', nuevo_turno_data['id_servicio']).single().execute()
             nombre_servicio = response_servicio.data['nombre_servicio'] if response_servicio.data else ''
