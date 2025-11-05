@@ -433,7 +433,7 @@ async function loadInitialData() {
     try {
         const { data: currentTurnData, error: currentTurnError } = await supabase
             .from('turnos')
-            .select('*, modulos(nombre_modulo)')
+            .select('*, modulos!turnos_id_modulo_atencion_fkey(*)')
             .eq('estado', 'en atencion')
             .order('hora_llamado', { ascending: false })
             .limit(1);
