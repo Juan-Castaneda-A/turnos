@@ -355,6 +355,87 @@ def funcionario_panel():
     #    flash("Error al cargar el panel. Por favor, intente de nuevo más tarde.", "error")
     #    return redirect(url_for('funcionario_login'))
 
+@app.route('/api/funcionario/transfer-turn', methods=['POST'])
+@login_required
+def api_transfer_turn():
+    # --- ¡CAMBIO IMPORTANTE! ---
+    # Ya no usamos g.org. Asumimos el ID de la notaría.
+    # ¡¡¡CAMBIA ESTE 1 SI EL ID DE LA NOTARÍA ES OTRO!!!
+    ORG_ID_FIJO = 1 
+    
+    if not g.user: 
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+    
+    user_id = g.user['id']
+    data = request.get_json()
+    turn_id = data.get('turn_id')
+    target_module_id = data.get('target_module_id')
+
+    if not turn_id or not target_module_id:
+        return jsonify({"success": False, "error": "Faltan parámetros (turn_id o target_module_id)"}), 400
+
+    try:
+        # 1. Averiguamos el estado actual del turno
+        turn_resp = supabase.table('turnos').select('estado, id_modulo_atencion') \
+            .eq('id_turno', turn_id) \
+            .eq('id_organizacion', ORG_ID_FIJO) \
+            .single().execute()
+        
+        if not turn_resp.data:
+            raise Exception("Turno no encontrado.")
+            
+        current_estado = turn_resp.data['estado']
+        current_module_id = turn_resp.data['id_modulo_atencion']
+
+        update_data = {}
+
+        if current_estado == 'en espera':
+            # Lógica para turnos pendientes (esta ya la tenías)
+            update_data = {
+                'id_modulo_reasignado': target_module_id
+            }
+
+        elif current_estado == 'en atencion':
+            # Lógica para turno actual (la nueva)
+            if current_module_id != g.user.get('assigned_module_id'):
+                raise Exception("No puedes transferir un turno que no estás atendiendo.")
+
+            update_data = {
+                'estado': 'en espera',
+                'id_modulo_reasignado': target_module_id,
+                'id_modulo_atencion': None,
+                'hora_llamado': None,
+                'hora_finalizacion': None
+            }
+        else:
+            raise Exception("No se puede transferir un turno que ya está finalizado.")
+            
+        # 2. Ejecutamos la actualización
+        response = supabase.table('turnos') \
+            .update(update_data) \
+            .eq('id_turno', turn_id) \
+            .eq('id_organizacion', ORG_ID_FIJO) \
+            .execute()
+
+        if not response.data:
+            raise Exception("No se pudo actualizar el estado del turno.")
+
+        # 3. Añadir un log de la transferencia (si estaba en atención)
+        if current_estado == 'en atencion':
+            supabase.table('logs_turnos').insert({
+                'id_turno': turn_id, 
+                'id_usuario': user_id, 
+                'accion': 'transferido', # <-- (CORTO) El tipo de acción
+                'detalles': f"Transferido desde {current_module_id} a {target_module_id}", # <-- (LARGO) Los detalles
+                'id_organizacion': ORG_ID_FIJO
+            }).execute()
+
+        return jsonify({"success": True, "message": "Turno transferido exitosamente."}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_transfer_turn: {e}")
+        # ¡Este 'jsonify' sí devolverá JSON, no HTML!
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/admin/dashboard')
 @admin_required #proteger esta ruta y requerir rol de administrador

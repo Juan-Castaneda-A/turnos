@@ -345,7 +345,9 @@ function setupRealtimeSubscriptions() {
             try {
                 const { data: nextTurnToShow, error } = await supabase
                     .from('turnos')
-                    .select('*, modulos(nombre_modulo)')
+                    // --- ¡ESTA ES LA CORRECCIÓN! ---
+                    .select('*, modulos!turnos_id_modulo_atencion_fkey(nombre_modulo)')
+                    // --- FIN DE LA CORRECCIÓN ---
                     .eq('estado', 'en atencion')
                     .order('hora_llamado', { ascending: false })
                     .limit(1)
@@ -429,41 +431,41 @@ async function init() {
 }
 
 async function loadInitialData() {
-    // Cargar turno principal solo una vez al inicio
-    try {
-        const { data: currentTurn, error } = await supabase.from('turnos')
-            .select('*, modulos!turnos_id_modulo_atencion_fkey(*)') // ¡Esta es la consulta explícita que arregla la ambigüedad!
-            .eq('estado', 'en atencion')
+    // Cargar turno principal solo una vez al inicio
+    try {
+        const { data: currentTurn, error } = await supabase.from('turnos')
+            .select('*, modulos!turnos_id_modulo_atencion_fkey(*)') // ¡Esta es la consulta explícita que arregla la ambigüedad!
+            .eq('estado', 'en atencion')
             .order('hora_llamado', { ascending: false })
-            .limit(1)
-            .single(); // .single() devuelve un objeto o null
+            .limit(1)
+            .single(); // .single() devuelve un objeto o null
 
-        // --- ¡¡AQUÍ ESTÁ LA CORRECCIÓN!! ---
+        // --- ¡¡AQUÍ ESTÁ LA CORRECCIÓN!! ---
         // 1. Se usa 'error' (el nombre correcto) en lugar de 'currentTurnError'
-        if (error && error.code !== 'PGRST116') { 
+        if (error && error.code !== 'PGRST116') {
             // Ignoramos el error 'PGRST116' (no rows found), porque es normal
             // que no haya turnos activos. Lanzamos cualquier OTRO error.
-            throw error; 
+            throw error;
         }
 
         // 2. Se usa 'currentTurn' (el nombre correcto) en lugar de 'currentTurnData'
-        if (currentTurn) {
-            // Esto previene el crash de 'Cannot read properties of null'
+        if (currentTurn) {
+            // Esto previene el crash de 'Cannot read properties of null'
             const moduleName = currentTurn.modulos ? currentTurn.modulos.nombre_modulo : '---';
-            currentTurnNumberElement.textContent = `${currentTurn.prefijo_turno}-${String(currentTurn.numero_turno).padStart(3, '0')}`;
-            currentTurnModuleElement.textContent = `Diríjase al módulo ${moduleName.split(' ')[1]}`;
-        } else {
+            currentTurnNumberElement.textContent = `${currentTurn.prefijo_turno}-${String(currentTurn.numero_turno).padStart(3, '0')}`;
+            currentTurnModuleElement.textContent = `Diríjase al módulo ${moduleName.split(' ')[1]}`;
+        } else {
             // Si no hay turnos, limpiamos la pantalla
             clearMainTurnDisplay();
         }
         // --- FIN DE LA CORRECCIÓN ---
 
-    } catch (e) {
-        console.error("Error cargando turno inicial", e);
-    }
+    } catch (e) {
+        console.error("Error cargando turno inicial", e);
+    }
 
-    // Carga el resto de datos
-    await updateSecondaryData();
+    // Carga el resto de datos
+    await updateSecondaryData();
 }
 
 async function loadAndDisplayMessages() {

@@ -1198,9 +1198,9 @@ async function loadRealtimeModulesStatus() {
         const { data: modulesData, error: modulesError } = await supabase
             .from('modulos')
             .select(`
-                *,
-                turnos(id_turno, numero_turno, prefijo_turno, estado)
-            `)
+                *,
+                turnos!turnos_id_modulo_atencion_fkey(id_turno, numero_turno, prefijo_turno, estado)
+            `)
             .order('nombre_modulo', { ascending: true });
 
         if (modulesError) throw modulesError;

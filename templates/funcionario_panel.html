@@ -51,7 +51,12 @@
                 </div>
             </section>
 
-            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-2">
+            <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center lg:col-span-2 relative">
+                <button id="btn-transfer-current" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition disabled:opacity-50 disabled:cursor-not-allowed" title="Transferir Turno Actual" disabled>
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.875L6 12zm0 0h7.5" />
+</svg>
+                </button>
                 <h2 class="text-2xl font-bold text-green-400 mb-4" id="my-module-title">Mi Módulo: Cargando...</h2>
                 <div class="flex-grow flex flex-col justify-center items-center w-full">
                     <p class="text-lg font-medium text-gray-400 mb-2">Turno en Curso:</p>
@@ -105,6 +110,26 @@
             <div class="flex justify-center gap-4">
                 <button id="modal-confirm-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar</button>
                 <button id="modal-cancel-btn" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="transfer-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-lg w-full">
+            <h3 class="text-2xl font-bold text-white mb-6" id="transfer-modal-title">Transferir Turno</h3>
+            
+            <div class="mb-6">
+                <label for="transfer-module-select" class="block text-sm font-medium text-gray-300 mb-2">Seleccione el módulo de destino:</label>
+                <select id="transfer-module-select" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Cargando módulos... --</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end gap-4">
+                <button id="transfer-modal-cancel-btn"
+                    class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg">Cancelar</button>
+                <button id="transfer-modal-confirm-btn"
+                    class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg">Confirmar Transferencia</button>
             </div>
         </div>
     </div>
