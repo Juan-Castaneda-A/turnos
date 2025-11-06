@@ -516,6 +516,28 @@ function setupRealtimeSubscriptions() {
             console.log('Panel de funcionario conectado al canal de chat.');
         }
     });
+
+    const chatParticipantsChannel = supabase.channel('chat_participants_channel');
+    chatParticipantsChannel.on(
+        'postgres_changes',
+        {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_participants',
+            filter: `user_id=eq.${window.USER_ID}` // ¡Cuando me añaden a MÍ!
+        },
+        (payload) => {
+            console.log("¡Me han añadido a una nueva sala de chat!", payload.new);
+            // Si el modal de chat está abierto, recarga la lista de salas
+            if (!chatModal.classList.contains('hidden')) {
+                loadChatRooms();
+            }
+        }
+    ).subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Panel conectado al canal de participantes de chat.');
+        }
+    });
 }
 
 // ==========================================================
@@ -721,33 +743,86 @@ function closeChat() {
 async function loadChatRooms() {
     chatRoomList.innerHTML = '<p class="text-gray-500 text-sm p-4 text-center">Cargando chats...</p>';
     try {
+        // 1. Cargamos las salas "normales" (como el Chat Global)
         const response = await fetch('/api/chat/rooms');
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.error);
 
         chatRoomList.innerHTML = ''; // Limpiamos "Cargando..."
 
-        if (result.rooms.length === 0) {
-            chatRoomList.innerHTML = '<p class="text-gray-500 text-sm p-4 text-center">No hay chats disponibles.</p>';
-            return;
-        }
-
+        // Renderizamos las salas (Chat Global)
         result.rooms.forEach(room => {
             const roomElement = document.createElement('button');
-            roomElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-200 hover:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:bg-blue-600";
-            roomElement.textContent = room.nombre;
+            roomElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-200 hover:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:bg-blue-600 font-bold";
+            roomElement.textContent = `🌐 ${room.nombre}`; // Añadimos un ícono
             roomElement.dataset.roomId = room.id;
             roomElement.dataset.roomName = room.nombre;
 
+            // Este onclick es el "viejo"
             roomElement.onclick = () => {
                 selectChatRoom(room.id, room.nombre);
             };
             chatRoomList.appendChild(roomElement);
         });
 
+        // 2. Añadimos un divisor
+        const divider = document.createElement('hr');
+        divider.className = 'border-gray-700 my-2';
+        chatRoomList.appendChild(divider);
+
+        // 3. Renderizamos los usuarios del caché (el que carga loadUserCache())
+        if (userCacheMap.size === 0) {
+            await loadUserCache(); // Por si acaso no se ha cargado
+        }
+
+        userCacheMap.forEach((userName, userId) => {
+            // No mostrarme a mí mismo en la lista de DMs
+            if (userId === window.USER_ID) return;
+
+            const userElement = document.createElement('button');
+            userElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:bg-blue-600";
+            userElement.textContent = `👤 ${userName}`; // Añadimos ícono
+            userElement.dataset.userId = userId;
+            userElement.dataset.userName = userName;
+
+            // Este onclick es el "nuevo"
+            userElement.onclick = () => {
+                openDirectMessage(userId, userName);
+            };
+            chatRoomList.appendChild(userElement);
+        });
+
+
     } catch (error) {
         console.error("Error al cargar salas de chat:", error.message);
         chatRoomList.innerHTML = '<p class="text-red-400 text-sm p-4 text-center">Error al cargar chats.</p>';
+    }
+}
+
+async function openDirectMessage(targetUserId, targetUserName) {
+    console.log(`Intentando abrir DM con ${targetUserName} (ID: ${targetUserId})`);
+    // Mostramos un "cargando" temporal en el chat
+    chatMessageHeader.querySelector('h3').textContent = `Conectando con ${targetUserName}...`;
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">Creando chat...</p></div>';
+    currentChatRoomId = null; // Reseteamos la sala actual
+
+    try {
+        const response = await fetch('/api/chat/get-or-create-dm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_user_id: targetUserId })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+
+        // ¡Éxito! La API nos dio la room_id (nueva o vieja)
+        // Ahora la seleccionamos
+        selectChatRoom(result.room_id, targetUserName);
+
+    } catch (error) {
+        console.error("Error al crear o encontrar el DM:", error.message);
+        chatMessageArea.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
     }
 }
 
@@ -803,31 +878,34 @@ function renderMessage(message, isMe) {
     if (placeholder) placeholder.parentElement.remove();
 
     const bubble = document.createElement('div');
-    // Clases de Tailwind para burbujas de chat
-    const bubbleClasses = isMe
-        ? 'bg-blue-600 text-white p-3 rounded-lg max-w-xs self-end'
-        : 'bg-gray-700 text-gray-200 p-3 rounded-lg max-w-xs self-start';
-    bubble.className = `flex flex-col ${bubbleClasses}`;
 
+    // 1. Clases con 'w-fit' para que la burbuja se encoja
+    const bubbleClasses = isMe
+        ? 'flex flex-col w-fit bg-blue-600 text-white p-3 rounded-lg max-w-xs self-end'
+        : 'flex flex-col w-fit bg-gray-700 text-gray-200 p-3 rounded-lg max-w-xs self-start';
+    bubble.className = bubbleClasses;
+
+    // (Obtenemos los datos como antes)
     let senderName = 'Usuario Desconocido';
     if (isMe) {
         senderName = 'Tú';
     } else if (message.sender && message.sender.nombre_completo) {
-        senderName = message.sender.nombre_completo; // De la API
+        senderName = message.sender.nombre_completo;
     } else if (message.sender_id) {
-        senderName = userCacheMap.get(message.sender_id) || 'Usuario'; // De Realtime
+        senderName = userCacheMap.get(message.sender_id) || 'Usuario';
     }
     const sentTime = new Date(message.sent_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
-    bubble.innerHTML = `
-        <span class="font-bold text-sm ${isMe ? 'text-blue-200' : 'text-green-300'}">${senderName}</span>
-        <p class="text-base">${message.content}</p>
-        <span class="text-xs opacity-70 mt-1 self-end">${sentTime}</span>
-    `;
+    // --- 2. ¡LA CORRECCIÓN! ---
+    // El HTML está todo en una sola línea, sin espacios ni saltos de línea.
+    bubble.innerHTML = `<span class="font-bold text-sm ${isMe ? 'text-blue-200' : 'text-green-300'}">${senderName}</span><p class="text-base break-words">${message.content}</p><span class="text-xs opacity-70 mt-1 self-end">${sentTime}</span>`;
+    // --- FIN DE LA CORRECCIÓN ---
 
-    // Cambiamos el flex-direction del área de mensajes
+    // El contenedor debe ser 'flex' para que 'self-start' y 'self-end' funcionen
+    chatMessageArea.style.display = 'flex';
     chatMessageArea.style.flexDirection = 'column';
-    chatMessageArea.style.alignItems = 'stretch';
+    chatMessageArea.style.gap = '0.75rem'; // espacio entre burbujas
+
     chatMessageArea.appendChild(bubble);
     chatMessageArea.scrollTop = chatMessageArea.scrollHeight;
 }

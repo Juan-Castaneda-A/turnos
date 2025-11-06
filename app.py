@@ -761,22 +761,23 @@ def verificar_pertenencia_chat(user_id, room_id, org_id=1):
 @login_required
 def api_get_chat_rooms():
     """
-    Obtiene todas las salas de chat (Global y Directas)
-    a las que pertenece el usuario logueado (g.user).
+    Obtiene todas las salas de chat a las que pertenece el usuario
+    QUE NO SEAN MENSAJES DIRECTOS (ej. 'global').
     """
     ORG_ID_FIJO = 1 # Asumimos Org 1
     user_id = g.user['id']
     
     try:
-        # Hacemos un "join" a través de chat_participants
-        # "Tráeme todas las chat_rooms que estén vinculadas a mí"
+        # --- ¡ESTA ES LA CORRECCIÓN! ---
         response = supabase.table('chat_participants') \
-            .select('chat_rooms(*)') \
+            .select('chat_rooms!inner(*)') \
             .eq('user_id', user_id) \
             .eq('id_organizacion', ORG_ID_FIJO) \
-            .execute()
-        
-        # Extraemos las salas de la respuesta
+            .neq('chat_rooms.tipo', 'direct') \
+            .execute() # <-- ¡¡ESTA ES LA PALABRA QUE FALTABA!!
+        # --- FIN DE LA CORRECCIÓN ---
+
+        # Esta línea ahora funcionará porque response SÍ tiene .data
         rooms = [item['chat_rooms'] for item in response.data if item.get('chat_rooms')]
             
         return jsonify({"success": True, "rooms": rooms}), 200
@@ -859,6 +860,77 @@ def api_send_message():
         logging.error(f"Error en api_send_message: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# --- API 4: Obtener o Crear un Chat Directo (DM) ---
+# --- (VERSIÓN CORREGIDA PARA SUPABASE-PYTHON V1) ---
+@app.route('/api/chat/get-or-create-dm', methods=['POST'])
+@login_required
+def api_get_or_create_dm():
+    """
+    Encuentra una sala de chat 'direct' existente entre dos usuarios.
+    Si no existe, la crea y añade a ambos participantes.
+    """
+    ORG_ID_FIJO = 1 # Asumimos Org 1
+    my_user_id = g.user['id']
+    
+    data = request.get_json()
+    target_user_id = data.get('target_user_id')
+
+    if not target_user_id:
+        return jsonify({"success": False, "error": "Falta 'target_user_id'."}), 400
+    
+    if my_user_id == target_user_id:
+        return jsonify({"success": False, "error": "No puedes chatear contigo mismo."}), 400
+
+    try:
+        # 1. Usamos la función SQL (Esto estaba bien)
+        params = {
+            'user_a_id': my_user_id,
+            'user_b_id': target_user_id,
+            'org_id': ORG_ID_FIJO
+        }
+        response = supabase.rpc('find_dm_room', params).execute()
+        
+        existing_room_id = response.data
+
+        # 2. Si YA existe (no es null), la devolvemos
+        if existing_room_id:
+            logging.info(f"DM encontrado entre {my_user_id} y {target_user_id}. Sala: {existing_room_id}")
+            return jsonify({"success": True, "room_id": existing_room_id}), 200
+
+        # 3. Si NO existe, la CREAMOS
+        logging.info(f"No se encontró DM. Creando nueva sala para {my_user_id} y {target_user_id}...")
+        
+        # --- ¡¡¡ESTA ES LA CORRECCIÓN!!! ---
+        # Usamos la sintaxis V1 (sin .select().single())
+        room_resp = supabase.table('chat_rooms').insert({
+            'id_organizacion': ORG_ID_FIJO,
+            'tipo': 'direct',
+            'nombre': None # <-- LÍNEA CORREGIDA
+        }).execute()
+        # --- FIN DE LA CORRECCIÓN ---
+
+        if not room_resp.data:
+            raise Exception("No se pudo crear la sala de chat.")
+
+        # En V1, .insert() devuelve una LISTA, así que tomamos el primer [0] elemento
+        new_room_id = room_resp.data[0]['id']
+
+        # b. Añadir a AMBOS participantes (Esto estaba bien)
+        participants_data = [
+            {'id_organizacion': ORG_ID_FIJO, 'room_id': new_room_id, 'user_id': my_user_id},
+            {'id_organizacion': ORG_ID_FIJO, 'room_id': new_room_id, 'user_id': target_user_id}
+        ]
+        
+        part_resp = supabase.table('chat_participants').insert(participants_data).execute()
+        
+        if not part_resp.data:
+            raise Exception("No se pudo añadir participantes a la sala de chat.")
+
+        return jsonify({"success": True, "room_id": new_room_id}), 201
+
+    except Exception as e:
+        logging.error(f"Error en api_get_or_create_dm: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
