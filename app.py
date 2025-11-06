@@ -734,6 +734,132 @@ def get_reports():
         logging.error(f"Error al generar el reporte: {e}")
         return jsonify({"error": str(e)}), 500
 
+# --- (HELPER) Función de Seguridad para el Chat ---
+# Esta función verifica que el usuario logueado PERTENECE a la sala de chat
+# antes de permitirle leer o escribir en ella.
+def verificar_pertenencia_chat(user_id, room_id, org_id=1):
+    """
+    Verifica si un usuario es participante de una sala de chat.
+    Devuelve True si pertenece, False si no.
+    """
+    try:
+        response = supabase.table('chat_participants') \
+            .select('id') \
+            .eq('user_id', user_id) \
+            .eq('room_id', room_id) \
+            .eq('id_organizacion', org_id) \
+            .single() \
+            .execute()
+        
+        return response.data is not None
+    except Exception as e:
+        logging.error(f"Error al verificar pertenencia a chat: {e}")
+        return False
+
+# --- API 1: Obtener la lista de Salas de Chat ---
+@app.route('/api/chat/rooms')
+@login_required
+def api_get_chat_rooms():
+    """
+    Obtiene todas las salas de chat (Global y Directas)
+    a las que pertenece el usuario logueado (g.user).
+    """
+    ORG_ID_FIJO = 1 # Asumimos Org 1
+    user_id = g.user['id']
+    
+    try:
+        # Hacemos un "join" a través de chat_participants
+        # "Tráeme todas las chat_rooms que estén vinculadas a mí"
+        response = supabase.table('chat_participants') \
+            .select('chat_rooms(*)') \
+            .eq('user_id', user_id) \
+            .eq('id_organizacion', ORG_ID_FIJO) \
+            .execute()
+        
+        # Extraemos las salas de la respuesta
+        rooms = [item['chat_rooms'] for item in response.data if item.get('chat_rooms')]
+            
+        return jsonify({"success": True, "rooms": rooms}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_chat_rooms: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- API 2: Obtener los Mensajes de una Sala ---
+@app.route('/api/chat/messages/<int:room_id>')
+@login_required
+def api_get_chat_messages(room_id):
+    """
+    Obtiene todos los mensajes de una sala de chat específica.
+    Primero, verifica que el usuario pertenezca a esa sala.
+    """
+    ORG_ID_FIJO = 1 # Asumimos Org 1
+    user_id = g.user['id']
+
+    try:
+        # 1. ¡Control de Seguridad!
+        if not verificar_pertenencia_chat(user_id, room_id, ORG_ID_FIJO):
+            return jsonify({"success": False, "error": "Acceso denegado a esta sala de chat."}), 403
+
+        # 2. Si el usuario pertenece, obtenemos los mensajes
+        # Hacemos join con 'usuarios' para obtener el nombre del remitente
+        response = supabase.table('chat_messages') \
+            .select('*, sender:sender_id(nombre_completo)') \
+            .eq('room_id', room_id) \
+            .eq('id_organizacion', ORG_ID_FIJO) \
+            .order('sent_at', desc=False) \
+            .execute()
+
+        return jsonify({"success": True, "messages": response.data}), 200
+
+    except Exception as e:
+        logging.error(f"Error en api_get_chat_messages: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- API 3: Enviar un Mensaje Nuevo ---
+@app.route('/api/chat/send-message', methods=['POST'])
+@login_required
+def api_send_message():
+    """
+    Publica un nuevo mensaje en una sala de chat.
+    Primero, verifica que el usuario pertenezca a esa sala.
+    """
+    ORG_ID_FIJO = 1 # Asumimos Org 1
+    user_id = g.user['id']
+    
+    data = request.get_json()
+    room_id = data.get('room_id')
+    content = data.get('content')
+
+    if not room_id or not content:
+        return jsonify({"success": False, "error": "Faltan 'room_id' o 'content'."}), 400
+
+    try:
+        # 1. ¡Control de Seguridad!
+        if not verificar_pertenencia_chat(user_id, room_id, ORG_ID_FIJO):
+            return jsonify({"success": False, "error": "No tiene permiso para enviar mensajes a esta sala."}), 403
+
+        # 2. Si el usuario pertenece, inserta el mensaje
+        message_data = {
+            'room_id': room_id,
+            'sender_id': user_id,
+            'content': content,
+            'id_organizacion': ORG_ID_FIJO
+        }
+        
+        response = supabase.table('chat_messages') \
+            .insert(message_data) \
+            .execute()
+
+        return jsonify({"success": True, "sent_message": response.data[0]}), 201
+
+    except Exception as e:
+        logging.error(f"Error en api_send_message: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # --- Ejecución de la Aplicación ---
 if __name__ == '__main__':
     # Para desarrollo, puedes usar app.run(debug=True)
