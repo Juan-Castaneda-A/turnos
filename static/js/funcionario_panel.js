@@ -3,6 +3,14 @@
 // ==========================================================
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
+const ICONS = {
+    TICKET: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" /></svg>`,
+    // --- ESTA ES LA LÍNEA CORREGIDA ---
+    TRANSFER: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.875L6 12zm0 0h7.5" /></svg>`,
+    // --- FIN DE LA CORRECCIÓN ---
+    CHAT: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.344 48.344 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>`
+};
+
 // Inicializar Supabase
 //const supabase = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
 //console.log("Supabase Client inicializado para Panel de Funcionario.");
@@ -22,7 +30,7 @@ let assignedModuleNameElement, myModuleTitleElement, pendingTurnsBody,
     silenceAlertBtn,
     transferModal, transferModalTitle, transferModuleSelect,
     transferModalConfirmBtn, transferModalCancelBtn, btnTransferCurrent, chatModal, openChatBtn, closeChatBtn, chatRoomList, chatMessageHeader,
-    chatMessageArea, chatMessageForm, chatMessageInput, chatSendBtn;
+    chatMessageArea, chatMessageForm, chatMessageInput, chatSendBtn, customMessageInput, sendCustomMessageBtn, notificationList, kpiTurnosAtendidos, kpiTiempoPromedio;
 
 let currentAttendingTurnId = null;
 let sortedPendingTurns = [];
@@ -64,8 +72,13 @@ async function init() {
     transferModalTitle = document.getElementById('transfer-modal-title');
     transferModuleSelect = document.getElementById('transfer-module-select');
     transferModalConfirmBtn = document.getElementById('transfer-modal-confirm-btn');
-    transferModalCancelBtn = document.getElementById('transfer-modal-cancel-btn'); // <-- El que daba error
-    btnTransferCurrent = document.getElementById('btn-transfer-current'); // <-- El nuevo botón
+    transferModalCancelBtn = document.getElementById('transfer-modal-cancel-btn');
+    btnTransferCurrent = document.getElementById('btn-transfer-current');
+
+    notificationList = document.getElementById('notification-list');
+
+    kpiTurnosAtendidos = document.getElementById('kpi-turnos-atendidos');
+    kpiTiempoPromedio = document.getElementById('kpi-tiempo-promedio');
 
     chatModal = document.getElementById('chat-modal');
     openChatBtn = document.getElementById('open-chat-btn');
@@ -80,6 +93,10 @@ async function init() {
     openChatBtn.addEventListener('click', openChat);
     closeChatBtn.addEventListener('click', closeChat);
     chatMessageForm.addEventListener('submit', handleSendMessage);
+
+    customMessageInput = document.getElementById('custom-message-input');
+    sendCustomMessageBtn = document.getElementById('send-custom-message-btn');
+    sendCustomMessageBtn.addEventListener('click', onSendCustomMessage);
 
     loadUserCache();
 
@@ -144,6 +161,78 @@ function showConfirmationModal(title, message) {
     });
 }
 
+/**
+ * Toma segundos (ej. 255) y los formatea a "MM:SS" (ej. "4:15").
+ */
+function formatSecondsToMMSS(totalSeconds) {
+    if (isNaN(totalSeconds) || totalSeconds === 0) return '0:00';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.round(totalSeconds % 60); // Redondea los segundos
+    return `${minutes}:${String(seconds).padStart(2, '0')}`; // Rellena con '0' (ej. 4:05)
+}
+
+/**
+ * Calcula y muestra los KPIs personales (Turnos Atendidos y Tiempo Promedio).
+ * Recibe los datos de la función loadDailyHistory.
+ */
+function updatePersonalKPIs(historyData) {
+    const totalTurns = historyData.length;
+    kpiTurnosAtendidos.textContent = totalTurns;
+
+    if (totalTurns === 0) {
+        kpiTiempoPromedio.textContent = '--:--';
+        return;
+    }
+
+    let totalServiceSeconds = 0;
+    historyData.forEach(turn => {
+        // Nos aseguramos de que el turno tenga hora de inicio y fin
+        if (turn.hora_finalizacion && turn.hora_llamado) {
+            const end = new Date(turn.hora_finalizacion);
+            const start = new Date(turn.hora_llamado);
+            const durationSeconds = (end - start) / 1000; // Diferencia en segundos
+            totalServiceSeconds += durationSeconds;
+        }
+    });
+
+    const avgSeconds = totalServiceSeconds / totalTurns;
+    kpiTiempoPromedio.textContent = formatSecondsToMMSS(avgSeconds);
+}
+
+function addNotification(icon, message, room_id = null, user_name = null) {
+    // Quitar el placeholder "No hay notificaciones"
+    const placeholder = document.getElementById('no-notifications-placeholder');
+    if (placeholder) placeholder.remove();
+
+    const notif = document.createElement('div');
+    notif.className = 'p-3 bg-gray-800 rounded-lg flex items-start gap-3 cursor-pointer hover:bg-gray-700 transition';
+
+    // Si es una notificación de chat, la hacemos "clicable"
+    if (room_id && user_name) {
+        notif.onclick = () => {
+            openChat(); // Abre el modal de chat
+            selectChatRoom(room_id, user_name); // Selecciona la sala
+        };
+    }
+
+    notif.innerHTML = `<div class="flex-shrink-0 w-6 h-6 text-yellow-400">${icon}</div><p class="text-sm text-gray-300">${message}</p>`;
+
+    // Añadir al principio de la lista
+    notificationList.prepend(notif);
+
+    // Limitar a las últimas 10 notificaciones
+    if (notificationList.children.length > 10) {
+        notificationList.removeChild(notificationList.lastChild);
+    }
+
+    // Sonido de notificación
+    const sound = document.getElementById('notification-sound');
+    if (sound) {
+        sound.currentTime = 0;
+        sound.play().catch(e => console.warn("La notificación fue bloqueada por el navegador.", e));
+    }
+}
+
 async function updateAssignedModuleName() {
     if (window.ASSIGNED_MODULE_ID !== null) {
         try {
@@ -170,6 +259,8 @@ async function updateAssignedModuleName() {
 }
 
 async function loadPendingTurns() {
+    const oldTurnCount = sortedPendingTurns.length;
+
     pendingTurnsBody.innerHTML = `<tr><td colspan="2" class="text-center text-gray-500 py-4">Cargando turnos...</td></tr>`;
 
     if (window.ASSIGNED_MODULE_ID === null) {
@@ -231,7 +322,17 @@ async function loadPendingTurns() {
             return new Date(a.hora_solicitud) - new Date(b.hora_solicitud);
         });
 
-        sortedPendingTurns = allPendingTurns; // Guardamos la lista ordenada
+        sortedPendingTurns = allPendingTurns; // Guardamos la lista 
+
+        const newTurnCount = allPendingTurns.length;
+        if (newTurnCount > oldTurnCount) {
+            // ¡Si hay más turnos que antes, suena!
+            const sound = document.getElementById('notification-sound');
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(e => console.warn("El navegador bloqueó el sonido de notificación.", e));
+            }
+        }
 
         // Renderizamos
         pendingTurnsBody.innerHTML = '';
@@ -331,6 +432,8 @@ async function loadDailyHistory() {
             .order('hora_finalizacion', { ascending: false });
 
         if (error) throw error;
+
+        updatePersonalKPIs(history);
 
         dailyHistoryBody.innerHTML = '';
         if (history.length === 0) {
@@ -464,31 +567,55 @@ async function handleTransferConfirm() {
 function setupRealtimeSubscriptions() {
     console.log("Configurando suscripciones en tiempo real para el panel...");
 
+    // --- Canal 1: CAMBIOS EN LOS TURNOS ---
     turnosChannel.on('postgres_changes', { event: '*', schema: 'public', table: 'turnos' },
         (payload) => {
             console.log(`Cambio en 'turnos' detectado: ${payload.eventType}`);
 
-            // Lógica unificada: cualquier cambio en 'turnos' recarga todo
-            // para mantener la consistencia.
-            loadPendingTurns();
-
-            // Solo recargamos el turno actual si no somos nosotros los que lo estamos
-            // finalizando (para evitar que se limpie antes de tiempo)
-            if (payload.new.estado !== 'atendido' || payload.new.id_turno !== currentAttendingTurnId) {
-                loadCurrentTurn();
+            if (payload.eventType === 'INSERT') {
+                // Un turno fue creado.
+                // ¿Me pertenece? Lo sabremos recargando la lista.
+                // `loadPendingTurns` se encargará de ver si nos interesa.
+                loadPendingTurns();
             }
 
-            if (payload.eventType === 'INSERT' ||
-                (payload.old.estado !== 'atendido' && payload.new.estado === 'atendido')) {
-                loadDailyHistory();
+            if (payload.eventType === 'UPDATE') {
+                const newTurn = payload.new;
+                const oldTurn = payload.old;
+
+                // 1. ¿Me transfirieron un turno?
+                if (newTurn.id_modulo_reasignado === window.ASSIGNED_MODULE_ID &&
+                    oldTurn.id_modulo_reasignado !== window.ASSIGNED_MODULE_ID) {
+
+                    addNotification(ICONS.TRANSFER, `Turno <strong>${newTurn.prefijo_turno}-${String(newTurn.numero_turno).padStart(3, '0')}</strong> transferido a tu módulo.`);
+                }
+
+                // 2. ¿Un turno fue finalizado (por mí o por otro)?
+                if (oldTurn.estado === 'en atencion' && newTurn.estado === 'atendido') {
+                    console.log("Un turno fue finalizado. Actualizando historial.");
+                    loadDailyHistory();
+
+                    // 3. ¿Era MI turno el que finalizó?
+                    if (oldTurn.id_turno === currentAttendingTurnId) {
+                        console.log("Era mi turno, limpiando el panel.");
+                        loadCurrentTurn();
+                    }
+                }
+
+                // 4. Actualizar siempre las listas por si acaso
+                loadPendingTurns();
+                if (newTurn.estado === 'en atencion') {
+                    loadCurrentTurn(); // Si alguien más llamó un turno
+                }
             }
         }
     ).subscribe((status) => {
         if (status === 'SUBSCRIBED') {
-            console.log('Panel de funcionario conectado al canal de tiempo real.');
+            console.log('Panel de funcionario conectado al canal de turnos.');
         }
     });
 
+    // --- Canal 2: CAMBIOS EN EL CHAT ---
     const chatMessagesChannel = supabase.channel('chat_messages_channel');
     chatMessagesChannel.on(
         'postgres_changes',
@@ -496,20 +623,52 @@ function setupRealtimeSubscriptions() {
             event: 'INSERT',
             schema: 'public',
             table: 'chat_messages',
-            filter: `id_organizacion=eq.1` // ¡Asumimos Org 1!
+            filter: `id_organizacion=eq.1` // Asumimos Org 1
         },
         (payload) => {
             console.log("Nuevo mensaje de chat recibido:", payload.new);
             const msg = payload.new;
             const isMe = msg.sender_id === window.USER_ID;
 
-            // Si estamos viendo la sala correcta, renderiza el mensaje
+            if (isMe) return; // No me notifico a mí mismo
+
+            // 1. Renderizar en el modal si está abierto
             if (!chatModal.classList.contains('hidden') && msg.room_id === currentChatRoomId) {
                 renderMessage(msg, isMe);
             } else {
-                // Si no, muestra una notificación
+                // 2. Mostrar notificación de "globo rojo"
                 showChatNotification(msg.room_id);
             }
+
+            // 3. ¡Añadir a la lista de Notificaciones!
+            const senderName = userCacheMap.get(msg.sender_id) || "Alguien";
+
+            // Buscamos el nombre de la sala. Es complejo, así que simplificamos:
+            let roomName = "un chat";
+            let userNameForClick = senderName; // Para DMs
+
+            if (chatRoomList) { // Asegurarse de que la lista de salas existe
+                const roomButton = chatRoomList.querySelector(`button[data-room-id="${msg.room_id}"]`);
+                if (roomButton) {
+                    roomName = roomButton.dataset.roomName;
+                    userNameForClick = roomName; // Para el chat global
+                }
+            }
+
+            // Si el roomName sigue siendo "un chat", es probable que sea un DM nuevo
+            // que aún no se ha cargado en la lista.
+            if (roomName === "un chat") {
+                roomName = "un mensaje privado";
+            } else {
+                roomName = `el chat "${roomName}"`;
+            }
+
+            addNotification(
+                ICONS.CHAT,
+                `<strong>${senderName}</strong> envió un mensaje en <strong>${roomName}</strong>.`,
+                msg.room_id, // ID de la sala
+                userNameForClick // Nombre para abrir el chat
+            );
         }
     ).subscribe((status) => {
         if (status === 'SUBSCRIBED') {
@@ -517,6 +676,7 @@ function setupRealtimeSubscriptions() {
         }
     });
 
+    // --- Canal 3: CAMBIOS EN PARTICIPANTES (Para DMs) ---
     const chatParticipantsChannel = supabase.channel('chat_participants_channel');
     chatParticipantsChannel.on(
         'postgres_changes',
@@ -528,7 +688,6 @@ function setupRealtimeSubscriptions() {
         },
         (payload) => {
             console.log("¡Me han añadido a una nueva sala de chat!", payload.new);
-            // Si el modal de chat está abierto, recarga la lista de salas
             if (!chatModal.classList.contains('hidden')) {
                 loadChatRooms();
             }
@@ -953,6 +1112,22 @@ function showChatNotification(roomId) {
         dot.className = 'notification-dot w-3 h-3 bg-red-500 rounded-full inline-block ml-2';
         roomButton.appendChild(dot);
     }
+}
+
+function onSendCustomMessage() {
+    const text = customMessageInput.value;
+    if (!text.trim()) return; // No enviar si está vacío
+
+    console.log(`Enviando mensaje personalizado: ${text}`);
+    turnosChannel.send({
+        type: 'broadcast',
+        event: 'custom_message', // <-- El nuevo "grito"
+        payload: {
+            text: text,
+            sender: window.USER_NAME // "Mensaje de: Tu Nombre"
+        }
+    });
+    customMessageInput.value = ''; // Limpiar el input
 }
 
 // ==========================================================

@@ -46,18 +46,35 @@
         <main class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
             <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col lg:col-span-1">
-                <h2 class="text-2xl font-bold text-green-400 mb-4">Turnos por Atender</h2>
-                <div class="overflow-y-auto flex-grow h-80">
-                    <table class="w-full text-left">
-                        <thead class="sticky top-0 bg-gray-700">
-                            <tr class="text-sm font-semibold text-gray-400 uppercase">
-                                <th class="p-3">Turno</th>
-                                <th class="p-3">Servicio</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pending-turns-body" class="divide-y divide-gray-700">
-                        </tbody>
-                    </table>
+                <div class="flex-grow">
+                    <h2 class="text-2xl font-bold text-green-400 mb-4">Turnos por Atender</h2>
+                    <div class="overflow-y-auto h-56">
+                        <table class="w-full text-left">
+                            <thead class="sticky top-0 bg-gray-700">
+                                <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                    <th class="p-3">Turno</th>
+                                    <th class="p-3">Servicio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pending-turns-body" class="divide-y divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <hr class="border-gray-700 my-4">
+
+                <div class="flex-shrink-0"> <h3 class="text-xl font-bold text-blue-400 mb-3">Tus Métricas de Hoy</h3>
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <span class="block text-sm font-medium text-gray-400">Turnos Atendidos</span>
+                            <span id="kpi-turnos-atendidos" class="block text-3xl font-bold text-white">--</span>
+                        </div>
+                        <div>
+                            <span class="block text-sm font-medium text-gray-400">Tiempo Promedio</span>
+                            <span id="kpi-tiempo-promedio" class="block text-3xl font-bold text-white">--:--</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -114,21 +131,47 @@
                         </button>
                     </div>
                 </div>
+
+                <div class="w-full max-w-lg mt-6 pt-6 border-t border-gray-700">
+                    <label for="custom-message-input" class="block text-sm font-medium text-gray-300 mb-2">Anuncio para
+                        el Visualizador:</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="custom-message-input"
+                            placeholder="Ej: Funcionario Juan, favor acercarse a..."
+                            class="flex-1 p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:ring-blue-500 focus:border-blue-500">
+                        <button id="send-custom-message-btn"
+                            class="px-5 py-2 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition">
+                            Anunciar
+                        </button>
+                    </div>
+                </div>
             </section>
 
             <section class="bg-gray-900 p-6 rounded-2xl shadow-lg flex flex-col lg:col-span-1">
-                <h2 class="text-2xl font-bold text-green-400 mb-4">Historial del Día</h2>
-                <div class="overflow-y-auto flex-grow h-80">
-                    <table class="w-full text-left">
-                        <thead class="sticky top-0 bg-gray-700">
-                            <tr class="text-sm font-semibold text-gray-400 uppercase">
-                                <th class="p-3">Turno</th>
-                                <th class="p-3">Hora Fin</th>
-                            </tr>
-                        </thead>
-                        <tbody id="daily-history-body" class="divide-y divide-gray-700">
-                        </tbody>
-                    </table>
+                <div>
+                    <h2 class="text-2xl font-bold text-green-400 mb-4">Historial del Día</h2>
+                    <div class="overflow-y-auto flex-grow h-40">
+                        <table class="w-full text-left">
+                            <thead class="sticky top-0 bg-gray-700">
+                                <tr class="text-sm font-semibold text-gray-400 uppercase">
+                                    <th class="p-3">Turno</th>
+                                    <th class="p-3">Hora Fin</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily-history-body" class="divide-y divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <hr class="border-gray-700 my-4">
+
+                <div class="flex flex-col flex-grow overflow-hidden">
+                    <h2 class="text-2xl font-bold text-yellow-400 mb-4">Notificaciones</h2>
+                    <div id="notification-list" class="overflow-y-auto h-40 space-y-3 pr-2">
+                        <p id="no-notifications-placeholder" class="text-gray-500 text-center">No hay notificaciones.
+                        </p>
+                    </div>
                 </div>
             </section>
         </main>
@@ -211,6 +254,9 @@
             </main>
         </div>
     </div>
+
+    <audio id="notification-sound" src="{{ url_for('static', filename='audio/notificacion.mp3') }}"
+        preload="auto"></audio>
 
     <script>
         window.SUPABASE_URL = "{{ supabase_url }}";

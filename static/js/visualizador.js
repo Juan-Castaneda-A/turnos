@@ -144,6 +144,31 @@ function announceTurn(prefijoTurno, numeroTurno, nombreModulo) {
 
 }
 
+function speakText(textToSpeak) {
+    // 1. Asegura que la voz en español esté cargada
+    if (!spanishVoice) {
+        loadSpanishVoice();
+    }
+    console.log("Anunciando (nativo):", textToSpeak);
+
+    // 2. Cancela cualquier anuncio anterior
+    window.speechSynthesis.cancel(); 
+    
+    // 3. Crea el objeto de voz nativo
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
+    if (spanishVoice) {
+        utterance.voice = spanishVoice;
+    }
+    
+    // Usamos la misma configuración que 'announceTurn'
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    
+    // 4. ¡Habla!
+    window.speechSynthesis.speak(utterance);
+}
+
 async function forceAnnounceTurnById(turnId) {
     if (!turnId) return;
 
@@ -382,6 +407,23 @@ function setupRealtimeSubscriptions() {
         setTimeout(() => {
             silenceBanner.classList.add('hidden');
         }, 4000);
+    });
+
+    channel.on('broadcast', { event: 'custom_message' }, (message) => {
+        const data = message.payload;
+        const fullText = `${data.text}.`;
+
+        console.log("Mensaje personalizado recibido:", fullText);
+        speakText(fullText); // ¡Llama a la nueva función de voz!
+
+        // (Opcional, pero recomendado) Mostrarlo como un banner
+        // Reutilizamos el banner de silencio
+        const banner = document.getElementById('silence-banner');
+        if (banner) {
+            banner.textContent = fullText;
+            banner.classList.remove('hidden');
+            setTimeout(() => banner.classList.add('hidden'), 10000); // Ocultar después de 10 seg
+        }
     });
 
     const messagesChannel = supabase.channel('visualizador_messages_channel');
