@@ -1,6 +1,14 @@
 // Importar el cliente de Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.43.0/+esm';
 
+const ICONS = {
+    TICKET: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V6.375c0-.621-.504-1.125-1.125-1.125H3.375z" /></svg>`,
+    // --- ESTA ES LA LÍNEA CORREGIDA ---
+    TRANSFER: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.875L6 12zm0 0h7.5" /></svg>`,
+    // --- FIN DE LA CORRECCIÓN ---
+    CHAT: `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.068.157 2.148.279 3.238.364.466.037.893.281 1.153.671L12 21l2.652-3.978c.26-.39.687-.634 1.153-.67 1.09-.086 2.17-.208 3.238-.365 1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.344 48.344 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>`
+};
+
 // 1. DECLARAMOS las variables aquí, pero NO las asignamos todavía.
 let supabase;
 let navLinks, contentSections, turnsWaitingElement, turnsAttendedTodayElement, activeModulesElement,
@@ -14,7 +22,9 @@ let navLinks, contentSections, turnsWaitingElement, turnsAttendedTodayElement, a
     btnFilterAll, reportStartDate, reportEndDate, reportTableBody, chartCanvas,
     generateReportBtn, historyStartDate, historyEndDate, historyServiceFilter,
     filterHistoryBtn, turnHistoryTableBody, resetTurnsBtn, confirmationModal, modalTitle,
-    modalMessage, modalConfirmBtn, modalCancelBtn, moduleFilter;
+    modalMessage, modalConfirmBtn, modalCancelBtn, moduleFilter, chatModal, openChatBtn, closeChatBtn, chatRoomList, chatMessageHeader,
+    chatMessageArea, chatMessageForm, chatMessageInput, chatSendBtn,
+    notificationList, kpiTurnosAtendidos, kpiTiempoPromedio;
 
 let reportChart = null;
 let isSavingConfig = false;
@@ -34,6 +44,9 @@ let currentReportData = []; // <-- AÑADE ESTA LÍNEA para guardar los datos del
 let exportMenuBtn, exportOptions, exportXLSXBtn, exportCSVBtn, copyDataBtn;
 let exportPDFBtn;
 let reportInsightsContainer, reportInsightsList;
+
+let currentChatRoomId = null;
+let userCacheMap = new Map();
 
 function init() {
     // Inicializar Supabase
@@ -133,6 +146,15 @@ function init() {
     messageActiveField = document.getElementById('message-active-field');
     messageActiveText = document.getElementById('message-active-text');
     cancelMessageFormBtn = document.getElementById('cancel-message-form-btn');
+    chatModal = document.getElementById('chat-modal');
+    openChatBtn = document.getElementById('open-chat-btn');
+    closeChatBtn = document.getElementById('close-chat-btn');
+    chatRoomList = document.getElementById('chat-room-list');
+    chatMessageHeader = document.getElementById('chat-message-header');
+    chatMessageArea = document.getElementById('chat-message-area');
+    chatMessageForm = document.getElementById('chat-message-form');
+    chatMessageInput = document.getElementById('chat-message-input');
+    chatSendBtn = document.getElementById('chat-send-btn');
 
     const moduleFilterElement = document.getElementById('module-filter');
     if (moduleFilterElement) {
@@ -142,10 +164,15 @@ function init() {
     // 4. Asignamos todos los Event Listeners aquí.
     assignEventListeners();
 
+    openChatBtn.addEventListener('click', openChat);
+    closeChatBtn.addEventListener('click', closeChat);
+    chatMessageForm.addEventListener('submit', handleSendMessage);
+
     // 5. Cargamos la vista inicial y los datos.
     showView('dashboard');
     setupRealtimeSubscriptions();
     loadReportFilters();
+    loadUserCache();
 
 }
 
@@ -2097,6 +2124,200 @@ async function handleDeleteService(id, name) {
     }
 }
 
+async function loadUserCache() {
+    try {
+        const { data: users, error } = await supabase.from('usuarios').select('id_usuario, nombre_completo').eq('id_organizacion', 1); // Asumimos Org 1
+        if (error) throw error;
+        userCacheMap.clear();
+        users.forEach(user => {
+            userCacheMap.set(user.id_usuario, user.nombre_completo);
+        });
+        console.log("Caché de usuarios (Admin) cargado.");
+    } catch (error) {
+        console.error("Error al cargar caché de usuarios (Admin):", error.message);
+    }
+}
+
+async function openChat() {
+    console.log("Abriendo chat (Admin)...");
+    chatModal.classList.remove('hidden');
+    chatMessageHeader.querySelector('h3').textContent = "Seleccione un chat";
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">No hay mensajes cargados.</p></div>';
+    chatMessageInput.disabled = true;
+    chatSendBtn.disabled = true;
+    currentChatRoomId = null;
+    openChatBtn.classList.remove('animate-pulse', 'bg-red-600', 'hover:bg-red-700');
+    openChatBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+    await loadChatRooms();
+}
+
+function closeChat() {
+    chatModal.classList.add('hidden');
+}
+
+async function loadChatRooms() {
+    chatRoomList.innerHTML = '<p class="text-gray-500 text-sm p-4 text-center">Cargando chats...</p>';
+    try {
+        const response = await fetch('/api/chat/rooms');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+        chatRoomList.innerHTML = '';
+        result.rooms.forEach(room => {
+            const roomElement = document.createElement('button');
+            roomElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-200 hover:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:bg-blue-600 font-bold";
+            roomElement.textContent = `🌐 ${room.nombre}`;
+            roomElement.dataset.roomId = room.id;
+            roomElement.dataset.roomName = room.nombre;
+            roomElement.onclick = () => { selectChatRoom(room.id, room.nombre); };
+            chatRoomList.appendChild(roomElement);
+        });
+        const divider = document.createElement('hr');
+        divider.className = 'border-gray-700 my-2';
+        chatRoomList.appendChild(divider);
+        if (userCacheMap.size === 0) { await loadUserCache(); }
+        userCacheMap.forEach((userName, userId) => {
+            if (userId === window.USER_ID) return;
+            const userElement = document.createElement('button');
+            userElement.className = "w-full text-left px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:bg-blue-600";
+            userElement.textContent = `👤 ${userName}`;
+            userElement.dataset.userId = userId;
+            userElement.dataset.userName = userName;
+            userElement.onclick = () => { openDirectMessage(userId, userName); };
+            chatRoomList.appendChild(userElement);
+        });
+    } catch (error) {
+        console.error("Error al cargar salas de chat (Admin):", error.message);
+        chatRoomList.innerHTML = '<p class="text-red-400 text-sm p-4 text-center">Error al cargar chats.</p>';
+    }
+}
+
+async function openDirectMessage(targetUserId, targetUserName) {
+    console.log(`Intentando abrir DM con ${targetUserName} (ID: ${targetUserId})`);
+    chatMessageHeader.querySelector('h3').textContent = `Conectando con ${targetUserName}...`;
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">Creando chat...</p></div>';
+    currentChatRoomId = null;
+    try {
+        const response = await fetch('/api/chat/get-or-create-dm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_user_id: targetUserId })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+        selectChatRoom(result.room_id, targetUserName);
+    } catch (error) {
+        console.error("Error al crear o encontrar el DM:", error.message);
+        chatMessageArea.innerHTML = `<p class="text-red-400">Error: ${error.message}</p>`;
+    }
+}
+
+async function selectChatRoom(roomId, roomName) {
+    console.log(`Seleccionando sala: ${roomName} (ID: ${roomId})`);
+    currentChatRoomId = roomId;
+    const roomButton = document.querySelector(`#chat-room-list button[data-room-id="${roomId}"]`);
+    if (roomButton) {
+        const dot = roomButton.querySelector('.notification-dot');
+        if (dot) dot.remove();
+    }
+    chatMessageHeader.querySelector('h3').textContent = roomName;
+    chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">Cargando mensajes...</p></div>';
+    chatMessageInput.disabled = false;
+    chatSendBtn.disabled = false;
+    chatMessageInput.focus();
+    await loadChatMessages(roomId);
+}
+
+async function loadChatMessages(roomId) {
+    try {
+        const response = await fetch(`/api/chat/messages/${roomId}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+        chatMessageArea.innerHTML = '';
+        if (result.messages.length === 0) {
+            chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-gray-500">No hay mensajes.</p></div>';
+            return;
+        }
+        result.messages.forEach(msg => {
+            const isMe = msg.sender_id === window.USER_ID;
+            renderMessage(msg, isMe);
+        });
+        chatMessageArea.scrollTop = chatMessageArea.scrollHeight;
+    } catch (error) {
+        console.error("Error al cargar mensajes:", error.message);
+        chatMessageArea.innerHTML = '<div class="flex justify-center items-center h-full"><p class="text-red-400">Error al cargar mensajes.</p></div>';
+    }
+}
+
+function renderMessage(message, isMe) {
+    const placeholder = chatMessageArea.querySelector('.text-gray-500');
+    if (placeholder) placeholder.parentElement.remove();
+    const bubble = document.createElement('div');
+    const bubbleClasses = isMe
+        ? 'flex flex-col w-fit bg-blue-600 text-white p-3 rounded-lg max-w-xs self-end'
+        : 'flex flex-col w-fit bg-gray-700 text-gray-200 p-3 rounded-lg max-w-xs self-start';
+    bubble.className = bubbleClasses;
+    let senderName = 'Usuario Desconocido';
+    if (isMe) {
+        senderName = 'Tú';
+    } else if (message.sender && message.sender.nombre_completo) {
+        senderName = message.sender.nombre_completo;
+    } else if (message.sender_id) {
+        senderName = userCacheMap.get(message.sender_id) || 'Usuario';
+    }
+    const sentTime = new Date(message.sent_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    bubble.innerHTML = `<span class="font-bold text-sm ${isMe ? 'text-blue-200' : 'text-green-300'}">${senderName}</span><p class="text-base break-words">${message.content}</p><span class="text-xs opacity-70 mt-1 self-end">${sentTime}</span>`;
+    chatMessageArea.style.display = 'flex';
+    chatMessageArea.style.flexDirection = 'column';
+    chatMessageArea.style.gap = '0.75rem';
+    chatMessageArea.appendChild(bubble);
+    chatMessageArea.scrollTop = chatMessageArea.scrollHeight;
+}
+
+async function handleSendMessage(event) {
+    event.preventDefault();
+    const content = chatMessageInput.value;
+    if (!content.trim() || !currentChatRoomId) return;
+    const messagePayload = { type: 'text', content: content };
+    sendStructuredMessage(messagePayload); // Usamos la función de stickers
+    chatMessageInput.value = '';
+}
+
+async function sendStructuredMessage(payload) {
+    if (!currentChatRoomId || !payload) return;
+    chatMessageInput.disabled = true;
+    chatSendBtn.disabled = true;
+    try {
+        const response = await fetch('/api/chat/send-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                room_id: currentChatRoomId,
+                content: JSON.stringify(payload)
+            })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error);
+    } catch (error) {
+        console.error("Error al enviar mensaje estructurado:", error.message);
+    } finally {
+        chatMessageInput.disabled = false;
+        chatSendBtn.disabled = false;
+        chatMessageInput.focus();
+    }
+}
+
+function showChatNotification(roomId) {
+    openChatBtn.classList.add('animate-pulse');
+    openChatBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+    openChatBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+    const roomButton = document.querySelector(`#chat-room-list button[data-room-id="${roomId}"]`);
+    if (roomButton && !roomButton.querySelector('.notification-dot')) {
+        const dot = document.createElement('span');
+        dot.className = 'notification-dot w-3 h-3 bg-red-500 rounded-full inline-block ml-2';
+        roomButton.appendChild(dot);
+    }
+}
+
 // IMPORTANTE: Expón las funciones al ámbito global para que los `onclick` funcionen
 window.handleEditService = handleEditService;
 window.handleDeleteService = handleDeleteService;
@@ -2182,6 +2403,46 @@ function setupRealtimeSubscriptions() {
             }
         )
         .subscribe();
+
+    const chatMessagesChannel = supabase.channel('admin_chat_messages_channel');
+    chatMessagesChannel.on(
+        'postgres_changes',
+        {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `id_organizacion=eq.1` // Asumimos Org 1
+        },
+        (payload) => {
+            console.log("Nuevo mensaje de chat recibido (Admin):", payload.new);
+            const msg = payload.new;
+            const isMe = msg.sender_id === window.USER_ID;
+            if (isMe) return; // No notifico mis propios mensajes
+
+            if (!chatModal.classList.contains('hidden') && msg.room_id === currentChatRoomId) {
+                renderMessage(msg, isMe);
+            } else {
+                showChatNotification(msg.room_id);
+            }
+        }
+    ).subscribe();
+
+    const chatParticipantsChannel = supabase.channel('admin_chat_participants_channel');
+    chatParticipantsChannel.on(
+        'postgres_changes',
+        {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'chat_participants',
+            filter: `user_id=eq.${window.USER_ID}` // ¡Cuando me añaden a MÍ!
+        },
+        (payload) => {
+            console.log("¡Me han añadido a una nueva sala de chat! (Admin)", payload.new);
+            if (!chatModal.classList.contains('hidden')) {
+                loadChatRooms();
+            }
+        }
+    ).subscribe();
 
     console.log("Suscripciones Realtime configuradas para el Panel de Administración.");
 }
