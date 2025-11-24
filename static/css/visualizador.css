@@ -1,152 +1,110 @@
-/* Mantenemos la fuente base para el body */
-body {
-    font-family: 'Inter', sans-serif;
+/* Fuentes */
+.font-JetBrains { font-family: 'JetBrains Mono', monospace; }
+.font-Rubik { font-family: 'Rubik', sans-serif; }
+
+/* ==================== ESTILOS DEL TURNO PRINCIPAL ==================== */
+
+/* Tamaño dinámico masivo para el número */
+#current-turn-number {
+    font-size: 18vw; /* Ocupa casi el 20% del ancho de la pantalla */
+    background: linear-gradient(to bottom, #ffffff, #e2e8f0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
 }
 
-/* Conservamos ÚNICAMENTE las animaciones personalizadas que creamos */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* Tamaño dinámico para el nombre del módulo */
+#current-turn-module {
+    font-size: 5vw; /* Tamaño grande y legible desde lejos */
 }
 
-@keyframes pulseGreen {
-    0% {
-        box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 20px rgba(72, 187, 120, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(72, 187, 120, 0);
-    }
+/* Animación de "Latido" cuando llega un turno nuevo (Se aplica con JS) */
+@keyframes heartbeat {
+    0% { transform: scale(1); }
+    15% { transform: scale(1.1); text-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+    30% { transform: scale(1); }
+    45% { transform: scale(1.1); text-shadow: 0 0 20px rgba(255, 255, 255, 0.8); }
+    100% { transform: scale(1); }
 }
 
-/*
-   Aún necesitas una clase para aplicar la animación, ya que Tailwind no la conoce.
-   Tu JavaScript añade y quita esta clase.
-*/
 .pulse-animation {
-    animation: pulseGreen 1.5s; /* La quitamos de 'infinite' para que solo se ejecute una vez por llamado */
+    animation: heartbeat 1.2s ease-in-out;
 }
 
-/* En static/css/visualizador.css */
-.turn-font-size {
-    /* vw significa "viewport width". El texto ocupará el 20% del ancho de la pantalla. */
-    /* Esto hace que se ajuste automáticamente a cualquier tamaño de TV. */
-    font-size: 18vw;
-}
+/* ==================== ESTILOS DEL HISTORIAL (SIDEBAR) ==================== */
 
-/* Pega esto al final de tu visualizador.css */
-
-/* 1. Preparamos el panel original para la animación */
-#current-turn-display {
-    /* Le decimos que la transición de sus propiedades (transform, tamaño, etc.) dure 0.5s */
-    transition: all 0.5s ease-in-out;
-}
-
-/* 2. Definimos el estado de "pantalla completa" */
-#current-turn-display.fullscreen-mode {
-    position: fixed; /* Lo saca de su sitio normal y lo pone sobre todo */
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 100; /* Asegura que esté por encima de todo lo demás */
-    border-radius: 0; /* Quitamos los bordes redondeados en pantalla completa */
-}
-
-/* 3. Agrandamos el texto SOLO cuando está en modo pantalla completa */
-#current-turn-display.fullscreen-mode #current-turn-number {
-    font-size: 30vw; /* Ocupará el 35% del ancho de la pantalla */
-}
-#current-turn-display.fullscreen-mode #current-turn-module {
-    font-size: 8vw; /* Un tamaño grande pero secundario */
-}
-
-/* En static/css/visualizador.css */
-
-/* AÑADE ESTAS REGLAS AL FINAL DEL ARCHIVO */
-
-/* Estilo para cada fila en la lista de 'Últimos Llamados' */
+/* Tarjeta individual del historial */
 .history-item {
+    background: rgba(30, 41, 59, 0.6); /* Slate-800 semi transparente */
+    border: 1px solid rgba(71, 85, 105, 0.5);
+    border-radius: 16px;
+    padding: 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 0.25rem; /* 12px de espacio vertical, 4px horizontal */
-    border-bottom: 1px solid #374151; /* Un borde sutil (color de gray-700) */
+    transition: all 0.3s ease;
 }
 
-/* Quitar el borde del último elemento de la lista para que se vea limpio */
-.history-item:last-child {
-    border-bottom: none;
+/* El primer elemento del historial (el más reciente) se ve diferente */
+.history-item:first-child {
+    background: rgba(59, 130, 246, 0.15); /* Azul sutil */
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: scale(1.02);
 }
 
-/* Estilo para el NÚMERO DE TURNO (el primer span dentro de .history-item) */
+/* Número del historial */
 .history-item span:first-child {
-    font-size: 3rem; /* Equivalente a text-5xl de Tailwind */
-    line-height: 2.5rem;
-    font-weight: 700; /* bold */
-    color: #e5e7eb; /* text-gray-200 */
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 3.5rem; /* Muy grande para verse de lejos */
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1;
 }
 
-/* Estilo para el MÓDULO (el último span dentro de .history-item) */
+/* Módulo del historial */
 .history-item span:last-child {
-    font-size: 1.5rem; /* Equivalente a text-2xl de Tailwind */
-    line-height: 2rem;
-    font-weight: 600; /* semibold */
-    /* El color text-gray-400 ya lo tienes en el HTML, así que se mantiene */
+    font-family: 'Rubik', sans-serif;
+    font-size: 1.5rem;
+    color: #94a3b8;
+    text-align: right;
+    line-height: 1.2;
 }
 
-/* Container for the ticker */
-#message-ticker-container {
-  overflow: hidden; /* Crucial: Hides the text outside the box */
-  position: relative; /* Needed for absolute positioning if desired later */
+.history-item span:last-child::before {
+    content: 'MÓDULO';
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #64748b;
 }
 
-/* The text element that will scroll */
-#message-ticker-text {
-  /* Start the animation */
-  animation: ticker-scroll 30s linear infinite; 
-  display: inline-block; /* Allows text to move as one block */
-  padding-left: 100%; /* Start the text off-screen to the right */
-  white-space: nowrap; /* Prevent text wrapping */
-  opacity: 1; /* Ensure opacity is reset if changed by JS */
-  transition: none; /* Override the JS fade transition */
+/* ==================== SCROLLING TICKER (MARQUESINA) ==================== */
+@keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
 }
 
-/* Define the scrolling animation */
-@keyframes ticker-scroll {
-  0% {
-    transform: translateX(0); /* Start position (off-screen right) */
-  }
-  100% {
-    transform: translateX(-100%); /* End position (completely off-screen left) */
-  }
+.animate-marquee {
+    display: inline-block;
+    padding-left: 100%;
+    animation: marquee 25s linear infinite;
 }
 
-/* Optional: Pause animation on hover */
-#message-ticker-container:hover #message-ticker-text {
-  animation-play-state: paused;
+/* ==================== ALERTAS ==================== */
+@keyframes bgPulse {
+    0%, 100% { background-color: rgb(220, 38, 38); }
+    50% { background-color: rgb(185, 28, 28); }
+}
+.animate-bg-pulse {
+    animation: bgPulse 2s infinite;
 }
 
-#call-history, #modules-status-body /* Assuming modules status uses this ID or similar */ {
-  max-height: calc(55vh - 100px); /* Example: 55% of viewport height minus some pixels for padding/margins */
-  overflow-y: auto; /* Add scrollbars IF content exceeds the max height */
+/* Ocultar scrollbar pero permitir scroll */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
 }
-
-/* Ensure the parent container allows shrinking */
-main > section {
-  min-height: 0; /* Allows sections to shrink if needed */
-}
-
-/* Adjust padding within the side sections if needed */
-main > section:not(#current-turn-display) {
-   padding-top: 0.75rem; /* Reduce top padding */
-   padding-bottom: 0.75rem; /* Reduce bottom padding */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
