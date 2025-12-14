@@ -37,7 +37,7 @@ export default function VirtualKeyboard({ mode, onKeyPress, onDelete, onEnter }:
           0
         </button>
         {onEnter && (
-          <button onClick={onEnter} className="h-20 flex items-center justify-center bg-blue-600 text-white rounded-xl shadow-lg hover:bg-blue-500 active:scale-95 transition-all">
+          <button onClick={onEnter} className="h-20 flex items-center justify-center bg-brand-600 text-white rounded-xl shadow-lg hover:bg-blue-500 active:scale-95 transition-all">
             <CornerDownLeft size={32} />
           </button>
         )}
@@ -74,7 +74,7 @@ export default function VirtualKeyboard({ mode, onKeyPress, onDelete, onEnter }:
          <button onClick={() => handleClick(' ')} className="flex-[4] h-14 bg-slate-600 text-white rounded-lg flex items-center justify-center active:scale-95">
             <Space /> ESPACIO
          </button>
-         <button onClick={onEnter} className="flex-[2] h-14 bg-blue-600 text-white rounded-lg font-bold active:scale-95">
+         <button onClick={onEnter} className="flex-[2] h-14 bg-brand-600 text-white rounded-lg font-bold active:scale-95">
             LISTO
          </button>
       </div>

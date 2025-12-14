@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import VirtualKeyboard from '@/components/kiosco/VirtualKeyboard'
 import { Loader2, Printer, CheckCircle } from 'lucide-react'
+import { useBranding } from '@/components/providers/BrandingProvider'
 
 // Definimos los pasos del flujo
 type Step = 'cedula' | 'nombre' | 'servicios' | 'imprimiendo' | 'exito'
@@ -15,6 +16,8 @@ export default function KioscoPage() {
   const [servicios, setServicios] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [mensajeTicket, setMensajeTicket] = useState('')
+
+  const { logoUrl } = useBranding()
 
   // Cliente Supabase
   const supabase = createBrowserClient(
@@ -126,9 +129,16 @@ export default function KioscoPage() {
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
 
       {/* HEADER */}
-      <div className="mb-10 text-center">
-        <h1 className="text-4xl font-bold text-blue-500 mb-2">Notaría Tercera</h1>
-        <p className="text-slate-400">Bienvenido, solicite su turno a continuación.</p>
+      <div className="mb-10 text-center flex flex-col items-center">
+        {logoUrl && (
+            <img 
+                src={logoUrl} 
+                alt="Logo Notaría" 
+                className="h-24 w-auto object-contain mb-6 drop-shadow-2xl" 
+            />
+        )}
+        <h1 className="text-4xl font-bold text-brand-500 mb-2">Bienvenido</h1>
+        <p className="text-slate-400">Solicite su turno a continuación.</p>
       </div>
 
       {/* PASO 1: CÉDULA */}
@@ -139,7 +149,7 @@ export default function KioscoPage() {
             type="text"
             readOnly
             value={cedula}
-            className="w-full bg-slate-800 border-2 border-slate-600 rounded-xl p-4 text-center text-4xl font-mono tracking-widest focus:border-blue-500 outline-none mb-4"
+            className="w-full bg-slate-800 border-2 border-slate-600 rounded-xl p-4 text-center text-4xl font-mono tracking-widest focus:border-brand-500 outline-none mb-4"
             placeholder="Documento"
           />
           <VirtualKeyboard
@@ -151,7 +161,7 @@ export default function KioscoPage() {
           <button
             onClick={verificarCedula}
             disabled={loading}
-            className="w-full mt-6 bg-blue-600 hover:bg-blue-500 p-4 rounded-xl text-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50"
+            className="w-full mt-6 bg-brand-600 hover:bg-brand-500 p-4 rounded-xl text-xl font-bold shadow-lg shadow-brand-900/20 disabled:opacity-50"
           >
             {loading ? <Loader2 className="animate-spin mx-auto" /> : "Continuar"}
           </button>
@@ -181,7 +191,7 @@ export default function KioscoPage() {
       {/* PASO 3: SERVICIOS */}
       {step === 'servicios' && (
         <div className="w-full max-w-5xl animate-in fade-in zoom-in duration-300">
-          <h2 className="text-3xl text-center mb-8">Hola <span className="text-blue-400 font-bold">{nombre}</span>, ¿qué trámite realizará?</h2>
+          <h2 className="text-3xl text-center mb-8">Hola <span className="text-brand-400 font-bold">{nombre}</span>, ¿qué trámite realizará?</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {servicios.map((serv) => (
@@ -189,7 +199,7 @@ export default function KioscoPage() {
                 key={serv.id_servicio}
                 onClick={() => registrarYPedirTurno(serv.id_servicio, serv.nombre_servicio)}
                 disabled={loading}
-                className="bg-slate-800 border border-slate-700 p-8 rounded-2xl hover:bg-blue-600 hover:border-blue-400 hover:-translate-y-1 transition-all shadow-xl group text-left relative overflow-hidden"
+                className="bg-slate-800 border border-slate-700 p-8 rounded-2xl hover:bg-brand-600 hover:border-blue-400 hover:-translate-y-1 transition-all shadow-xl group text-left relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <div className="text-6xl font-black">{serv.prefijo_ticket}</div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { loginAction } from '@/actions/auth'
 import { Loader2, KeyRound, User } from 'lucide-react'
 import { Toaster, toast } from 'sonner' // Notificaciones bonitas
+import BrandingLogo from '@/components/ui/branding-logo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -34,12 +35,13 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
       <Toaster position="top-center" richColors />
-      
+
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-slate-900 p-8 border border-slate-800 shadow-2xl">
         <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-900/30 text-blue-500 mb-4">
-            <KeyRound size={32} />
+          <div className="mx-auto flex justify-center mb-6">
+            <BrandingLogo className="h-20 w-auto" fallbackClass="h-16 w-16 text-3xl" />
           </div>
+
           <h2 className="text-3xl font-bold tracking-tight text-white">Iniciar Sesión</h2>
           <p className="mt-2 text-sm text-slate-400">Sistema de Turnos Notaría 3ra</p>
         </div>

@@ -3,10 +3,9 @@ import type { Config } from "tailwindcss"
 const config = {
   darkMode: ["class"],
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   prefix: "",
   theme: {
@@ -24,6 +23,18 @@ const config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        brand: {
+          50: "hsl(var(--brand-hue) var(--brand-sat) 95%)",
+          100: "hsl(var(--brand-hue) var(--brand-sat) 90%)",
+          200: "hsl(var(--brand-hue) var(--brand-sat) 80%)",
+          300: "hsl(var(--brand-hue) var(--brand-sat) 70%)",
+          400: "hsl(var(--brand-hue) var(--brand-sat) 60%)",
+          500: "hsl(var(--brand-hue) var(--brand-sat) 50%)", // Color Principal
+          600: "hsl(var(--brand-hue) var(--brand-sat) 40%)",
+          700: "hsl(var(--brand-hue) var(--brand-sat) 30%)",
+          800: "hsl(var(--brand-hue) var(--brand-sat) 20%)",
+          900: "hsl(var(--brand-hue) var(--brand-sat) 10%)",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

@@ -13,6 +13,8 @@ import { toast, Toaster } from 'sonner'
 import ChatWidget from '@/components/chat/ChatWidget'
 import TransferModal from './TransferModal'
 import { useTheme } from 'next-themes'
+import { useBranding } from '@/components/providers/BrandingProvider' // <--- 1. IMPORTAR
+import BrandingLogo from '@/components/ui/branding-logo'
 
 // Tipos
 type UserSession = {
@@ -25,6 +27,7 @@ type UserSession = {
 export default function PanelInterface({ user }: { user: UserSession }) {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
+  const { logoUrl } = useBranding()
   const [mounted, setMounted] = useState(false)
 
   // Estados
@@ -66,7 +69,7 @@ export default function PanelInterface({ user }: { user: UserSession }) {
       .from('turnos')
       .select('id_turno, prefijo_turno, numero_turno, servicios(nombre_servicio)')
       .eq('estado', 'en espera')
-      .or(`id_modulo_reasignado.eq.${user.modulo},id_modulo_reasignado.is.null`) // Simplificación
+      .or(`id_modulo_reasignado.eq.${user.modulo},id_modulo_reasignado.is.null`)
       .order('hora_solicitud', { ascending: true })
       .limit(10)
 
@@ -199,22 +202,20 @@ export default function PanelInterface({ user }: { user: UserSession }) {
       {/* SIDEBAR */}
       <aside className="w-full lg:w-72 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between border-r border-slate-200 dark:border-slate-800 shadow-xl z-20 transition-colors">
         <div>
-          <div className="flex items-center gap-3 mb-8 px-2">
-            <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center font-bold text-white">T</div>
-            <span className="font-bold text-xl tracking-tight text-slate-800 dark:text-white">TurnosWeb</span>
+          <div className="flex items-center justify-center mb-10 mt-4">
+             <BrandingLogo className="h-16 w-auto max-w-[80%]" fallbackClass="h-14 w-14 text-2xl" />
           </div>
 
           <div className="space-y-6">
-            {/* Tarjeta Usuario */}
             <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
               <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 font-bold">Funcionario</p>
               <div className="flex items-center gap-3 font-medium text-slate-900 dark:text-slate-100">
-                <div className="p-2 bg-blue-100 dark:bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400"><User size={18} /></div>
+                {/* Cambiamos blue por brand */}
+                <div className="p-2 bg-brand-100 dark:bg-brand-500/10 rounded-lg text-brand-600 dark:text-brand-400"><User size={18} /></div>
                 {user.nombre}
               </div>
             </div>
 
-            {/* Tarjeta Módulo */}
             <div className="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
               <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 font-bold">Ubicación</p>
               <div className="flex items-center gap-3 font-medium text-slate-900 dark:text-yellow-400">
@@ -223,7 +224,6 @@ export default function PanelInterface({ user }: { user: UserSession }) {
               </div>
             </div>
 
-            {/* Botón Silencio */}
             <button onClick={pedirSilencio} className="w-full py-3 px-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-yellow-400 text-yellow-600 dark:text-yellow-500 font-bold transition-all shadow-sm hover:shadow-md active:scale-95 flex items-center justify-center gap-2 group">
               <Volume2 className="group-hover:animate-pulse" /> Pedir Silencio
             </button>
@@ -231,19 +231,11 @@ export default function PanelInterface({ user }: { user: UserSession }) {
         </div>
 
         <div className="mt-auto space-y-4">
-          {/* Toggle Tema */}
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"
-          >
+          <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
             {mounted && (theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />)}
             Modo {mounted && (theme === 'dark' ? 'Día' : 'Noche')}
           </button>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all">
             <LogOut size={18} /> Cerrar Sesión
           </button>
         </div>
@@ -257,27 +249,22 @@ export default function PanelInterface({ user }: { user: UserSession }) {
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl flex flex-col h-[500px] transition-colors">
               <div className="flex items-center gap-2 mb-4">
-                <Bell size={20} className="text-blue-500 dark:text-blue-400" />
+                <Bell size={20} className="text-brand-500 dark:text-brand-400" />
                 <h3 className="font-bold text-slate-800 dark:text-white">En Espera</h3>
-                <span className="ml-auto bg-blue-100 dark:bg-blue-600 text-blue-700 dark:text-white text-xs px-2 py-1 rounded-full font-bold">{pendientes.length}</span>
+                <span className="ml-auto bg-brand-100 dark:bg-brand-600 text-brand-700 dark:text-white text-xs px-2 py-1 rounded-full font-bold">{pendientes.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                 {pendientes.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center p-4">
-                    <Bell className="h-10 w-10 mb-2 opacity-20" />
-                    <p>No hay turnos pendientes</p>
-                  </div>
+                  <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center p-4"><Bell className="h-10 w-10 mb-2 opacity-20" /><p>No hay turnos pendientes</p></div>
                 ) : (
                   pendientes.map((p) => (
-                    <div key={p.id_turno} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors group cursor-default">
+                    <div key={p.id_turno} className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 rounded-xl hover:bg-brand-50 dark:hover:bg-slate-800 transition-colors group cursor-default">
                       <div>
-                        <span className="font-mono font-bold text-lg text-slate-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors block">
-                          {p.prefijo_turno}-{String(p.numero_turno).padStart(3, '0')}
-                        </span>
+                        <span className="font-mono font-bold text-lg text-slate-700 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors block">{p.prefijo_turno}-{String(p.numero_turno).padStart(3, '0')}</span>
                         {/* @ts-ignore */}
                         <span className="text-slate-500 dark:text-slate-500 text-xs uppercase font-bold">{p.servicios?.nombre_servicio}</span>
                       </div>
-                      <div className="h-8 w-1 bg-blue-200 dark:bg-blue-500/20 rounded-full group-hover:bg-blue-500 transition-colors"></div>
+                      <div className="h-8 w-1 bg-brand-200 dark:bg-brand-500/20 rounded-full group-hover:bg-brand-500 transition-colors"></div>
                     </div>
                   ))
                 )}
@@ -289,28 +276,17 @@ export default function PanelInterface({ user }: { user: UserSession }) {
           <div className="lg:col-span-2 space-y-6">
 
             {/* TARJETA GIGANTE */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 md:p-12 text-center shadow-2xl relative overflow-hidden group transition-colors">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-
+           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] p-8 md:p-12 text-center shadow-2xl relative overflow-hidden group transition-colors">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-brand-500 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
               <p className="text-slate-400 uppercase tracking-[0.2em] text-xs font-bold mb-8">Turno en Curso</p>
-
               {turnoActual ? (
                 <div className="animate-in zoom-in duration-300">
-                  <div className="text-7xl md:text-9xl font-black text-slate-800 dark:text-white mb-4 tracking-tighter drop-shadow-sm dark:drop-shadow-2xl font-mono">
-                    {turnoActual.prefijo_turno}-{String(turnoActual.numero_turno).padStart(3, '0')}
-                  </div>
-
+                  <div className="text-7xl md:text-9xl font-black text-slate-800 dark:text-white mb-4 tracking-tighter drop-shadow-sm dark:drop-shadow-2xl font-mono">{turnoActual.prefijo_turno}-{String(turnoActual.numero_turno).padStart(3, '0')}</div>
                   <div className="space-y-2">
                     {/* @ts-ignore */}
-                    <p className="text-xl md:text-2xl text-blue-600 dark:text-blue-400 font-bold">
-                      {turnoActual.servicios?.nombre_servicio}
-                    </p>
+                    <p className="text-xl md:text-2xl text-brand-600 dark:text-brand-400 font-bold">{turnoActual.servicios?.nombre_servicio}</p>
                     {/* @ts-ignore */}
-                    {turnoActual.clientes && (
-                      <p className="text-slate-500 dark:text-slate-400 text-sm flex items-center justify-center gap-2">
-                        <User size={14} /> {turnoActual.clientes.nombre_completo}
-                      </p>
-                    )}
+                    {turnoActual.clientes && <p className="text-slate-500 dark:text-slate-400 text-sm flex items-center justify-center gap-2"><User size={14} /> {turnoActual.clientes.nombre_completo}</p>}
                   </div>
                 </div>
               ) : (

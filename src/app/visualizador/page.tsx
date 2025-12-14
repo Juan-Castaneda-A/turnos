@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import Ticker from '@/components/visualizador/Ticker'
 import StatusGrid from '@/components/visualizador/StatusGrid'
+import BrandingLogo from '@/components/ui/branding-logo'
 import { useTTS } from '@/hooks/useTTS' // <--- IMPORTAMOS EL HOOK 
 
 export default function VisualizadorPage() {
@@ -160,6 +161,11 @@ export default function VisualizadorPage() {
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white overflow-hidden relative flex flex-col items-center justify-center">
+      
+      {/* LOGO FLOTANTE (ESQUINA SUPERIOR DERECHA) */}
+      <div className="absolute top-6 right-8 z-50 animate-in fade-in slide-in-from-top-4 duration-1000">
+        <BrandingLogo className="h-24 w-auto drop-shadow-2xl" />
+      </div>
       
       {/* Fondo Animado */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950 z-0"></div>
