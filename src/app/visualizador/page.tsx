@@ -90,17 +90,65 @@ export default function VisualizadorPage() {
     })
   }
 
+  const playSilenceAudio = () => {
+    console.log("🤫 SOLICITUD DE SILENCIO RECIBIDA")
+    const audio = new Audio('/sounds/silencio.mp3')
+    audio.play().catch(e => console.error("Error al reproducir silencio:", e))
+    
+    // Opcional: Mostrar una alerta visual temporal en pantalla
+    const alertDiv = document.createElement('div')
+    alertDiv.innerText = "⚠️ POR FAVOR, GUARDAR SILENCIO ⚠️"
+    alertDiv.style.position = 'fixed'
+    alertDiv.style.top = '20%'
+    alertDiv.style.left = '50%'
+    alertDiv.style.transform = 'translate(-50%, -50%)'
+    alertDiv.style.backgroundColor = 'red'
+    alertDiv.style.color = 'white'
+    alertDiv.style.padding = '40px'
+    alertDiv.style.fontSize = '3rem'
+    alertDiv.style.fontWeight = 'bold'
+    alertDiv.style.borderRadius = '20px'
+    alertDiv.style.zIndex = '9999'
+    alertDiv.style.boxShadow = '0 0 50px rgba(255,0,0,0.5)'
+    document.body.appendChild(alertDiv)
+
+    setTimeout(() => {
+        document.body.removeChild(alertDiv)
+    }, 5000) // Quitar letrero a los 5 segundos
+  }
+  
   useEffect(() => {
     fetchData()
     resetCarousel()
 
-    // Realtime Suscription
+    // CORRECCIÓN: Escuchamos todo en 'sistema_turnos'
     const channel = supabase.channel('visualizador_v2_logic')
-      .on('broadcast', { event: 'nuevo_llamado' }, (payload) => {
-          // Escuchar el evento de broadcast directo es MÁS RÁPIDO que esperar el cambio en la DB
-          // Pero por seguridad, recargamos los datos igual
-          fetchData()
+      
+      // 1. Nuevo Llamado
+      .on('broadcast', { event: 'nuevo_llamado' }, () => {
+          console.log("📡 Recibido: Nuevo Llamado")
+          fetchData() // Recargar datos de la DB
       })
+      
+      // 2. Rellamar
+      .on('broadcast', { event: 'rellamar' }, (payload) => {
+          console.log("📡 Recibido: Rellamar", payload)
+          // Forzamos el anuncio incluso si el turno no ha cambiado en la DB
+          // Nota: payload.payload contiene los datos enviados
+          if (turnoActual) {
+             triggerAnnouncement(turnoActual)
+          } else {
+             fetchData() // Por si acaso
+          }
+      })
+      
+      // 3. Silencio
+      .on('broadcast', { event: 'silence_alert' }, () => {
+          console.log("📡 Recibido: Silencio")
+          playSilenceAudio()
+      })
+      
+      // 4. Cambios en la DB (Respaldo)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'turnos' }, fetchData)
       .subscribe()
 
@@ -108,7 +156,7 @@ export default function VisualizadorPage() {
         supabase.removeChannel(channel)
         if (carouselTimer.current) clearTimeout(carouselTimer.current)
     }
-  }, [])
+  }, [turnoActual])
 
   return (
     <div className="h-screen w-screen bg-slate-950 text-white overflow-hidden relative flex flex-col items-center justify-center">
