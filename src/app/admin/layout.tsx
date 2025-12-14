@@ -1,0 +1,67 @@
+// src/app/admin/layout.tsx
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import LogoutButton from '@/components/admin/LogoutButton'
+import Link from 'next/link'
+import {
+    LayoutDashboard, Users, MonitorSmartphone,
+    BarChart3, Settings, LogOut
+} from 'lucide-react'
+import { logoutAction } from '@/actions/auth'
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+    // 1. Protección de Ruta (Solo Admins)
+    const cookieStore = await cookies()
+    const session = cookieStore.get('turnos_session')
+
+    if (!session) redirect('/login')
+
+    const user = JSON.parse(session.value)
+    if (user.rol !== 'administrador') redirect('/funcionario/panel')
+
+    return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex">
+            {/* SIDEBAR FIJO */}
+            <aside className="w-64 border-r border-slate-800 bg-slate-900/50 flex flex-col fixed h-full">
+                <div className="p-6 border-b border-slate-800">
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                        Admin Panel
+                    </h1>
+                    <p className="text-xs text-slate-500 mt-1">Notaría 3ra</p>
+                </div>
+
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                    <AdminLink href="/admin" icon={<LayoutDashboard size={18} />}>Dashboard</AdminLink>
+                    <AdminLink href="/admin/usuarios" icon={<Users size={18} />}>Usuarios</AdminLink>
+                    <AdminLink href="/admin/modulos" icon={<MonitorSmartphone size={18} />}>Módulos</AdminLink>
+                    <AdminLink href="/admin/reportes" icon={<BarChart3 size={18} />}>Reportes</AdminLink>
+                    <div className="pt-4 mt-4 border-t border-slate-800">
+                        <AdminLink href="/admin/configuracion" icon={<Settings size={18} />}>Configuración</AdminLink>
+                    </div>
+                </nav>
+
+                <div className="p-4 border-t border-slate-800">
+                    <LogoutButton />
+                </div>
+            </aside>
+
+            {/* CONTENIDO DINÁMICO */}
+            <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen bg-slate-950">
+                {children}
+            </main>
+        </div>
+    )
+}
+
+// Componente pequeño para los links (para no repetir clases)
+function AdminLink({ href, icon, children }: { href: string, icon: React.ReactNode, children: React.ReactNode }) {
+    return (
+        <Link
+            href={href}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+        >
+            {icon}
+            {children}
+        </Link>
+    )
+}
