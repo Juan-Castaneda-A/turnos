@@ -2,6 +2,7 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import LogoutButton from '@/components/admin/LogoutButton'
+import ChatWidget from '@/components/chat/ChatWidget'
 import Link from 'next/link'
 import {
     LayoutDashboard, Users, MonitorSmartphone,
@@ -54,6 +55,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen bg-slate-950">
                 {children}
             </main>
+            <ChatWidget userId={user.id} userName={user.nombre} />
         </div>
     )
 }

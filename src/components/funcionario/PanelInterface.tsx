@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { logoutAction } from '@/actions/auth'
+import ChatWidget from '@/components/chat/ChatWidget'
 import { 
   Megaphone, RotateCcw, CheckCircle, LogOut, 
   User, MapPin, Bell, Loader2 
@@ -283,6 +284,8 @@ export default function PanelInterface({ user }: { user: UserSession }) {
 
         </div>
       </main>
+      {/* Agregamos el Chat aquí */}
+      <ChatWidget userId={user.id} userName={user.nombre} />
     </div>
   )
 }

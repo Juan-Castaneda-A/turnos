@@ -46,10 +46,10 @@ export default function KioscoPage() {
   const verificarCedula = async () => {
     if (cedula.length < 5) return alert("Cédula muy corta")
     setLoading(true)
-    
+
     // Buscamos si existe el cliente
     const { data } = await supabase.from('clientes').select('nombre_completo').eq('numero_identificacion', cedula).maybeSingle()
-    
+
     setLoading(false)
     if (data) {
       setNombre(data.nombre_completo)
@@ -61,7 +61,7 @@ export default function KioscoPage() {
 
   const registrarYPedirTurno = async (idServicio: number, nombreServicio: string) => {
     setLoading(true)
-    
+
     try {
       // 1. Guardar/Actualizar Cliente
       const { data: cliente } = await supabase.from('clientes').upsert({
@@ -81,9 +81,14 @@ export default function KioscoPage() {
 
       const datosTurno = turno[0] // El RPC devuelve un array
       const codigoTurno = `${datosTurno.prefijo_turno}-${String(datosTurno.numero_turno).padStart(3, '0')}`
-      
+
+      // --- NUEVO: Generar URL ---
+      // Nota: En local será localhost, en producción será tu dominio de Render
+      const baseUrl = window.location.origin
+      const trackingUrl = `${baseUrl}/t/${datosTurno.id_turno}`
+
       // 3. Imprimir Ticket (WebSocket Local)
-      imprimirTicket(codigoTurno, nombreServicio)
+      imprimirTicket(codigoTurno, nombreServicio, trackingUrl)
 
       // 4. Mostrar Éxito
       setMensajeTicket(codigoTurno)
@@ -105,11 +110,11 @@ export default function KioscoPage() {
     }
   }
 
-  const imprimirTicket = (turno: string, servicio: string) => {
+  const imprimirTicket = (turno: string, servicio: string, url: string) => {
     // Conexión con tu script de Python local
     const ws = new WebSocket('ws://localhost:8765')
     ws.onopen = () => {
-      ws.send(JSON.stringify({ turno, servicio }))
+      ws.send(JSON.stringify({ turno, servicio, qr_data: url }))
       ws.close()
     }
     ws.onerror = () => console.warn("No se detectó impresora local (WebSocket)")
@@ -119,7 +124,7 @@ export default function KioscoPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
-      
+
       {/* HEADER */}
       <div className="mb-10 text-center">
         <h1 className="text-4xl font-bold text-blue-500 mb-2">Notaría Tercera</h1>
@@ -130,21 +135,21 @@ export default function KioscoPage() {
       {step === 'cedula' && (
         <div className="w-full max-w-md animate-in fade-in zoom-in duration-300">
           <label className="block text-center text-xl mb-4">Ingrese su número de documento</label>
-          <input 
-            type="text" 
-            readOnly 
-            value={cedula} 
+          <input
+            type="text"
+            readOnly
+            value={cedula}
             className="w-full bg-slate-800 border-2 border-slate-600 rounded-xl p-4 text-center text-4xl font-mono tracking-widest focus:border-blue-500 outline-none mb-4"
             placeholder="Documento"
           />
-          <VirtualKeyboard 
-            mode="numeric" 
-            onKeyPress={handleKeyPress} 
-            onDelete={handleDelete} 
-            onEnter={verificarCedula} 
+          <VirtualKeyboard
+            mode="numeric"
+            onKeyPress={handleKeyPress}
+            onDelete={handleDelete}
+            onEnter={verificarCedula}
           />
-          <button 
-            onClick={verificarCedula} 
+          <button
+            onClick={verificarCedula}
             disabled={loading}
             className="w-full mt-6 bg-blue-600 hover:bg-blue-500 p-4 rounded-xl text-xl font-bold shadow-lg shadow-blue-900/20 disabled:opacity-50"
           >
@@ -157,18 +162,18 @@ export default function KioscoPage() {
       {step === 'nombre' && (
         <div className="w-full max-w-3xl animate-in fade-in slide-in-from-right duration-300">
           <label className="block text-center text-xl mb-4">Ingrese su Nombre Completo</label>
-          <input 
-            type="text" 
-            readOnly 
-            value={nombre} 
+          <input
+            type="text"
+            readOnly
+            value={nombre}
             className="w-full bg-slate-800 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl mb-4"
             placeholder="Su Nombre"
           />
-          <VirtualKeyboard 
-            mode="qwerty" 
-            onKeyPress={handleKeyPress} 
-            onDelete={handleDelete} 
-            onEnter={() => setStep('servicios')} 
+          <VirtualKeyboard
+            mode="qwerty"
+            onKeyPress={handleKeyPress}
+            onDelete={handleDelete}
+            onEnter={() => setStep('servicios')}
           />
         </div>
       )}
@@ -177,7 +182,7 @@ export default function KioscoPage() {
       {step === 'servicios' && (
         <div className="w-full max-w-5xl animate-in fade-in zoom-in duration-300">
           <h2 className="text-3xl text-center mb-8">Hola <span className="text-blue-400 font-bold">{nombre}</span>, ¿qué trámite realizará?</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {servicios.map((serv) => (
               <button
@@ -194,7 +199,7 @@ export default function KioscoPage() {
               </button>
             ))}
           </div>
-          
+
           <button onClick={() => setStep('cedula')} className="mt-10 mx-auto block text-slate-500 hover:text-white underline">
             Cancelar / Volver
           </button>
@@ -209,7 +214,7 @@ export default function KioscoPage() {
           </div>
           <h2 className="text-4xl font-bold text-white mb-2">¡Turno Generado!</h2>
           <p className="text-slate-400 text-xl mb-8">Por favor retire su ticket impreso.</p>
-          
+
           <div className="bg-white text-black p-6 rounded-xl w-64 mx-auto rotate-3 shadow-xl transform transition-transform hover:rotate-0">
             <div className="border-b-2 border-dashed border-gray-300 pb-4 mb-4">
               <p className="text-sm font-bold text-gray-500 uppercase">Su Turno</p>
