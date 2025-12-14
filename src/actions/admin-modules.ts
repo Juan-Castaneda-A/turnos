@@ -8,26 +8,31 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function createModuleAction(formData: FormData) {
+export async function createOrUpdateModuleAction(formData: FormData) {
+  const id = formData.get('id') as string
   const nombre = formData.get('nombre') as string
   const descripcion = formData.get('descripcion') as string
+  // Si estamos editando, el estado no se cambia aquí (se usa el Switch de la tabla), 
+  // pero si es nuevo, por defecto activo.
   const estado = formData.get('estado') === 'on' ? 'activo' : 'inactivo'
 
-  if (!nombre) return { success: false, message: 'El nombre es obligatorio' }
+  if (!nombre) return { success: false, message: 'Faltan datos' }
 
   try {
-    const { error } = await supabase.from('modulos').insert({
-      nombre_modulo: nombre,
-      descripcion: descripcion,
-      estado: estado
-    })
+    const moduleData = { nombre_modulo: nombre, descripcion: descripcion }
+    
+    // Solo asignamos estado si es nuevo (para no sobreescribir el switch accidentalmente)
+    if (!id) Object.assign(moduleData, { estado })
 
-    if (error) throw error
+    if (id) {
+      await supabase.from('modulos').update(moduleData).eq('id_modulo', id)
+    } else {
+      await supabase.from('modulos').insert(moduleData)
+    }
+
     revalidatePath('/admin/modulos')
-    return { success: true, message: 'Módulo creado' }
-  } catch (e: any) {
-    return { success: false, message: e.message }
-  }
+    return { success: true, message: id ? 'Módulo actualizado' : 'Módulo creado' }
+  } catch (e: any) { return { success: false, message: e.message } }
 }
 
 export async function toggleModuleStatusAction(id: number, nuevoEstado: boolean) {

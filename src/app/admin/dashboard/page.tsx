@@ -1,5 +1,7 @@
 // src/app/admin/page.tsx
 import { createClient } from '@supabase/supabase-js'
+import SilenceButton from '@/components/admin/SilenceButton'
+import RealtimeModulesTable from '@/components/admin/RealtimeModulesTable'
 import { Users, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 
 // Cliente Supabase (Server-side)
@@ -31,9 +33,13 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard General</h2>
-        <p className="text-slate-400 mt-1">Resumen de la operación en tiempo real.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-white">Dashboard General</h2>
+          <p className="text-slate-400 mt-1">Resumen de la operación en tiempo real.</p>
+        </div>
+        {/* AQUÍ ESTÁ EL BOTÓN DE SILENCIO */}
+        <SilenceButton />
       </div>
 
       {/* GRID DE TARJETAS (KPIS) */}
@@ -69,13 +75,19 @@ export default async function AdminDashboard() {
 
       </div>
 
+      {/* AQUÍ ESTÁ LA TABLA REALTIME */}
+      <div className="space-y-4">
+        <h3 className="text-xl font-bold text-white">Estado de Módulos</h3>
+        <RealtimeModulesTable />
+      </div>
+
       {/* AQUÍ IRÍA LA TABLA DE ESTADO EN TIEMPO REAL */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+      {/* <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
         <h3 className="text-lg font-medium text-white mb-4">Actividad Reciente</h3>
         <div className="h-64 flex items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-lg">
            Próximamente: Gráficos y Tabla Realtime
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }

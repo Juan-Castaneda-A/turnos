@@ -5,7 +5,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow 
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Trash2, Plus, Tag } from "lucide-react"
+import { Trash2, Plus, Tag, Pencil } from "lucide-react" // <--- Agregamos Pencil
 import { deleteServiceAction } from '@/actions/admin-services'
 import { toast } from 'sonner'
 import {
@@ -15,6 +15,17 @@ import ServiceForm from './ServiceForm'
 
 export default function ServicesTable({ services }: { services: any[] }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [selectedService, setSelectedService] = useState<any>(null) // <--- Estado para editar
+
+  const handleCreate = () => {
+    setSelectedService(null) // Limpiar
+    setIsOpen(true)
+  }
+
+  const handleEdit = (service: any) => {
+    setSelectedService(service) // Cargar datos
+    setIsOpen(true)
+  }
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Seguro que deseas eliminar este servicio?')) return
@@ -30,15 +41,17 @@ export default function ServicesTable({ services }: { services: any[] }) {
         
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-500 text-white">
+            {/* Usamos handleCreate */}
+            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-500 text-white">
               <Plus className="mr-2 h-4 w-4" /> Nuevo Servicio
             </Button>
           </DialogTrigger>
           <DialogContent className="bg-slate-900 text-white border-slate-800">
             <DialogHeader>
-              <DialogTitle>Crear Servicio</DialogTitle>
+              <DialogTitle>{selectedService ? 'Editar Servicio' : 'Crear Servicio'}</DialogTitle>
             </DialogHeader>
-            <ServiceForm onSuccess={() => setIsOpen(false)} />
+            {/* Pasamos initialData */}
+            <ServiceForm onSuccess={() => setIsOpen(false)} initialData={selectedService} />
           </DialogContent>
         </Dialog>
       </div>
@@ -67,9 +80,16 @@ export default function ServicesTable({ services }: { services: any[] }) {
                     </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(service.id_servicio)} className="text-red-400 hover:bg-red-950/50 hover:text-red-300">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    {/* Botón Editar */}
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(service)} className="text-blue-400 hover:bg-blue-950/50 hover:text-blue-300">
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                    {/* Botón Eliminar */}
+                    <Button variant="ghost" size="icon" onClick={() => handleDelete(service.id_servicio)} className="text-red-400 hover:bg-red-950/50 hover:text-red-300">
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

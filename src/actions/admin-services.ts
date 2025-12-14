@@ -8,24 +8,25 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-export async function createServiceAction(formData: FormData) {
+export async function createOrUpdateServiceAction(formData: FormData) {
+  const id = formData.get('id') as string
   const nombre = formData.get('nombre') as string
   const prefijo = formData.get('prefijo') as string
 
   if (!nombre || !prefijo) return { success: false, message: 'Faltan datos' }
 
   try {
-    const { error } = await supabase.from('servicios').insert({
-      nombre_servicio: nombre,
-      prefijo_ticket: prefijo.toUpperCase() // Siempre mayúsculas (ej: A, B, RC)
-    })
+    const data = { nombre_servicio: nombre, prefijo_ticket: prefijo.toUpperCase() }
+    
+    if (id) {
+      await supabase.from('servicios').update(data).eq('id_servicio', id)
+    } else {
+      await supabase.from('servicios').insert(data)
+    }
 
-    if (error) throw error
     revalidatePath('/admin/servicios')
-    return { success: true, message: 'Servicio creado exitosamente' }
-  } catch (e: any) {
-    return { success: false, message: e.message }
-  }
+    return { success: true, message: id ? 'Servicio actualizado' : 'Servicio creado' }
+  } catch (e: any) { return { success: false, message: e.message } }
 }
 
 export async function deleteServiceAction(id: number) {
