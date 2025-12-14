@@ -91,35 +91,23 @@ export default function PanelInterface({ user }: { user: UserSession }) {
     setLoadingAction(true)
 
     try {
-      // Buscar siguiente (Prioridad a reasignados)
-      let { data: siguiente } = await supabase
-        .from('turnos')
-        .select('id_turno')
-        .eq('estado', 'en espera')
-        .eq('id_modulo_reasignado', user.modulo) // Primero los transferidos a mí
-        .limit(1)
-        .maybeSingle()
+      // 1. LLAMAMOS AL RPC (La función inteligente que creamos en SQL)
+      const { data: turnos, error: rpcError } = await supabase.rpc('obtener_siguiente_turno', {
+        _id_modulo: user.modulo
+      })
+
+      if (rpcError) throw rpcError
+
+      // El RPC devuelve un array, tomamos el primero
+      const siguiente = turnos && turnos.length > 0 ? turnos[0] : null
 
       if (!siguiente) {
-        // Si no hay reasignados, busca general (Aquí deberías filtrar por servicios del módulo)
-        const res = await supabase
-          .from('turnos')
-          .select('id_turno')
-          .eq('estado', 'en espera')
-          .is('id_modulo_reasignado', null)
-          .order('hora_solicitud', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        siguiente = res.data
-      }
-
-      if (!siguiente) {
-        toast.info("No hay turnos en espera")
+        toast.info("No hay turnos pendientes para tus servicios asignados")
         return
       }
 
-      // Actualizar
-      const { error } = await supabase
+      // 2. ACTUALIZAMOS EL ESTADO DEL TURNO
+      const { error: updateError } = await supabase
         .from('turnos')
         .update({
           estado: 'en atencion',
@@ -128,18 +116,18 @@ export default function PanelInterface({ user }: { user: UserSession }) {
         })
         .eq('id_turno', siguiente.id_turno)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
-      // Broadcast manual para el visualizador (importante para que suene rápido)
-      await supabase.channel('turnos_channel').send({
+      // 3. BROADCAST PARA QUE SUENE EN EL TV
+      await supabase.channel('sistema_turnos').send({
         type: 'broadcast', event: 'nuevo_llamado', payload: { id_turno: siguiente.id_turno }
       })
 
-      toast.success("Turno llamado")
+      toast.success(`Llamando turno: ${siguiente.prefijo_turno}-${siguiente.numero_turno}`)
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
-      toast.error("Error al llamar")
+      toast.error("Error al llamar: " + e.message)
     } finally {
       setLoadingAction(false)
     }

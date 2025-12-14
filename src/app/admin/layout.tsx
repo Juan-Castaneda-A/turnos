@@ -6,7 +6,8 @@ import ChatWidget from '@/components/chat/ChatWidget'
 import Link from 'next/link'
 import {
     LayoutDashboard, Users, MonitorSmartphone,
-    BarChart3, Settings, LogOut, Briefcase, GitMerge, MessageSquareText, History, UserCircle
+    BarChart3, Settings, LogOut, Briefcase, GitMerge, 
+    MessageSquareText, History, UserCircle, ListOrdered
 } from 'lucide-react'
 import { logoutAction } from '@/actions/auth'
 
@@ -36,6 +37,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     <AdminLink href="/admin/usuarios" icon={<Users size={18} />}>Usuarios</AdminLink>
                     <AdminLink href="/admin/modulos" icon={<MonitorSmartphone size={18} />}>Módulos</AdminLink>
                     <AdminLink href="/admin/servicios" icon={<Briefcase size={18}/>}>Servicios</AdminLink>
+                    <AdminLink href="/admin/prioridades" icon={<ListOrdered size={18}/>}>Prioridades</AdminLink>
                     <AdminLink href="/admin/asignaciones" icon={<GitMerge size={18}/>}>Asignaciones</AdminLink>
                     <AdminLink href="/admin/reportes" icon={<BarChart3 size={18} />}>Reportes</AdminLink>
                     <AdminLink href="/admin/mensajes" icon={<MessageSquareText size={18}/>}>Mensajes TV</AdminLink>
