@@ -5,7 +5,7 @@ import LogoutButton from '@/components/admin/LogoutButton'
 import Link from 'next/link'
 import {
     LayoutDashboard, Users, MonitorSmartphone,
-    BarChart3, Settings, LogOut, Briefcase, GitMerge
+    BarChart3, Settings, LogOut, Briefcase, GitMerge, MessageSquareText, History, UserCircle
 } from 'lucide-react'
 import { logoutAction } from '@/actions/auth'
 
@@ -37,6 +37,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     <AdminLink href="/admin/servicios" icon={<Briefcase size={18}/>}>Servicios</AdminLink>
                     <AdminLink href="/admin/asignaciones" icon={<GitMerge size={18}/>}>Asignaciones</AdminLink>
                     <AdminLink href="/admin/reportes" icon={<BarChart3 size={18} />}>Reportes</AdminLink>
+                    <AdminLink href="/admin/mensajes" icon={<MessageSquareText size={18}/>}>Mensajes TV</AdminLink>
+                    <AdminLink href="/admin/historial" icon={<History size={18}/>}>Historial</AdminLink>
+                    <AdminLink href="/admin/clientes" icon={<UserCircle size={18}/>}>Clientes</AdminLink>
                     <div className="pt-4 mt-4 border-t border-slate-800">
                         <AdminLink href="/admin/configuracion" icon={<Settings size={18} />}>Configuración</AdminLink>
                     </div>
