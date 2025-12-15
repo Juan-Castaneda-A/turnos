@@ -8,7 +8,8 @@ import Link from 'next/link'
 import {
     LayoutDashboard, Users, MonitorSmartphone,
     BarChart3, Settings, LogOut, Briefcase, GitMerge,
-    MessageSquareText, History, UserCircle, ListOrdered
+    MessageSquareText, History, UserCircle, ListOrdered,
+    Megaphone
 } from 'lucide-react'
 import { logoutAction } from '@/actions/auth'
 
@@ -43,6 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                     <AdminLink href="/admin/historial" icon={<History size={18} />}>Historial</AdminLink>
                     <AdminLink href="/admin/clientes" icon={<UserCircle size={18} />}>Clientes</AdminLink>
                     <AdminLink href="/admin/apariencia" icon={<MonitorSmartphone size={18} />}>Apariencia</AdminLink>
+                    <AdminLink href="/admin/marketing" icon={<Megaphone size={18}/>}>Marketing TV</AdminLink>
                     <div className="pt-4 mt-4 border-t border-slate-800">
                         <AdminLink href="/admin/configuracion" icon={<Settings size={18} />}>Configuración</AdminLink>
                     </div>
