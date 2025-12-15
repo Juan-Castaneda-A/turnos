@@ -2,46 +2,68 @@ document.addEventListener('DOMContentLoaded', function () {
     // --- Referencias a los elementos del DOM ---
     const step1 = document.getElementById('step-1-identification');
     const step2 = document.getElementById('step-2-services');
+    
     const identificationInput = document.getElementById('numero_identificacion');
     const continueBtn = document.getElementById('continue-btn');
     const loadingMessage = document.getElementById('loading-message');
+    
+    // Elementos del Paso 2
     const welcomeUserMessage = document.getElementById('welcome-user-message');
     const fullNameContainer = document.getElementById('full-name-container');
     const fullNameInput = document.getElementById('nombre_completo');
     const serviceSelectionContainer = document.getElementById('service-selection-container');
-    const serviceButtons = document.querySelectorAll('.service-button');
-
-    // --- Lógica de Nuestro Teclado Numérico ---
-    const numericKeyboard = document.getElementById('custom-numeric-keyboard');
-    const qwertyKeyboard = document.getElementById('custom-qwerty-keyboard');
-
     const actionButtonsContainer = document.getElementById('action-buttons-container');
     const editNameBtn = document.getElementById('edit-name-btn');
     const cancelBtn = document.getElementById('cancel-btn');
+    const qwertyKeyboardContainer = document.getElementById('custom-qwerty-keyboard'); // Contenedor del teclado QWERTY
 
-    // Añadimos un solo event listener al contenedor del teclado
-    numericKeyboard.addEventListener('click', function(event) {
-        // Ignoramos clics que no sean en los botones
-        if (!event.target.matches('button')) {
-            return;
+    // --- Referencias Habeas Data ---
+    const habeasDataCheck = document.getElementById('habeas-data-check');
+    const legalModal = document.getElementById('legalModal');
+    const openModalBtn = document.getElementById('open-modal-btn');
+    const closeModalElements = document.querySelectorAll('.close-modal, .close-modal-btn');
+
+    // --- Lógica de Modal Legal ---
+    openModalBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        legalModal.style.display = 'block';
+    });
+
+    closeModalElements.forEach(el => {
+        el.addEventListener('click', () => {
+            legalModal.style.display = 'none';
+        });
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target == legalModal) {
+            legalModal.style.display = 'none';
         }
+    });
 
-        const button = event.target;
+    // --- TECLADO NUMÉRICO (Paso 1) ---
+    const numericKeyboard = document.getElementById('custom-numeric-keyboard');
+    
+    numericKeyboard.addEventListener('click', function(event) {
+        // Buscar el botón más cercano (por si clickean el ícono SVG dentro del botón)
+        const button = event.target.closest('button');
+        if (!button) return;
+
         const currentValue = identificationInput.value;
 
-        // Verificamos qué tipo de botón se presionó
         if (button.classList.contains('keypad-btn')) {
-            identificationInput.value += button.textContent;
+            identificationInput.value += button.textContent.trim();
         } else if (button.classList.contains('keypad-bksp')) {
             identificationInput.value = currentValue.slice(0, -1);
         } else if (button.classList.contains('keypad-enter')) {
-            // Simulamos un clic en el botón principal de "Continuar"
             continueBtn.click();
         }
     });
 
-    // Listener para el teclado QWERTY
-    qwertyKeyboard.addEventListener('click', async function(event) { //<-- Convertido a async
+    // --- TECLADO QWERTY (Paso 2) ---
+    const qwertyKeyboard = document.getElementById('custom-qwerty-keyboard');
+    
+    qwertyKeyboard.addEventListener('click', async function(event) {
         if (!event.target.matches('button')) return;
         
         const button = event.target;
@@ -55,15 +77,16 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (button.classList.contains('keypad-bksp')) {
             fullNameInput.value = currentValue.slice(0, -1);
         } else if (button.classList.contains('keypad-enter')) {
-            // **NUEVA LÓGICA DE GUARDADO AL PRESIONAR "LISTO"**
+            // Guardar Nombre Nuevo
             const newName = fullNameInput.value.trim();
             if (!newName) {
                 alert("Por favor, ingrese un nombre.");
                 return;
             }
 
-            loadingMessage.textContent = "Guardando nombre...";
-            loadingMessage.classList.remove('hidden');
+            // Feedback visual simple en el botón
+            const originalText = button.textContent;
+            button.textContent = "...";
             allKeys.forEach(key => key.disabled = true);
 
             try {
@@ -81,67 +104,78 @@ document.addEventListener('DOMContentLoaded', function () {
                     throw new Error(result.error || 'No se pudo guardar el nombre.');
                 }
                 
-                // Si todo salió bien, procedemos a mostrar los servicios
+                // Si guardó, mostramos servicios
                 showServices();
 
             } catch (error) {
                 console.error("Error al registrar el nombre:", error);
                 alert(`Error al guardar el nombre: ${error.message}`);
             } finally {
-                loadingMessage.classList.add('hidden');
-                loadingMessage.textContent = "Verificando..."; // Revertir texto
+                button.textContent = originalText;
                 allKeys.forEach(key => key.disabled = false);
             }
         }
     });
 
+    // --- BOTÓN CONTINUAR (Transición Principal) ---
     continueBtn.addEventListener('click', async function () {
+        // 1. Validación Habeas Data
+        if (!habeasDataCheck.checked) {
+            alert("⚠️ Por favor, acepte la Política de Tratamiento de Datos para continuar.");
+            habeasDataCheck.parentElement.classList.add('ring-2', 'ring-red-500');
+            setTimeout(() => habeasDataCheck.parentElement.classList.remove('ring-2', 'ring-red-500'), 1000);
+            return;
+        }
+
         const identificacion = identificationInput.value;
-        if (!identificacion) {
-            alert('Por favor, ingrese un número de identificación.');
+        if (!identificacion || identificacion.length < 4) {
+            alert('Por favor, ingrese un número de identificación válido.');
             return;
         }
 
         loadingMessage.classList.remove('hidden');
         continueBtn.disabled = true;
-        numericKeyboard.classList.add('hidden'); // Ocultamos el teclado
-
+        
         try {
             const response = await fetch(`/api/check-cliente/${identificacion}`);
             const data = await response.json();
 
-            step1.querySelector('label').classList.add('hidden');
-            step1.querySelector('.flex').classList.add('hidden');
-            step2.classList.remove('hidden');
-
-            actionButtonsContainer.classList.remove('hidden');
+            // --- CORRECCIÓN CLAVE AQUÍ ---
+            // En lugar de ocultar inputs individuales, ocultamos TODO el contenedor del Paso 1
+            step1.classList.add('hidden'); 
+            
+            // Mostramos TODO el contenedor del Paso 2
+            step2.classList.remove('hidden'); 
 
             if (data && data.nombre_completo) {
-                welcomeUserMessage.textContent = `Hola de nuevo, ${data.nombre_completo}!`;
+                // USUARIO EXISTENTE: Vamos directo a Servicios
+                welcomeUserMessage.textContent = `Hola de nuevo, ${data.nombre_completo}`;
                 fullNameInput.value = data.nombre_completo;
-                editNameBtn.classList.remove('hidden');
-                showServices();
+                
+                // Preparamos la vista
+                showServices(); 
+                
             } else {
+                // USUARIO NUEVO: Vamos al Teclado QWERTY
                 welcomeUserMessage.textContent = '¡Bienvenido!';
                 fullNameInput.value = '';
-                editNameBtn.classList.add('hidden');
+                
+                // Preparamos la vista
                 showFullNameInput();
-                // Aquí iría la lógica del teclado QWERTY
             }
+
         } catch (error) {
             console.error('Error al verificar el cliente:', error);
-            alert('Hubo un error al verificar la identificación.');
-            resetToStep1(); // Si hay un error, reseteamos
+            alert('Hubo un error de conexión. Intente nuevamente.');
+            resetToStep1(); 
         } finally {
             loadingMessage.classList.add('hidden');
             continueBtn.disabled = false;
         }
     });
 
+    // --- Botones de Acción Paso 2 ---
     editNameBtn.addEventListener('click', function() {
-        // Ocultamos los servicios y el botón de editar para mostrar el campo de nombre
-        serviceSelectionContainer.classList.add('hidden');
-        editNameBtn.classList.add('hidden');
         showFullNameInput();
     });
 
@@ -149,84 +183,59 @@ document.addEventListener('DOMContentLoaded', function () {
         resetToStep1();
     });
 
+    // --- FUNCIONES DE VISTA ---
+
     function showFullNameInput() {
+        // Configuración para escribir nombre
         fullNameContainer.classList.remove('hidden');
-        qwertyKeyboard.classList.remove('hidden');
-        fullNameInput.focus();
+        qwertyKeyboardContainer.classList.remove('hidden'); // Mostrar teclado
+        
+        serviceSelectionContainer.classList.add('hidden'); // Ocultar servicios
+        actionButtonsContainer.classList.add('hidden'); // Ocultar botones editar/cancelar (se muestra teclado)
+        
+        // Botón volver simple si quieren cancelar escritura
+        cancelBtn.classList.remove('hidden'); 
+        actionButtonsContainer.classList.remove('hidden'); 
+        editNameBtn.classList.add('hidden'); // No tiene sentido editar si ya estás editando
     }
 
     function showServices() {
-    const currentName = fullNameInput.value; // 1. Lee el nombre que está en el campo de texto
-    if (!currentName.trim()) {
-        alert("Por favor, ingrese un nombre válido.");
-        return;
-    }
-    
-    // 2. Actualiza el mensaje de bienvenida SIEMPRE con ese nombre
-    //    Esta es la línea clave que arregla el bug.
-    welcomeUserMessage.textContent = `Hola, ${currentName}!`;
+        const currentName = fullNameInput.value; 
+        
+        // Actualizar saludo
+        welcomeUserMessage.textContent = `Hola, ${currentName}`;
 
-    // 3. Oculta el teclado y el input de nombre
-    qwertyKeyboard.classList.add('hidden');
-    fullNameContainer.classList.add('hidden');
+        // Ocultar herramientas de entrada
+        qwertyKeyboardContainer.classList.add('hidden');
+        fullNameContainer.classList.add('hidden');
 
-    // 4. Muestra los servicios Y el botón de editar
-    serviceSelectionContainer.classList.remove('hidden');
-    editNameBtn.classList.remove('hidden');
-    serviceButtons.forEach(button => button.disabled = false);
+        // Mostrar herramientas de selección
+        serviceSelectionContainer.classList.remove('hidden');
+        
+        // Mostrar barra de acciones
+        actionButtonsContainer.classList.remove('hidden');
+        editNameBtn.classList.remove('hidden');
+        cancelBtn.classList.remove('hidden');
     }
 
     function resetToStep1() {
-        // Ocultar paso 2 y sus componentes
+        // Ocultar Paso 2 completo
         step2.classList.add('hidden');
+        
+        // Resetear estados internos del Paso 2
         welcomeUserMessage.textContent = '';
         fullNameContainer.classList.add('hidden');
         serviceSelectionContainer.classList.add('hidden');
         actionButtonsContainer.classList.add('hidden');
-        editNameBtn.classList.add('hidden');
 
         // Limpiar inputs
         identificationInput.value = '';
         fullNameInput.value = '';
+        
+        // Reset Checkbox
+        habeasDataCheck.checked = false; 
 
-        // Mostrar paso 1 y sus componentes
-        step1.querySelector('label').classList.remove('hidden');
-        step1.querySelector('.flex').classList.remove('hidden');
-        numericKeyboard.classList.remove('hidden');
+        // Mostrar Paso 1 completo
+        step1.classList.remove('hidden');
     }
 });
-
-/* arguments: _id_servicio integer
-
-DECLARE
-  prefijo_ticket TEXT;
-  nuevo_numero_turno INT;
-  nuevo_turno turnos%ROWTYPE;
-BEGIN
-  -- 1. Obtener el prefijo del servicio Y BLOQUEAR LA FILA DE ESE SERVICIO.
-  -- Esto previene que otra transacción intente crear un turno para el MISMO servicio al mismo tiempo.
-  SELECT s.prefijo_ticket INTO prefijo_ticket
-  FROM public.servicios s
-  WHERE s.id_servicio = _id_servicio
-  FOR UPDATE; -- El bloqueo ahora se aplica a la fila de la tabla 'servicios'.
-
-  -- Si el servicio no existe, la consulta no encontrará filas y la función terminará.
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'El servicio con id % no existe', _id_servicio;
-  END IF;
-
-  -- 2. Calcular el siguiente número. Esta operación ahora es segura porque la fila del servicio está bloqueada.
-  -- Ya no se necesita el "FOR UPDATE" aquí.
-  SELECT COALESCE(MAX(t.numero_turno), 0) + 1 INTO nuevo_numero_turno
-  FROM public.turnos t
-  WHERE t.prefijo_turno = prefijo_ticket;
-
-  -- 3. Insertar el nuevo turno y devolver la fila creada
-  INSERT INTO public.turnos (numero_turno, prefijo_turno, id_servicio, estado)
-  VALUES (nuevo_numero_turno, prefijo_ticket, _id_servicio, 'en espera')
-  RETURNING * INTO nuevo_turno;
-
-  RETURN nuevo_turno;
-END;
-
-*/

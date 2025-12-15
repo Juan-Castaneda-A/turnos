@@ -5,3 +5,7 @@ README.md
 README.md
 venv/
 .env
+node_modules
+/.next
+next-env.d.ts
+.env.local
