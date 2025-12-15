@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fullNameInput.value = '';
         
         // Reset Checkbox
-        habeasDataCheck.checked = false; 
+        habeasDataCheck.checked = true; 
 
         // Mostrar Paso 1 completo
         step1.classList.remove('hidden');
